@@ -37,3 +37,4 @@
 # project specific files
 sudoku-solver
 Makefile.bak
+out.txt
