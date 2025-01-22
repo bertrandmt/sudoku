@@ -30,3 +30,10 @@
 *.exe
 *.out
 *.app
+
+# Vi swap files
+*.swp
+
+# project specific files
+sudoku-solver
+Makefile.bak
