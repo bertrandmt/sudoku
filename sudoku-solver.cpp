@@ -46,6 +46,18 @@ int main(void) {
 
         std::cout << b << std::endl;
 
+        for (auto pr = b.row_begin(); pr != b.row_end(); ++pr) {
+            std::cout << *pr << std::endl;
+        }
+
+        Column col(b, 2);
+        std::cout << col << std::endl;
+
+        for (auto pc = b.column_begin(); pc != b.column_end(); ++pc) {
+            std::cout << *pc << std::endl;
+        }
+
+        b.autonote(0, 1);
         b.autonote();
     }
 

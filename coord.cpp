@@ -3,6 +3,6 @@
 #include "coord.h"
 
 std::ostream& operator<< (std::ostream& outs, const Coord &c) {
-    return outs << "[" << c.line() << ", " << c.column() << "]";
+    return outs << "[" << c.row() << ", " << c.column() << "]";
 }
 

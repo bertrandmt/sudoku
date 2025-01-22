@@ -6,15 +6,15 @@
 
 class Coord {
 public:
-    Coord(size_t line, size_t column)
-        : mLine(line)
+    Coord(size_t row, size_t column)
+        : mRow(row)
         , mColumn(column) {}
 
-    size_t line() const { return mLine; }
+    size_t row() const { return mRow; }
     size_t column() const { return mColumn; }
 
 private:
-    const size_t mLine;
+    const size_t mRow;
     const size_t mColumn;
 };
 
