@@ -84,29 +84,4 @@ std::ostream& operator<<(std::ostream& outs, const Board &b) {
     return outs;
 }
 
-std::ostream& operator<<(std::ostream& outs, const Row &r) {
-    outs << "+-----+-----+-----++-----+-----+-----++-----+-----+-----+"
-         << std::endl;
-    for (auto l = 0; l < 3; l++) {
-        for (auto const &c : r) {
-            outs << (c.coord().column() % 3 == 0 ? "[" : "|")
-                 << c
-                 << (c.coord().column() % 3 == 2 ? "]" : "");
-        }
-        outs << std::endl;
-    }
-    outs << "+-----+-----+-----++-----+-----+-----++-----+-----+-----+"
-         << std::endl;
-    return outs;
-}
 
-std::ostream& operator<<(std::ostream& outs, const Column &col) {
-    for (auto const &c : col) {
-        outs << "+-----+" << std::endl;
-        for (auto l = 0; l < 3; l++) {
-            outs << "|" << c << "|" << std::endl;
-        }
-    }
-    outs << "+-----+" << std::endl;
-    return outs;
-}
