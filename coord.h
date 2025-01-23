@@ -13,9 +13,13 @@ public:
     size_t row() const { return mRow; }
     size_t column() const { return mColumn; }
 
+    bool operator==(const Coord &other) const {
+        return mRow == other.mRow
+            && mColumn == other.mColumn;
+    }
 private:
-    const size_t mRow;
-    const size_t mColumn;
+    size_t mRow;
+    size_t mColumn;
 };
 
 std::ostream& operator<< (std::ostream& outs, const Coord &);

@@ -28,11 +28,11 @@ public:
             , mIndex(rowIndex * board.width)
             , mStart(mIndex)
             , mSentinel(mIndex + board.width) { }
-        Iterator(const Iterator &i, size_t index)
-            : pCells(i.pCells)
+        Iterator(const Iterator &other, size_t index)
+            : pCells(other.pCells)
             , mIndex(index)
-            , mStart(i.mStart)
-            , mSentinel(i.mSentinel) { }
+            , mStart(other.mStart)
+            , mSentinel(other.mSentinel) { }
 
         reference operator*() const { return pCells->at(mIndex); }
 

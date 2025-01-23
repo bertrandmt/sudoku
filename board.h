@@ -16,17 +16,15 @@ class Board {
 public:
     Board();
 
-    const size_t width = 9;
-    const size_t height = 9;
+    static const size_t width = 9;
+    static const size_t height = 9;
 
     Cell &at(size_t row, size_t col);
     const Cell &at(size_t row, size_t col) const;
 
-    void autonote(size_t row, size_t col);
     void autonote();
 
-    //***
-    // Cell iterator over all cells
+
     using Iterator = std::vector<Cell>::iterator;
 
     auto begin() { return mCells.begin(); }
@@ -35,8 +33,7 @@ public:
     auto begin() const { return mCells.begin(); }
     auto end() const { return mCells.end(); }
 
-    //***
-    // Row iterator
+
     using RowIterator = std::vector<Row>::iterator;
 
     auto row_begin() { return mRows.begin(); }
@@ -45,8 +42,7 @@ public:
     auto row_begin() const { return mRows.begin(); }
     auto row_end() const { return mRows.end(); }
 
-    //***
-    // Column iterator
+
     using ColumnIterator = std::vector<Column>::iterator;
 
     auto column_begin() { return mColumns.begin(); }
@@ -55,15 +51,30 @@ public:
     auto column_begin() const { return mColumns.begin(); }
     auto column_end() const { return mColumns.end(); }
 
+
+    using NonetIterator = std::vector<Nonet>::iterator;
+
+    auto nonet_begin() { return mNonets.begin(); }
+    auto nonet_end() { return mNonets.end(); }
+
+    auto nonet_begin() const { return mNonets.begin(); }
+    auto nonet_end() const { return mNonets.end(); }
+
+
     friend std::ostream& operator<< (std::ostream& outs, const Board &);
     friend class Row;
     friend class Column;
+    friend class Nonet;
 
 private:
     static_assert(std::forward_iterator<Iterator>);
+    static_assert(std::forward_iterator<RowIterator>);
+    static_assert(std::forward_iterator<ColumnIterator>);
+
     std::vector<Cell> mCells;
     std::vector<Row> mRows;
     std::vector<Column> mColumns;
+    std::vector<Nonet> mNonets;
 };
 
 #include "row.h"

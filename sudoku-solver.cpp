@@ -45,7 +45,7 @@ int main(void) {
         b.at(8, 7) = Cell::kSix;
 
         std::cout << b << std::endl;
-
+#if 0
         for (auto pr = b.row_begin(); pr != b.row_end(); ++pr) {
             std::cout << *pr << std::endl;
         }
@@ -57,8 +57,19 @@ int main(void) {
             std::cout << *pc << std::endl;
         }
 
+        Coord c(5, 1);
+        Nonet n(b, c);
+        std::cout << n << std::endl;
+
+        for (auto pn = b.nonet_begin(); pn != b.nonet_end(); ++pn) {
+            std::cout << *pn << std::endl;
+        }
+
         b.autonote(0, 1);
+#endif
+
         b.autonote();
+        std::cout << b << std::endl;
     }
 
     return 0;
