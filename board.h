@@ -22,8 +22,13 @@ public:
     Cell &at(size_t row, size_t col);
     const Cell &at(size_t row, size_t col) const;
 
-    void autonote();
+    const Row &rowForCell(const Cell &c) const;
+    const Column &columnForCell(const Cell &c) const;
+    const Nonet &nonetForCell(const Cell &c) const;
 
+    void autonote();
+    bool naked_single();
+    bool hidden_single();
 
     using Iterator = std::vector<Cell>::iterator;
 

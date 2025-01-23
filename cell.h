@@ -2,46 +2,65 @@
 // See LICENSE for details of BSD 3-Clause License
 #pragma once
 
+#include <cassert>
 #include <string>
 #include <vector>
 
 #include "coord.h"
 
+enum Value: int {
+    kUnset = 0,
+    kOne,
+    kTwo,
+    kThree,
+    kFour,
+    kFive,
+    kSix,
+    kSeven,
+    kEight,
+    kNine,
+};
+
+class Cell;
+
+class Notes {
+public:
+    Notes()
+        : mNotes(kNine, true) { }
+
+    void clear() { mNotes.clear(); }
+
+    bool check(const Value &v) const { return mNotes.at(v - 1); }
+    bool set(const Value &v, bool set);
+
+    size_t count() const;
+    std::vector<Value> values() const;
+
+private:
+    std::vector<bool> mNotes;
+};
+
 class Cell {
 public:
-    enum Value: int {
-        kUnset = 0,
-        kOne,
-        kTwo,
-        kThree,
-        kFour,
-        kFive,
-        kSix,
-        kSeven,
-        kEight,
-        kNine,
-    };
-
     Cell(size_t line, size_t column)
         : mCoord(line, column)
-        , mValue(kUnset)
-        , mNotes(kNine, true) { }
+        , mValue(kUnset) { }
 
     const Coord &coord() const { return mCoord; }
     Value value() const { return mValue; }
-    std::vector<bool> notes() const { return mNotes; }
+    Notes &notes() { assert(mValue == kUnset); return mNotes; }
+    const Notes &notes() const { assert(mValue == kUnset); return mNotes; }
 
     Cell &operator=(const Value &v);
-    bool note(const Value &v) const;
-    bool note(const Value &v, bool set);
 
     friend std::ostream& operator<< (std::ostream& outs, const Cell &);
 private:
     const Coord mCoord;
 
     Value mValue;
-    std::vector<bool> mNotes;
+    Notes mNotes;
 
+    // horrible hack for operator<< and multiline representation
     mutable size_t mPass = 0;
 };
 
