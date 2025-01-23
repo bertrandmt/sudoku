@@ -11,11 +11,15 @@ namespace {
 
 void help(void) {
     std::cout << "Enter table entries in the format:" << std::endl
-              << "    rcv" << std::endl
+              << "    rcv[;...]" << std::endl
               << "  where:" << std::endl
               << "    * \"r\" is the row, with value between 1 and 9, and" << std::endl
               << "    * \"c\" is the column, with value between 1 and 9, and" << std::endl
-              << "    * \"v\" is the value, with value between 1 and 9." << std::endl;
+              << "    * \"v\" is the value, with value between 1 and 9." << std::endl
+              << "Several entries on one line, separated by semicolons, are allowed." << std::endl
+              << std::endl
+              << "Other commands:" << std::endl
+              << "  '%'     run one step of auto-solving" << std::endl;
 }
 
 bool record_entry(Board &board, const std::string &entry) {
@@ -87,6 +91,20 @@ void record_entries(Board &board, const std::string &entries) {
     std::cout << board << std::endl;
 }
 
+void autosolve_one_step(Board &board) {
+    if (board.naked_single()) {
+        std::cout << board << std::endl;
+        return;
+    }
+
+    if (board.hidden_single()) {
+        std::cout << board << std::endl;
+        return;
+    }
+
+    std::cout << "No autosolve step made progress :(" << std::endl;
+}
+
 bool routine(Board &board) {
     bool done = false;
 
@@ -122,7 +140,13 @@ bool routine(Board &board) {
         case '9': // it's recording one or more entries
             record_entries(board, nowsline);
             break;
+
+        case '%': // auto-solve one step
+            autosolve_one_step(board);
+            break;
+
         default:
+            help();
             break;
     }
 
@@ -182,6 +206,7 @@ int main(void) {
         b.at(8, 7) = kSix;
 
         // a.k.a 121;149;168;177;218;293;329;465;517;523;542;566;578;599;622;648;657;676;685;741;795;812;836;939;986
+
         b.autonote();
         std::cout << b << std::endl;
 #if 0
