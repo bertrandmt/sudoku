@@ -154,7 +154,7 @@ void Board::autonote() {
 bool Board::naked_single() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
     // A naked single arises when there is only one possible candidate for a cell
-    size_t naked_single_count(0);
+    bool found_naked_single = false;
 
     for (auto &c : *this) {
         if (c.isValue()) continue; // only considering note cells
@@ -167,16 +167,17 @@ bool Board::naked_single() {
         std::cout << "[NS] cell" << c.coord() << " = " << v << std::endl;
         c = v;
         autonote(c);
-        naked_single_count++;
+        found_naked_single = true;
+        break;
     }
 
-    return naked_single_count != 0;
+    return found_naked_single;
 }
 
 bool Board::hidden_single() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
     // A hidden single arises when there is only one possible cell for a candidate
-    size_t hidden_single_count(0);
+    bool found_hidden_single = false;
 
     for (auto &c : *this) {
         if (c.isValue()) continue; // only considering note cells
@@ -185,8 +186,7 @@ bool Board::hidden_single() {
         const Column &column = columnForCell(c);
         const Nonet &nonet = nonetForCell(c);
 
-        std::vector<Value> vs = c.notes().values();
-        for (auto const &v : vs) { // for each candidate value in this cell
+        for (auto const &v : c.notes().values()) { // for each candidate value in this cell
             // check this row
             bool other_possible_cell_candidate = false;
             for (auto const &c1 : row) {
@@ -202,7 +202,7 @@ bool Board::hidden_single() {
                 std::cout << "[HS] cell" << c.coord() << " = " << v << " [r]" << std::endl;
                 c = v;
                 autonote(c);
-                hidden_single_count++;
+                found_hidden_single = true;
                 break;
             }
 
@@ -221,7 +221,7 @@ bool Board::hidden_single() {
                 std::cout << "[HS] cell" << c.coord() << " = " << v << " [c]" << std::endl;
                 c = v;
                 autonote(c);
-                hidden_single_count++;
+                found_hidden_single = true;
                 break;
             }
 
@@ -240,13 +240,14 @@ bool Board::hidden_single() {
                 std::cout << "[HS] cell" << c.coord() << " = " << v << " [n]" << std::endl;
                 c = v;
                 autonote(c);
-                hidden_single_count++;
+                found_hidden_single = true;
                 break;
             }
         }
+        if (found_hidden_single) break;
     }
 
-    return hidden_single_count != 0;
+    return found_hidden_single;
 }
 
 std::ostream& operator<<(std::ostream& outs, const Board &b) {
