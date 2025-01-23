@@ -30,6 +30,15 @@ Board::Board() {
         mColumns.push_back(c);
     }
     assert(mColumns.size() == width);
+
+    for (size_t row = 0; row < height; row += Nonet::height) {
+        for (size_t col = 0; col < width; col += Nonet::width) {
+            Coord c(row, col);
+            Nonet n(*this, c);
+            mNonets.push_back(n);
+        }
+    }
+    assert(mNonets.size() == (height / Nonet::height) * (width / Nonet::width));
 }
 
 Cell &Board::at(size_t row, size_t col) {
@@ -50,18 +59,39 @@ const Cell &Board::at(size_t row, size_t col) const {
     return c;
 }
 
-void Board::autonote(size_t row, size_t col) {
-    Cell &c(at(row, col));
-    if (c.value() != Cell::kUnset) {
-        std::cout << "Cell at " << c.coord() << " already set to " << c.value() << std::endl;
-        return;
-    }
-}
-
 void Board::autonote() {
     for (auto &c : *this) {
-        if (c.value() != Cell::kUnset) {
-            std::cout << "Cell at " << c.coord() << " already set to " << c.value() << std::endl;
+        if (c.value() != Cell::kUnset) continue;
+
+        // process row
+        Row row(*this, c.coord().row());
+        for (auto const &c1 : row) {
+            if (c1.value() == Cell::kUnset) continue;
+            if (!c.note(c1.value())) continue;
+
+            std::cout << "[AN] note" << c.coord() << " XXX " << c1.value()
+                      << " in row at " << c1.coord() << std::endl;
+            c.note(c1.value(), false);
+        }
+        // process column
+        Column col(*this, c.coord().column());
+        for (auto const &c1 : col) {
+            if (c1.value() == Cell::kUnset) continue;
+            if (!c.note(c1.value())) continue;
+
+            std::cout << "[AN] note" << c.coord() << " XXX " << c1.value()
+                      << " in column at " << c1.coord() << std::endl;
+            c.note(c1.value(), false);
+        }
+        // process nonet
+        Nonet nonet(*this, c.coord());
+        for (auto const &c1 : nonet) {
+            if (c1.value() == Cell::kUnset) continue;
+            if (!c.note(c1.value())) continue;
+
+            std::cout << "[AN] note" << c.coord() << " XXX " << c1.value()
+                      << " in nonet at " << c1.coord() << std::endl;
+            c.note(c1.value(), false);
         }
     }
 }

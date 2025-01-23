@@ -14,6 +14,12 @@ Cell &Cell::operator=(const Cell::Value &v) {
     return *this;
 }
 
+bool Cell::note(const Cell::Value &v) const {
+    assert(mValue == Cell::kUnset);
+
+    return mNotes.at(v - 1);
+}
+
 bool Cell::note(const Cell::Value &v, bool set) {
     assert(mValue == Cell::kUnset);
 

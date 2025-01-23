@@ -32,6 +32,7 @@ public:
     std::vector<bool> notes() const { return mNotes; }
 
     Cell &operator=(const Value &v);
+    bool note(const Value &v) const;
     bool note(const Value &v, bool set);
 
     friend std::ostream& operator<< (std::ostream& outs, const Cell &);
