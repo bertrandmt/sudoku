@@ -6,7 +6,7 @@
 #include <cassert>
 
 Cell &Cell::operator=(const Value &v) {
-    assert(mValue == kUnset);
+    assert(isNote());
 
     mNotes.clear();
     mValue = v;
@@ -47,7 +47,7 @@ std::ostream& operator<< (std::ostream& outs, const Cell &c) {
     assert(c.mPass < 3);
     switch (c.mPass) {
     case 0:
-        if (c.mValue == kUnset) {
+        if (c.isNote()) {
             outs << (c.mNotes.check(kOne)   ? "* " : "  ")
                  << (c.mNotes.check(kTwo)   ? "* " : "  ")
                  << (c.mNotes.check(kThree) ? "*"  : " ");
@@ -57,7 +57,7 @@ std::ostream& operator<< (std::ostream& outs, const Cell &c) {
         }
         break;
     case 1:
-        if (c.mValue == kUnset) {
+        if (c.isNote()) {
             outs << (c.mNotes.check(kFour) ? "* " : "  ")
                  << (c.mNotes.check(kFive) ? "* " : "  ")
                  << (c.mNotes.check(kSix)  ? "*"  : " ");
@@ -67,7 +67,7 @@ std::ostream& operator<< (std::ostream& outs, const Cell &c) {
         }
         break;
     case 2:
-        if (c.mValue == kUnset) {
+        if (c.isNote()) {
             outs << (c.mNotes.check(kSeven) ? "* " : "  ")
                  << (c.mNotes.check(kEight) ? "* " : "  ")
                  << (c.mNotes.check(kNine)  ? "*"  : " ");

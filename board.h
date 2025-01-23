@@ -26,6 +26,7 @@ public:
     const Column &columnForCell(const Cell &c) const;
     const Nonet &nonetForCell(const Cell &c) const;
 
+    void autonote(Cell &c);
     void autonote();
     bool naked_single();
     bool hidden_single();

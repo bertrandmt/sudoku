@@ -46,10 +46,13 @@ public:
         : mCoord(line, column)
         , mValue(kUnset) { }
 
+    bool isNote() const { return mValue == kUnset; }
+    bool isValue() const { return !isNote(); }
+
     const Coord &coord() const { return mCoord; }
     Value value() const { return mValue; }
-    Notes &notes() { assert(mValue == kUnset); return mNotes; }
-    const Notes &notes() const { assert(mValue == kUnset); return mNotes; }
+    Notes &notes() { assert(isNote()); return mNotes; }
+    const Notes &notes() const { assert(isNote()); return mNotes; }
 
     Cell &operator=(const Value &v);
 
