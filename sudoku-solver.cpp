@@ -19,7 +19,9 @@ void help(void) {
               << "Several entries on one line, separated by semicolons, are allowed." << std::endl
               << std::endl
               << "Other commands:" << std::endl
-              << "  '%'     run one step of auto-solving" << std::endl;
+              << "  '$'     run one step of auto-solving" << std::endl
+              << "  '%'     run auto-solving until blocked (or done)" << std::endl
+              << "  'xrcv'  edit note at row 'r' and column 'c' and unset value 'v'" << std::endl;
 }
 
 bool record_entry(Board &board, const std::string &entry) {
@@ -91,18 +93,78 @@ void record_entries(Board &board, const std::string &entries) {
     std::cout << board << std::endl;
 }
 
-void autosolve_one_step(Board &board) {
+bool autosolve_one_step(Board &board) {
     if (board.naked_single()) {
         std::cout << board << std::endl;
-        return;
+        return true;
     }
 
     if (board.hidden_single()) {
         std::cout << board << std::endl;
+        return true;
+    }
+
+    return false;
+}
+
+void autosolve(Board &board) {
+    while (autosolve_one_step(board)) ;
+}
+
+void edit_note(Board &board, const std::string &entry) {
+    if (entry.size() != 4) {
+        help();
         return;
     }
 
-    std::cout << "No autosolve step made progress :(" << std::endl;
+    size_t row = 0;
+    switch (entry[1]) {
+        case '1': row = 0; break;
+        case '2': row = 1; break;
+        case '3': row = 2; break;
+        case '4': row = 3; break;
+        case '5': row = 4; break;
+        case '6': row = 5; break;
+        case '7': row = 6; break;
+        case '8': row = 7; break;
+        case '9': row = 8; break;
+        default: help(); return;
+    }
+    size_t col = 0;
+    switch (entry[2]) {
+        case '1': col = 0; break;
+        case '2': col = 1; break;
+        case '3': col = 2; break;
+        case '4': col = 3; break;
+        case '5': col = 4; break;
+        case '6': col = 5; break;
+        case '7': col = 6; break;
+        case '8': col = 7; break;
+        case '9': col = 8; break;
+        default: help(); return;
+    }
+    Value val = kUnset;
+    switch (entry[3]) {
+        case '1': val = kOne; break;
+        case '2': val = kTwo; break;
+        case '3': val = kThree; break;
+        case '4': val = kFour; break;
+        case '5': val = kFive; break;
+        case '6': val = kSix; break;
+        case '7': val = kSeven; break;
+        case '8': val = kEight; break;
+        case '9': val = kNine; break;
+        default: help(); return;
+    }
+
+    Cell &c = board.at(row, col);
+    if (!c.isNote()) {
+        std::cout << "note" << c.coord() << " is a value cell, not a note cell" << std::endl;
+        return;
+    }
+
+    c.notes().set(val, false);
+    std::cout << board << std::endl;
 }
 
 bool routine(Board &board) {
@@ -141,8 +203,17 @@ bool routine(Board &board) {
             record_entries(board, nowsline);
             break;
 
-        case '%': // auto-solve one step
+        case '$': // auto-solve one step
             autosolve_one_step(board);
+            break;
+
+        case '%': // auto-solve until blocked (or finished)
+            autosolve(board);
+            break;
+
+        case 'x':
+        case 'X': // edit a note
+            edit_note(board, nowsline);
             break;
 
         default:
