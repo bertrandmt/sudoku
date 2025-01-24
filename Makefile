@@ -20,7 +20,7 @@ depend:
 
 .PHONY: clean
 clean:
-	rm -f $(src:%.cpp=%.o)
+	rm -f $(src:%.cpp=%.o) sudoku-solver.o
 
 # DO NOT DELETE
 
