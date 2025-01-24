@@ -17,6 +17,8 @@ public:
         , mCellStart(index * board.width)
         , mCellSentinel(index * board.width + board.width) { }
 
+    std::string tag() const { return "r"; }
+
     class Iterator {
     public:
         using difference_type = std::ptrdiff_t;
