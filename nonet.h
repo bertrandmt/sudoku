@@ -17,7 +17,8 @@ public:
     Nonet(Board &board, const Coord &coord)
         : mBoard(board)
         , mCoord((coord.row()    / height) * height,
-                 (coord.column() / width)  * width) { }
+                 (coord.column() / width)  * width)
+        , mSentinel(mCoord.row() + height, mCoord.column()) { }
 
     class Iterator {
     public:
@@ -27,20 +28,14 @@ public:
         using reference = element_type&;
 
         Iterator()
-            : mStart(0, 0)
-            , mSentinel(0, 0)
-            , mIndex(0, 0) { throw std::runtime_error("Not implemented"); }
+            : mIndex(0, 0) { throw std::runtime_error("Not implemented"); }
         Iterator(Board &board, const Coord &origin)
             : pCells(&board.mCells)
             , mWidth(board.width)
-            , mStart(origin)
-            , mSentinel(origin.row() + height, origin.column())
             , mIndex(origin) { }
         Iterator(const Iterator &other, const Coord &index)
             : pCells(other.pCells)
             , mWidth(other.mWidth)
-            , mStart(other.mStart)
-            , mSentinel(other.mSentinel)
             , mIndex(index) { }
 
         reference operator*() const { return pCells->at(mIndex.row() * mWidth + mIndex.column()); }
@@ -67,21 +62,17 @@ public:
                 || mIndex != other.mIndex;
         }
 
-        auto begin() { return Iterator(*this, mStart); }
-        auto end() { return Iterator(*this, mSentinel); }
-
     private:
         std::vector<Cell> *pCells;
         size_t mWidth;
-        Coord mStart, mSentinel;
         Coord mIndex;
     };
 
-    auto begin() { return Iterator(mBoard, mCoord).begin(); }
-    auto end() { return Iterator(mBoard, mCoord).end(); }
+    auto begin() { return Iterator(mBoard, mCoord); }
+    auto end() { return Iterator(mBoard, mSentinel); }
 
-    auto begin() const { return Iterator(mBoard, mCoord).begin(); }
-    auto end() const { return Iterator(mBoard, mCoord).end(); }
+    auto begin() const { return Iterator(mBoard, mCoord); }
+    auto end() const { return Iterator(mBoard, mSentinel); }
 
     bool operator==(const Nonet &other) const {
         return &mBoard == &other.mBoard
@@ -93,5 +84,5 @@ public:
 private:
     static_assert(std::forward_iterator<Iterator>);
     Board &mBoard;
-    const Coord mCoord;
+    const Coord mCoord, mSentinel;
 };

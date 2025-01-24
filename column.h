@@ -11,9 +11,11 @@
 
 class Column {
 public:
-    Column(Board &b, size_t index)
-        : mBoard(b)
-        , mIndex(index) { }
+    Column(Board &board, size_t index)
+        : mBoard(board)
+        , mIndex(index)
+        , mCellStart(index) // line 0, column 'index'
+        , mCellSentinel(index + board.height * board.width) { }
 
     class Iterator {
     public:
@@ -26,15 +28,7 @@ public:
         Iterator(Board &board, size_t columnIndex)
             : pCells(&board.mCells)
             , mIndex(columnIndex)
-            , mStart(mIndex)
-            , mSentinel(mIndex + board.height * board.width)
             , mStep(board.width) { }
-        Iterator(const Iterator &other, size_t index)
-            : pCells(other.pCells)
-            , mIndex(index)
-            , mStart(other.mStart)
-            , mSentinel(other.mSentinel)
-            , mStep(other.mStep) { }
 
         reference operator*() const { return pCells->at(mIndex); }
 
@@ -51,20 +45,17 @@ public:
                 || mIndex != other.mIndex;
         }
 
-        auto begin() { return Iterator(*this, mStart); }
-        auto end() { return Iterator(*this, mSentinel); }
-
     private:
         std::vector<Cell> *pCells;
-        size_t mIndex, mStart, mSentinel;
+        size_t mIndex;
         size_t mStep;
     };
 
-    auto begin() { return Iterator(mBoard, mIndex).begin(); }
-    auto end() { return Iterator(mBoard, mIndex).end(); }
+    auto begin() { return Iterator(mBoard, mCellStart); }
+    auto end() { return Iterator(mBoard, mCellSentinel); }
 
-    auto begin() const { return Iterator(mBoard, mIndex).begin(); }
-    auto end() const { return Iterator(mBoard, mIndex).end(); }
+    auto begin() const { return Iterator(mBoard, mCellStart); }
+    auto end() const { return Iterator(mBoard, mCellSentinel); }
 
     bool operator==(const Column &other) const {
         return &mBoard == &other.mBoard
@@ -77,6 +68,5 @@ private:
     static_assert(std::forward_iterator<Iterator>);
     Board &mBoard;
     const size_t mIndex;
+    const size_t mCellStart, mCellSentinel;
 };
-
-
