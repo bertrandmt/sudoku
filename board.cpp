@@ -138,71 +138,41 @@ bool Board::naked_single() {
     return found_naked_single;
 }
 
+template<class Set>
+bool Board::hidden_single(Cell &cell, const Set &set, const Value &value) {
+    bool other_possible_cell_candidate = false;
+
+    for (auto const &other_cell : set) {
+        if (other_cell == cell) continue;               // do not consider the current cell
+        assert(other_cell.isNote() || other_cell.value() != value);
+        if (other_cell.isValue()) continue;             // only considering note cells
+        if (!other_cell.notes().check(value)) continue; // this note cell is _not_ a candidate
+
+        other_possible_cell_candidate = true;
+        break;
+    }
+    if (!other_possible_cell_candidate) {
+        std::cout << "[HS] cell" << cell.coord() << " = " << value << " [" << set.tag() << "]" << std::endl;
+        cell = value;
+        autonote(cell);
+        return true;
+    }
+    return false;
+}
+
 bool Board::hidden_single() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
     // A hidden single arises when there is only one possible cell for a candidate
     bool found_hidden_single = false;
 
-    for (auto &c : *this) {
-        if (c.isValue()) continue; // only considering note cells
+    for (auto &cell : *this) {
+        if (cell.isValue()) continue; // only considering note cells
 
-        for (auto const &v : c.notes().values()) { // for each candidate value in this note cell
-            // check this row
-            bool other_possible_cell_candidate = false;
-            for (auto const &c1 : rowForCell(c)) {
-                if (c1 == c) continue;  // do not consider the current cell
-                assert(c1.isNote() || c1.value() != v);
-                if (c1.isValue()) continue;             // only considering note cells
-                if (!c1.notes().check(v)) continue;     // this note cell is _not_ a candidate
+        for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
 
-                other_possible_cell_candidate = true;
-                break;
-            }
-            if (!other_possible_cell_candidate) {
-                std::cout << "[HS] cell" << c.coord() << " = " << v << " [r]" << std::endl;
-                c = v;
-                autonote(c);
-                found_hidden_single = true;
-                break;
-            }
-
-            // check this column
-            other_possible_cell_candidate = false;
-            for (auto const &c1 : columnForCell(c)) {
-                if (c1 == c) continue;  // do not consider the current cell
-                assert(c1.isNote() || c1.value() != v);
-                if (c1.isValue()) continue;             // only considering note cells
-                if (!c1.notes().check(v)) continue;     // this note cell is _not_ a candidate
-
-                other_possible_cell_candidate = true;
-                break;
-            }
-            if (!other_possible_cell_candidate) {
-                std::cout << "[HS] cell" << c.coord() << " = " << v << " [c]" << std::endl;
-                c = v;
-                autonote(c);
-                found_hidden_single = true;
-                break;
-            }
-
-            // check this nonet
-            other_possible_cell_candidate = false;
-            for (auto const &c1 : nonetForCell(c)) {
-                if (c1 == c) continue;  // do not consider the current cell
-                assert(c1.isNote() || c1.value() != v);
-                if (c1.isValue()) continue;             // only considering note cells
-                if (!c1.notes().check(v)) continue;     // this note cell is _not_ a candidate
-
-                other_possible_cell_candidate = true;
-                break;
-            }
-            if (!other_possible_cell_candidate) {
-                std::cout << "[HS] cell" << c.coord() << " = " << v << " [n]" << std::endl;
-                c = v;
-                autonote(c);
-                found_hidden_single = true;
-                break;
-            }
+            if (hidden_single(cell, rowForCell(cell), value)) { found_hidden_single = true; break; }
+            if (hidden_single(cell, columnForCell(cell), value)) { found_hidden_single = true; break; }
+            if (hidden_single(cell, nonetForCell(cell), value)) { found_hidden_single = true; break; }
         }
         if (found_hidden_single) break;
     }
