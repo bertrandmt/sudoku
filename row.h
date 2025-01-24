@@ -11,9 +11,11 @@
 
 class Row {
 public:
-    Row(Board &b, size_t index)
-        : mBoard(b)
-        , mIndex(index) { }
+    Row(Board &board, size_t index)
+        : mBoard(board)
+        , mIndex(index)
+        , mCellStart(index * board.width)
+        , mCellSentinel(index * board.width + board.width) { }
 
     class Iterator {
     public:
@@ -23,16 +25,9 @@ public:
         using reference = element_type&;
 
         Iterator() { throw std::runtime_error("Not implemented"); }
-        Iterator(Board &board, size_t rowIndex)
+        Iterator(Board &board, size_t start)
             : pCells(&board.mCells)
-            , mIndex(rowIndex * board.width)
-            , mStart(mIndex)
-            , mSentinel(mIndex + board.width) { }
-        Iterator(const Iterator &other, size_t index)
-            : pCells(other.pCells)
-            , mIndex(index)
-            , mStart(other.mStart)
-            , mSentinel(other.mSentinel) { }
+            , mIndex(start) { }
 
         reference operator*() const { return pCells->at(mIndex); }
 
@@ -44,24 +39,16 @@ public:
                 && mIndex == other.mIndex;
         }
 
-        bool operator!=(const Iterator &other) const {
-            return pCells != other.pCells
-                || mIndex != other.mIndex;
-        }
-
-        auto begin() { return Iterator(*this, mStart); }
-        auto end() { return Iterator(*this, mSentinel); }
-
     private:
         std::vector<Cell> *pCells;
-        size_t mIndex, mStart, mSentinel;
+        size_t mIndex;
     };
 
-    auto begin() { return Iterator(mBoard, mIndex).begin(); }
-    auto end() { return Iterator(mBoard, mIndex).end(); }
+    auto begin() { return Iterator(mBoard, mCellStart); }
+    auto end() { return Iterator(mBoard, mCellSentinel); }
 
-    auto begin() const { return Iterator(mBoard, mIndex).begin(); }
-    auto end() const { return Iterator(mBoard, mIndex).end(); }
+    auto begin() const { return Iterator(mBoard, mCellStart); }
+    auto end() const { return Iterator(mBoard, mCellSentinel); }
 
     bool operator==(const Row &other) const {
         return &mBoard == &other.mBoard
@@ -74,4 +61,5 @@ private:
     static_assert(std::forward_iterator<Iterator>);
     Board &mBoard;
     const size_t mIndex;
+    const size_t mCellStart, mCellSentinel;
 };
