@@ -33,6 +33,7 @@ public:
     bool hidden_single();
     bool locked_candidates();
     bool naked_pair();
+    bool hidden_pair();
 
     using Iterator = std::vector<Cell>::iterator;
 

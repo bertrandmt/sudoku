@@ -75,5 +75,3 @@ private:
     Board &mBoard;
     const size_t mIndex;
 };
-
-
