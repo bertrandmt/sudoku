@@ -19,6 +19,9 @@ public:
     static const size_t width = 9;
     static const size_t height = 9;
 
+    void reset();
+    void print(std::ostream &out);
+
     Cell &at(size_t row, size_t col);
     const Cell &at(size_t row, size_t col) const;
 
@@ -37,8 +40,10 @@ public:
     bool hidden_single(Cell &, const Set &, const Value &);
     bool hidden_single();
 
-    template<class Set>
-    bool act_on_locked_candidates(const Cell &, const Value &, const Set &);
+    template<class Set1, class Set2>
+    bool act_on_locked_candidates(const Cell &, const Value &, const Set1 &, const Set2 &);
+    template<class Set1, class Set2>
+    bool locked_candidates(const Cell &, const Value &, Set1 &, Set2 &);
     bool locked_candidates();
 
     template<class Set>

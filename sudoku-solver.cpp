@@ -219,8 +219,9 @@ bool routine(Board &board) {
             break;
 
         case '$': // auto-solve one step
-            autosolve_one_step(board);
-            std::cout << board << std::endl;
+            if (autosolve_one_step(board)) {
+                std::cout << board << std::endl;
+            }
             break;
 
         case '%': // auto-solve until blocked (or finished)
@@ -233,9 +234,19 @@ bool routine(Board &board) {
             }
             break;
 #endif
+        case '!': // reset
+            board.reset();
+            std::cout << board << std::endl;
+            break;
+
         case 'x':
         case 'X': // edit a note
             edit_note(board, nowsline);
+            break;
+
+        case 'p':
+        case 'P':
+            board.print(std::cout);
             break;
 
         default:
