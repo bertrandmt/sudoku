@@ -20,6 +20,8 @@ public:
                  (coord.column() / width)  * width)
         , mSentinel(mCoord.row() + height, mCoord.column()) { }
 
+    std::string tag() const { return "n"; }
+
     class Iterator {
     public:
         using difference_type = std::ptrdiff_t;

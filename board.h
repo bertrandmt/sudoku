@@ -26,6 +26,8 @@ public:
     const Column &columnForCell(const Cell &c) const;
     const Nonet &nonetForCell(const Cell &c) const;
 
+    template<class Set>
+    void autonote(Cell &c, Set &s);
     void autonote(Cell &c);
     void autonote();
 

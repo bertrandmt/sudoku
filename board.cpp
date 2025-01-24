@@ -74,74 +74,44 @@ const Nonet &Board::nonetForCell(const Cell &c) const {
     return mNonets.at(nonetRow + nonetCol / 3);
 }
 
-void Board::autonote(Cell &c) {
-    if (c.isNote()) {
-        // this is a note cell; let's update its own notes from all the value cells in the same row, column and nonet
+template<class Set>
+void Board::autonote(Cell &cell, Set &set) {
+    assert(std::find(set.begin(), set.end(), cell) != set.end());
 
-        // process row
-        for (auto const &c1 : rowForCell(c)) {
-            if (c1.isNote()) continue; // other note cells do not participate in this update
-            if (!c.notes().check(c1.value())) continue; // the value of c1 is already checked off c's notes
+    if (cell.isNote()) {
+        // this is a note cell; let's update its own notes from all the value cells in the same set
+        for (auto const &other_cell : set) {
+            if (other_cell.isNote()) continue; // other note cells do not participate in this update
+            if (!cell.notes().check(other_cell.value())) continue; // the value of other_cell is already checked off cell's notes
 
-            std::cout << "  [ANn] note" << c.coord() << " X" << c1.value()
-                      << " r(" << c1.coord() << ")" << std::endl;
-            c.notes().set(c1.value(), false);
-        }
-        // process column
-        for (auto const &c1 : columnForCell(c)) {
-            if (c1.isNote()) continue; // other note cells do not participate in this update
-            if (!c.notes().check(c1.value())) continue;
-
-            std::cout << "  [ANn] note" << c.coord() << " X" << c1.value()
-                      << " c(" << c1.coord() << ")" << std::endl;
-            c.notes().set(c1.value(), false);
-        }
-        // process nonet
-        for (auto const &c1 : nonetForCell(c)) {
-            if (c1.isNote()) continue; // other note cells do not participate in this update
-            if (!c.notes().check(c1.value())) continue;
-
-            std::cout << "  [ANn] note" << c.coord() << " X" << c1.value()
-                      << " n(" << c1.coord() << ")" << std::endl;
-            c.notes().set(c1.value(), false);
+            std::cout << "  [ANn] note" << cell.coord() << " X" << other_cell.value()
+                      << " " << set.tag() << "(" << other_cell.coord() << ")" << std::endl;
+            cell.notes().set(other_cell.value(), false);
         }
     }
     else {
-        // this is a value cell; let's update notes in note cells in the same row, column and nonet
+        assert(cell.isValue());
+        // this is a value cell; let's update notes in note cells in the same set
+        for (auto &other_cell : set) {
+            if (other_cell.isValue()) continue; // other value cells do not get changed by this process
+            if (!other_cell.notes().check(cell.value())) continue; // the value of cell is already checked off other_cell's notes
 
-        // process row
-        for (auto &c1 : rowForCell(c)) {
-            if (c1.isValue()) continue; // other value cells do not get changed by this process
-            if (!c1.notes().check(c.value())) continue; // the value of c is already checked off c1's notes
-
-            std::cout << "  [ANv] note" << c1.coord() << " X" << c.value()
-                      << " r(" << c.coord() << ")" << std::endl;
-            c1.notes().set(c.value(), false);
+            std::cout << "  [ANv] note" << other_cell.coord() << " X" << cell.value()
+                      << " " << set.tag() << "(" << cell.coord() << ")" << std::endl;
+            other_cell.notes().set(cell.value(), false);
         }
-        // process column
-        for (auto &c1 : columnForCell(c)) {
-            if (c1.isValue()) continue; // other value cells do not get changed by this process
-            if (!c1.notes().check(c.value())) continue; // the value of c is already checked off c1's notes
+    }
+}
 
-            std::cout << "  [ANv] note" << c1.coord() << " X" << c.value()
-                      << " c(" << c.coord() << ")" << std::endl;
-            c1.notes().set(c.value(), false);
-        }
-        // process nonet
-        for (auto &c1 : nonetForCell(c)) {
-            if (c1.isValue()) continue; // other value cells do not get changed by this process
-            if (!c1.notes().check(c.value())) continue; // the value of c is already checked off c1's notes
-
-            std::cout << "  [ANv] note" << c1.coord() << " X" << c.value()
-                      << " n(" << c.coord() << ")" << std::endl;
-            c1.notes().set(c.value(), false);
-        }
-     }
+void Board::autonote(Cell &cell) {
+    autonote(cell, rowForCell(cell));
+    autonote(cell, columnForCell(cell));
+    autonote(cell, nonetForCell(cell));
 }
 
 void Board::autonote() {
-    for (auto &c : *this) {
-        autonote(c);
+    for (auto &cell : *this) {
+        autonote(cell);
     }
 }
 
