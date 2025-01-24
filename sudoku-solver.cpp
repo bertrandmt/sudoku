@@ -95,12 +95,18 @@ void record_entries(Board &board, const std::string &entries) {
 
 bool autosolve_one_step(Board &board) {
     if (board.naked_single()) {
-        std::cout << board << std::endl;
         return true;
     }
 
     if (board.hidden_single()) {
-        std::cout << board << std::endl;
+        return true;
+    }
+
+    if (board.locked_candidates()) {
+        return true;
+    }
+
+    if (board.naked_pair()) {
         return true;
     }
 
@@ -109,6 +115,7 @@ bool autosolve_one_step(Board &board) {
 
 void autosolve(Board &board) {
     while (autosolve_one_step(board)) ;
+    std::cout << board << std::endl;
 }
 
 void edit_note(Board &board, const std::string &entry) {
@@ -205,6 +212,7 @@ bool routine(Board &board) {
 
         case '$': // auto-solve one step
             autosolve_one_step(board);
+            std::cout << board << std::endl;
             break;
 
         case '%': // auto-solve until blocked (or finished)

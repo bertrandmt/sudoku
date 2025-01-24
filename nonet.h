@@ -73,7 +73,7 @@ public:
     private:
         std::vector<Cell> *pCells;
         size_t mWidth;
-        const Coord mStart, mSentinel;
+        Coord mStart, mSentinel;
         Coord mIndex;
     };
 
@@ -83,9 +83,15 @@ public:
     auto begin() const { return Iterator(mBoard, mCoord).begin(); }
     auto end() const { return Iterator(mBoard, mCoord).end(); }
 
+    bool operator==(const Nonet &other) const {
+        return &mBoard == &other.mBoard
+             && mCoord == other.mCoord;
+    }
+
     friend std::ostream& operator<< (std::ostream& outs, const Nonet &);
 
 private:
+    static_assert(std::forward_iterator<Iterator>);
     Board &mBoard;
     const Coord mCoord;
 };
