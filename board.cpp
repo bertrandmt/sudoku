@@ -84,7 +84,7 @@ void Board::autonote(Cell &cell, Set &set) {
             if (other_cell.isNote()) continue; // other note cells do not participate in this update
             if (!cell.notes().check(other_cell.value())) continue; // the value of other_cell is already checked off cell's notes
 
-            std::cout << "  [ANn] note" << cell.coord() << " X" << other_cell.value()
+            std::cout << "  [ANn] note" << cell.coord() << " x" << other_cell.value()
                       << " " << set.tag() << "(" << other_cell.coord() << ")" << std::endl;
             cell.notes().set(other_cell.value(), false);
         }
@@ -96,7 +96,7 @@ void Board::autonote(Cell &cell, Set &set) {
             if (other_cell.isValue()) continue; // other value cells do not get changed by this process
             if (!other_cell.notes().check(cell.value())) continue; // the value of cell is already checked off other_cell's notes
 
-            std::cout << "  [ANv] note" << other_cell.coord() << " X" << cell.value()
+            std::cout << "  [ANv] note" << other_cell.coord() << " x" << cell.value()
                       << " " << set.tag() << "(" << cell.coord() << ")" << std::endl;
             other_cell.notes().set(cell.value(), false);
         }
@@ -128,7 +128,7 @@ bool Board::naked_single() {
         assert(vs.size() == 1);
         Value v = vs.at(0);
 
-        std::cout << "[NS] cell" << c.coord() << " = " << v << std::endl;
+        std::cout << "[NS] cell" << c.coord() << " =" << v << std::endl;
         c = v;
         autonote(c);
         found_naked_single = true;
@@ -152,7 +152,7 @@ bool Board::hidden_single(Cell &cell, const Set &set, const Value &value) {
         break;
     }
     if (!other_possible_cell_candidate) {
-        std::cout << "[HS] cell" << cell.coord() << " = " << value << " [" << set.tag() << "]" << std::endl;
+        std::cout << "[HS] cell" << cell.coord() << " =" << value << " [" << set.tag() << "]" << std::endl;
         cell = value;
         autonote(cell);
         return true;
@@ -313,6 +313,66 @@ bool Board::naked_pair() {
     return acted_on_naked_pair;
 }
 
+template<class Set>
+bool Board::hidden_pair(Cell &cell, const Value &v1, const Value &v2, Set &set, bool &consider_next_pv1) {
+    assert(cell.isNote());
+    assert(cell.notes().check(v1));
+    assert(cell.notes().check(v2));
+
+    bool acted_on_hidden_pair = false;
+
+    // can we find another note cell with the same pair in the same set, but no other cell with either candidate in the set?
+    Cell *ppair_cell = NULL; // "the" other potential candidate
+    bool condition_met = true;
+
+    for (auto &other_cell : set) {
+        if (other_cell.isValue()) continue; // only considering note cells
+        if (other_cell == cell) continue;      // not considering this cell
+        if (!other_cell.notes().check(v1) && !other_cell.notes().check(v2)) continue; // no impact on algorithm; check next cell in row
+        if (other_cell.notes().check(v1) && other_cell.notes().check(v2)) {
+            if (!ppair_cell) { // no candidate yet
+                ppair_cell = &other_cell; // this is "the" other candidate
+            }
+            else { // this is disqualifying: we have more than two candidates in the row
+                condition_met = false;
+                break;
+            }
+        }
+        if (other_cell.notes().check(v2) && !other_cell.notes().check(v1)) { // this is disqualifying for pv2
+            condition_met = false;
+            break;
+        }
+        if (other_cell.notes().check(v1) && !other_cell.notes().check(v2)) { // this is disqualifying for pv1
+
+            condition_met = false;
+            consider_next_pv1 = true;
+            break;
+        }
+    }
+    if (consider_next_pv1) { assert(!condition_met); }
+    if (!ppair_cell) { condition_met = false; } // we did not, in fact, find another candidate
+    if (!condition_met) { return acted_on_hidden_pair; }
+
+    if (cell.notes().values().size() == 2 && ppair_cell->notes().values().size() == 2) { // condition was met, in a way, but there is no action to take
+        return acted_on_hidden_pair;
+    }
+
+    // we have a pair of cells cell,*ppair_cell with a pair of values v1,v2 and nobody else in the row has those values
+    cell.notes().set_all(false);
+    cell.notes().set(v1, true);
+    cell.notes().set(v2, true);
+    std::cout << "[HP] note" << cell.coord() << " ={" << v1 << "," << v2 << "} [" << set.tag() << "]" << std::endl;
+
+    assert(ppair_cell);
+    ppair_cell->notes().set_all(false);
+    ppair_cell->notes().set(v1, true);
+    ppair_cell->notes().set(v2, true);
+    std::cout << "[HP] note" << ppair_cell->coord() << " ={" << v1 << "," << v2 << "} [" << set.tag() << "]" << std::endl;
+
+    acted_on_hidden_pair = true;
+    return acted_on_hidden_pair;
+}
+
 bool Board::hidden_pair() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#subsets
     // When n candidates are possible in a certain set of n cells all in the same block, row, or column,
@@ -336,167 +396,16 @@ bool Board::hidden_pair() {
                 if (*pv2 == *pv1) continue; // we need a pair a different values
                 // *pv1,*pv2 is the candidate pair
 
-                {
-                    // can we find another note cell with the same pair in the same row, but no other cell with either candidate in the row?
-                    Cell *pc1 = NULL; // "the" other potential candidate
-                    bool condition_met = true;
-                    for (auto &c1 : row(c)) {
-                        if (c1.isValue()) continue; // only considering note cells
-                        if (c1 == c) continue;      // not considering this cell
-                        if (!c1.notes().check(*pv1) && !c1.notes().check(*pv2)) continue; // no impact on algorithm; check next cell in row
-                        if (c1.notes().check(*pv1) && c1.notes().check(*pv2)) {
-                            if (!pc1) { // no candidate yet
-                                pc1 = &c1; // this is "the" other candidate
-                            }
-                            else { // this is disqualifying: we have more than two candidates in the row
-                                condition_met = false;
-                                break;
-                            }
-                        }
-                        if (c1.notes().check(*pv2) && !c1.notes().check(*pv1)) { // this is disqualifying for pv2
-                            condition_met = false;
-                            break;
-                        }
-                        if (c1.notes().check(*pv1) && !c1.notes().check(*pv2)) { // this is disqualifying for pv1
+                if (hidden_pair(c, *pv1, *pv2, row(c), consider_next_pv1)) { acted_on_hidden_pair = true; break; }
+                if (consider_next_pv1) { assert(!acted_on_hidden_pair); break; }
 
-                            condition_met = false;
-                            consider_next_pv1 = true;
-                            break;
-                        }
-                    }
-                    if (consider_next_pv1) {
-                        assert(!condition_met);
-                        break;
-                    }
-                    if (!pc1) { // we did not, in fact, find another candidate
-                        condition_met = false;
-                    }
-                    if (!condition_met) continue;
+                if (hidden_pair(c, *pv1, *pv2, column(c), consider_next_pv1)) { acted_on_hidden_pair = true; break; }
+                if (consider_next_pv1) { assert(!acted_on_hidden_pair); break; }
 
-                    if (c.notes().values().size() == 2 && pc1->notes().values().size() == 2) continue; // no action to take; continue searching
-
-                    // we have a pair of cells c,*pc1 with a pair of values *pv1,*pv2 and nobody else in the row has those values
-                    assert(pc1);
-                    c.notes().set_all(false);
-                    c.notes().set(*pv1, true);
-                    c.notes().set(*pv2, true);
-                    std::cout << "[HP] note" << c.coord() << "={" << *pv1 << "," << *pv2 << "} [r]" << std::endl;
-
-                    pc1->notes().set_all(false);
-                    pc1->notes().set(*pv1, true);
-                    pc1->notes().set(*pv2, true);
-                    std::cout << "[HP] note" << pc1->coord() << "={" << *pv1 << "," << *pv2 << "} [r]" << std::endl;
-
-                    acted_on_hidden_pair = true;
-                    break;
-                }
-
-                {
-                    // can we find another note cell with the same pair in the same column, but no other cell with either candidate in the column?
-                    Cell *pc1 = NULL; // "the" other potential candidate
-                    bool condition_met = true;
-                    for (auto &c1 : column(c)) {
-                        if (c1.isValue()) continue; // only considering note cells
-                        if (c1 == c) continue;      // not considering this cell
-                        if (!c1.notes().check(*pv1) && !c1.notes().check(*pv2)) continue; // no impact on algorithm; check next cell in column
-                        if (c1.notes().check(*pv1) && c1.notes().check(*pv2)) {
-                            if (!pc1) { // no candidate yet
-                                pc1 = &c1; // this is "the" other candidate
-                            }
-                            else { // this is disqualifying: we have more than two candidates in the column
-                                condition_met = false;
-                                break;
-                            }
-                        }
-                        if (c1.notes().check(*pv2) && !c1.notes().check(*pv1)) { // this is disqualifying for pv2
-                            condition_met = false;
-                            break;
-                        }
-                        if (c1.notes().check(*pv1) && !c1.notes().check(*pv2)) { // this is disqualifying for pv1
-
-                            condition_met = false;
-                            consider_next_pv1 = true;
-                            break;
-                        }
-                    }
-                    if (consider_next_pv1) {
-                        assert(!condition_met);
-                        break;
-                    }
-                    if (!pc1) { // we did not, in fact, find another candidate
-                        condition_met = false;
-                    }
-                    if (!condition_met) continue;
-
-                    // we have a pair of cells c,*pc1 with a pair of values *pv1,*pv2 and nobody else in the column has those values
-                    assert(pc1);
-                    c.notes().set_all(false);
-                    c.notes().set(*pv1, true);
-                    c.notes().set(*pv2, true);
-                    std::cout << "[HP] note" << c.coord() << "={" << *pv1 << "," << *pv2 << "} [c]" << std::endl;
-
-                    pc1->notes().set_all(false);
-                    pc1->notes().set(*pv1, true);
-                    pc1->notes().set(*pv2, true);
-                    std::cout << "[HP] note" << pc1->coord() << "={" << *pv1 << "," << *pv2 << "} [c]" << std::endl;
-
-                    acted_on_hidden_pair = true;
-                    break;
-                }
-
-                {
-                    // can we find another note cell with the same pair in the same nonet, but no other cell with either candidate in the nonet?
-                    Cell *pc1 = NULL; // "the" other potential candidate
-                    bool condition_met = true;
-                    for (auto &c1 : nonet(c)) {
-                        if (c1.isValue()) continue; // only considering note cells
-                        if (c1 == c) continue;      // not considering this cell
-                        if (!c1.notes().check(*pv1) && !c1.notes().check(*pv2)) continue; // no impact on algorithm; check next cell in nonet
-                        if (c1.notes().check(*pv1) && c1.notes().check(*pv2)) {
-                            if (!pc1) { // no candidate yet
-                                pc1 = &c1; // this is "the" other candidate
-                            }
-                            else { // this is disqualifying: we have more than two candidates in the nonet
-                                condition_met = false;
-                                break;
-                            }
-                        }
-                        if (c1.notes().check(*pv2) && !c1.notes().check(*pv1)) { // this is disqualifying for pv2
-                            condition_met = false;
-                            break;
-                        }
-                        if (c1.notes().check(*pv1) && !c1.notes().check(*pv2)) { // this is disqualifying for pv1
-
-                            condition_met = false;
-                            consider_next_pv1 = true;
-                            break;
-                        }
-                    }
-                    if (consider_next_pv1) {
-                        assert(!condition_met);
-                        break;
-                    }
-                    if (!pc1) { // we did not, in fact, find another candidate
-                        condition_met = false;
-                    }
-                    if (!condition_met) continue;
-
-                    // we have a pair of cells c,*pc1 with a pair of values *pv1,*pv2 and nobody else in the nonet has those values
-                    assert(pc1);
-                    c.notes().set_all(false);
-                    c.notes().set(*pv1, true);
-                    c.notes().set(*pv2, true);
-                    std::cout << "[HP] note" << c.coord() << "={" << *pv1 << "," << *pv2 << "} [n]" << std::endl;
-
-                    pc1->notes().set_all(false);
-                    pc1->notes().set(*pv1, true);
-                    pc1->notes().set(*pv2, true);
-                    std::cout << "[HP] note" << pc1->coord() << "={" << *pv1 << "," << *pv2 << "} [n]" << std::endl;
-
-                    acted_on_hidden_pair = true;
-                    break;
-                }
+                if (hidden_pair(c, *pv1, *pv2, nonet(c), consider_next_pv1)) { acted_on_hidden_pair = true; break; }
+                if (consider_next_pv1) { assert(!acted_on_hidden_pair); break; }
             }
+            if (acted_on_hidden_pair) { break; }
         }
         if (acted_on_hidden_pair) break;
     }
@@ -519,5 +428,3 @@ std::ostream& operator<<(std::ostream& outs, const Board &b) {
     outs << "+=====+=====+=====++=====+=====+=====++=====+=====+=====+";
     return outs;
 }
-
-
