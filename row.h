@@ -63,6 +63,11 @@ public:
     auto begin() const { return Iterator(mBoard, mIndex).begin(); }
     auto end() const { return Iterator(mBoard, mIndex).end(); }
 
+    bool operator==(const Row &other) const {
+        return &mBoard == &other.mBoard
+             && mIndex == other.mIndex;
+    }
+
     friend std::ostream& operator<< (std::ostream& outs, const Row &);
 
 private:

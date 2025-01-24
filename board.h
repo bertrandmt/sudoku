@@ -28,8 +28,11 @@ public:
 
     void autonote(Cell &c);
     void autonote();
+
     bool naked_single();
     bool hidden_single();
+    bool locked_candidates();
+    bool naked_pair();
 
     using Iterator = std::vector<Cell>::iterator;
 
