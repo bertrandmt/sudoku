@@ -180,6 +180,24 @@ bool Board::hidden_single() {
     return found_hidden_single;
 }
 
+template<class Set>
+bool Board::act_on_locked_candidates(const Cell &cell, const Value &value, const Set &set) {
+    bool acted_on_locked_candidates = false;
+
+    for (auto &other_cell : set) {
+        if (other_cell == cell) continue;   // do not consider the current cell
+        if (other_cell.isValue()) continue;              // only considering note cells
+        if (!other_cell.notes().check(value)) continue;      // this note cell is _not_ a candidate for the same value
+        if (nonetForCell(other_cell) == nonetForCell(cell)) continue; // this is another candidate in the same nonet
+
+        std::cout << "[LC] note" << other_cell.coord() << " x" << value << " [" << set.tag() << "]" << std::endl;
+        other_cell.notes().set(value, false);
+        acted_on_locked_candidates = true;
+    }
+
+    return acted_on_locked_candidates;
+}
+
 bool Board::locked_candidates() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#blocks
     // When a candidate is possible in a certain block and row/column, and it is not possible anywhere else in the same block,
@@ -192,20 +210,15 @@ bool Board::locked_candidates() {
 
         const Row &row = rowForCell(c);
         const Column &column = columnForCell(c);
-        const Nonet &nonet = nonetForCell(c);
 
-        for (auto const &v : c.notes().values()) { // for each candidate in this note cell
-            // is this candidate value possible elsewhere in the same nonet
+        for (auto const &v : c.notes().values()) { // for each candidate value in this note cell
             bool condition_met = true;
             bool same_row = false;
             bool same_column = false;
-            for (auto const &c1 : nonet) {
-                if (same_row && same_column) {
-                    // so far, we have managed to find this candidate on the same row *and* the same column,
-                    // thereby breaking the condition
-                    condition_met = false;
-                    break;
-                }
+
+            // is this candidate value possible elsewhere in the same nonet
+            for (auto const &c1 : nonetForCell(c)) {
+                if (same_row && same_column) { condition_met = false; break; }
 
                 if (c1 == c) continue;                             // do not consider the current cell
                 assert(c1.isNote() || c1.value() != v);
@@ -219,34 +232,15 @@ bool Board::locked_candidates() {
                 break;
             }
             if (same_row && same_column) condition_met = false; // we exited the for loop just as we found a cell on the same row/column
+            if (!same_row && !same_column) condition_met = false; // this candidate is by itself in the nonet and this is for naked_single or hidden_single to handle
 
             if (condition_met) {
-                assert(same_row || same_column); // otherwise this candidte is by itself in the nonet and that should have been caught at
-                                                 // naked_single or hidden_single stage
                 if (same_row) {
-                    for (auto &c1 : row) {
-                        if (c1 == c) continue;   // do not consider the current cell
-                        if (c1.isValue()) continue;              // only considering note cells
-                        if (!c1.notes().check(v)) continue;      // this note cell is _not_ a candidate for the same value
-                        if (nonetForCell(c1) == nonet) continue; // this is another candidate in the same nonet
-
-                        std::cout << "[LC] note" << c1.coord() << " x" << v << " [r]" << std::endl;
-                        c1.notes().set(v, false);
-                        acted_on_locked_candidates = true;
-                    }
+                    acted_on_locked_candidates = act_on_locked_candidates(c, v, row);
                 }
                 else {
                     assert(same_column);
-                    for (auto &c1 : column) {
-                        if (c1 == c) continue;   // do not consider the current cell
-                        if (c1.isValue()) continue;              // only considering note cells
-                        if (!c1.notes().check(v)) continue;      // this note cell is _not_ a candidate for the same value
-                        if (nonetForCell(c1) == nonet) continue; // this is another candidate in the same nonet
-
-                        std::cout << "[LC] note" << c1.coord() << " x" << v << " [c]" << std::endl;
-                        c1.notes().set(v, false);
-                        acted_on_locked_candidates = true;
-                    }
+                    acted_on_locked_candidates = act_on_locked_candidates(c, v, column);
                 }
             }
             if (acted_on_locked_candidates) break;

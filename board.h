@@ -32,9 +32,13 @@ public:
     void autonote();
 
     bool naked_single();
+
     template<class Set>
     bool hidden_single(Cell &, const Set &, const Value &);
     bool hidden_single();
+
+    template<class Set>
+    bool act_on_locked_candidates(const Cell &, const Value &, const Set &);
     bool locked_candidates();
     bool naked_pair();
     bool hidden_pair();
