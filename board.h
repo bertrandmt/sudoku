@@ -22,22 +22,23 @@ public:
     Cell &at(size_t row, size_t col);
     const Cell &at(size_t row, size_t col) const;
 
-    const Row &rowForCell(const Cell &c) const;
-    const Column &columnForCell(const Cell &c) const;
-    const Nonet &nonetForCell(const Cell &c) const;
+    const Row &rowForCell(const Cell &) const;
+    const Column &columnForCell(const Cell &) const;
+    const Nonet &nonetForCell(const Cell &) const;
 
     template<class Set>
-    void autonote(Cell &c, Set &s);
-    void autonote(Cell &c);
+    void autonote(Cell &, Set &);
+    void autonote(Cell &);
     void autonote();
 
     bool naked_single();
+    template<class Set>
+    bool hidden_single(Cell &, const Set &, const Value &);
     bool hidden_single();
     bool locked_candidates();
     bool naked_pair();
     bool hidden_pair();
 
-    using Iterator = std::vector<Cell>::iterator;
 
     auto begin() { return mCells.begin(); }
     auto end() { return mCells.end(); }
@@ -46,8 +47,6 @@ public:
     auto end() const { return mCells.end(); }
 
 
-    using RowIterator = std::vector<Row>::iterator;
-
     auto row_begin() { return mRows.begin(); }
     auto row_end() { return mRows.end(); }
 
@@ -55,16 +54,12 @@ public:
     auto row_end() const { return mRows.end(); }
 
 
-    using ColumnIterator = std::vector<Column>::iterator;
-
     auto column_begin() { return mColumns.begin(); }
     auto column_end() { return mColumns.end(); }
 
     auto column_begin() const { return mColumns.begin(); }
     auto column_end() const { return mColumns.end(); }
 
-
-    using NonetIterator = std::vector<Nonet>::iterator;
 
     auto nonet_begin() { return mNonets.begin(); }
     auto nonet_end() { return mNonets.end(); }
@@ -79,10 +74,6 @@ public:
     friend class Nonet;
 
 private:
-    static_assert(std::forward_iterator<Iterator>);
-    static_assert(std::forward_iterator<RowIterator>);
-    static_assert(std::forward_iterator<ColumnIterator>);
-
     std::vector<Cell> mCells;
     std::vector<Row> mRows;
     std::vector<Column> mColumns;
