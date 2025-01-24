@@ -22,9 +22,9 @@ public:
     Cell &at(size_t row, size_t col);
     const Cell &at(size_t row, size_t col) const;
 
-    const Row &rowForCell(const Cell &) const;
-    const Column &columnForCell(const Cell &) const;
-    const Nonet &nonetForCell(const Cell &) const;
+    const Row &row(const Cell &) const;
+    const Column &column(const Cell &) const;
+    const Nonet &nonet(const Cell &) const;
 
     template<class Set>
     void autonote(Cell &, Set &);
@@ -40,6 +40,9 @@ public:
     template<class Set>
     bool act_on_locked_candidates(const Cell &, const Value &, const Set &);
     bool locked_candidates();
+
+    template<class Set>
+    bool naked_pair(const Cell &, Set &);
     bool naked_pair();
     bool hidden_pair();
 

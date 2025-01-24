@@ -59,15 +59,15 @@ const Cell &Board::at(size_t row, size_t col) const {
     return c;
 }
 
-const Row &Board::rowForCell(const Cell &c) const {
+const Row &Board::row(const Cell &c) const {
     return mRows.at(c.coord().row());
 }
 
-const Column &Board::columnForCell(const Cell &c) const {
+const Column &Board::column(const Cell &c) const {
     return mColumns.at(c.coord().column());
 }
 
-const Nonet &Board::nonetForCell(const Cell &c) const {
+const Nonet &Board::nonet(const Cell &c) const {
     size_t nonetRow = (c.coord().row() / 3) * 3;
     size_t nonetCol = (c.coord().column() / 3) * 3;
 
@@ -104,9 +104,9 @@ void Board::autonote(Cell &cell, Set &set) {
 }
 
 void Board::autonote(Cell &cell) {
-    autonote(cell, rowForCell(cell));
-    autonote(cell, columnForCell(cell));
-    autonote(cell, nonetForCell(cell));
+    autonote(cell, row(cell));
+    autonote(cell, column(cell));
+    autonote(cell, nonet(cell));
 }
 
 void Board::autonote() {
@@ -170,9 +170,9 @@ bool Board::hidden_single() {
 
         for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
 
-            if (hidden_single(cell, rowForCell(cell), value)) { found_hidden_single = true; break; }
-            if (hidden_single(cell, columnForCell(cell), value)) { found_hidden_single = true; break; }
-            if (hidden_single(cell, nonetForCell(cell), value)) { found_hidden_single = true; break; }
+            if (hidden_single(cell, row(cell), value)) { found_hidden_single = true; break; }
+            if (hidden_single(cell, column(cell), value)) { found_hidden_single = true; break; }
+            if (hidden_single(cell, nonet(cell), value)) { found_hidden_single = true; break; }
         }
         if (found_hidden_single) break;
     }
@@ -188,7 +188,7 @@ bool Board::act_on_locked_candidates(const Cell &cell, const Value &value, const
         if (other_cell == cell) continue;   // do not consider the current cell
         if (other_cell.isValue()) continue;              // only considering note cells
         if (!other_cell.notes().check(value)) continue;      // this note cell is _not_ a candidate for the same value
-        if (nonetForCell(other_cell) == nonetForCell(cell)) continue; // this is another candidate in the same nonet
+        if (nonet(other_cell) == nonet(cell)) continue; // this is another candidate in the same nonet
 
         std::cout << "[LC] note" << other_cell.coord() << " x" << value << " [" << set.tag() << "]" << std::endl;
         other_cell.notes().set(value, false);
@@ -208,24 +208,21 @@ bool Board::locked_candidates() {
     for (auto const &c : *this) {
         if (c.isValue()) continue; // only considering note cells
 
-        const Row &row = rowForCell(c);
-        const Column &column = columnForCell(c);
-
         for (auto const &v : c.notes().values()) { // for each candidate value in this note cell
             bool condition_met = true;
             bool same_row = false;
             bool same_column = false;
 
             // is this candidate value possible elsewhere in the same nonet
-            for (auto const &c1 : nonetForCell(c)) {
+            for (auto const &c1 : nonet(c)) {
                 if (same_row && same_column) { condition_met = false; break; }
 
                 if (c1 == c) continue;                             // do not consider the current cell
                 assert(c1.isNote() || c1.value() != v);
                 if (c1.isValue()) continue;                                        // only considering note cells
                 if (!c1.notes().check(v)) continue;                                // this note cell is _not_ a candidate for the same value
-                if (rowForCell(c1) == row) { same_row = true; continue; }          // ok, but are they on the same row
-                if (columnForCell(c1) == column) { same_column = true; continue; } // ok, but are they on the same column
+                if (row(c1) == row(c)) { same_row = true; continue; }          // ok, but are they on the same row
+                if (column(c1) == column(c)) { same_column = true; continue; } // ok, but are they on the same column
 
                 // we have a different note cell in the nonet, which is a candidate for this value and is not on the same row
                 condition_met = false;
@@ -236,11 +233,11 @@ bool Board::locked_candidates() {
 
             if (condition_met) {
                 if (same_row) {
-                    acted_on_locked_candidates = act_on_locked_candidates(c, v, row);
+                    acted_on_locked_candidates = act_on_locked_candidates(c, v, row(c));
                 }
                 else {
                     assert(same_column);
-                    acted_on_locked_candidates = act_on_locked_candidates(c, v, column);
+                    acted_on_locked_candidates = act_on_locked_candidates(c, v, column(c));
                 }
             }
             if (acted_on_locked_candidates) break;
@@ -249,6 +246,48 @@ bool Board::locked_candidates() {
     }
 
     return acted_on_locked_candidates;
+}
+
+template<class Set>
+bool Board::naked_pair(const Cell &cell, Set &set) {
+    bool acted_on_naked_pair = false;
+
+    assert(cell.isNote());
+    auto c_values = cell.notes().values();
+    assert(c_values.size() == 2);
+
+    auto v1 = c_values[0];
+    auto v2 = c_values[1];
+
+    for (auto const &pair_cell : set) {
+        if (pair_cell.isValue()) continue;   // only considering note cells
+        if (pair_cell == cell) continue; // not considering this cell
+        auto pair_cell_values = pair_cell.notes().values();
+        if (pair_cell_values.size() != 2) continue;    // only considering other cells with two possible values in notes
+        if (std::find(pair_cell_values.begin(), pair_cell_values.end(), v1) == pair_cell_values.end()
+         || std::find(pair_cell_values.begin(), pair_cell_values.end(), v2) == pair_cell_values.end()) continue; // it's a pair, but not the same pair
+
+        // we found a candidate pair in this set -> remove either note entry from the rest of the set
+        for (auto &other_cell : set) {
+            if (other_cell.isValue()) continue;
+            if (other_cell == cell || other_cell == pair_cell) continue; // not looking at either of the cell pairs
+
+            if (other_cell.notes().check(v1)) {
+                other_cell.notes().set(v1, false);
+                std::cout << "[NP] note" << other_cell.coord() << " x" << v1 << " [" << set.tag() << "]" << std::endl;
+                acted_on_naked_pair = true;
+            }
+            if (other_cell.notes().check(v2)) {
+                other_cell.notes().set(v2, false);
+                std::cout << "[NP] note" << other_cell.coord() << " x" << v2 << " [" << set.tag() << "]" << std::endl;
+                acted_on_naked_pair = true;
+            }
+        }
+
+        if (acted_on_naked_pair) break;
+    }
+
+    return acted_on_naked_pair;
 }
 
 bool Board::naked_pair() {
@@ -266,105 +305,9 @@ bool Board::naked_pair() {
         assert(c_values.size() >= 2); // otherwise would have been caught at single stage.
         if (c_values.size() != 2) continue; // only considering candidates with two possible values in notes
 
-        const Row &row = rowForCell(c);
-        const Column &column = columnForCell(c);
-        const Nonet &nonet = nonetForCell(c);
-
-        auto v1 = c_values[0];
-        auto v2 = c_values[1];
-
-        // check row
-        for (auto const &c1 : row) {
-            if (c1.isValue()) continue;   // only considering note cells
-            if (c1 == c) continue; // not considering this cell
-            auto c1_values = c1.notes().values();
-            if (c1_values.size() != 2) continue;    // only considering other cells with two possible values in notes
-            if (std::find(c1_values.begin(), c1_values.end(), v1) == c1_values.end()
-             || std::find(c1_values.begin(), c1_values.end(), v2) == c1_values.end()) continue; // it's a pair, but not the same pair
-
-            // we found a candidate pair on this row -> remove either note entry from the rest of the row
-            for (auto &c2 : row) {
-                if (c2.isValue()) continue;
-                if (c2 == c || c2 == c1) continue; // not looking at either of the cell pairs
-
-                if (c2.notes().check(v1)) {
-                    c2.notes().set(v1, false);
-                    std::cout << "[NP] note" << c2.coord() << " x" << v1 << " [r]" << std::endl;
-                    acted_on_naked_pair = true;
-                }
-                if (c2.notes().check(v2)) {
-                    c2.notes().set(v2, false);
-                    std::cout << "[NP] note" << c2.coord() << " x" << v2 << " [r]" << std::endl;
-                    acted_on_naked_pair = true;
-                }
-
-            }
-
-            if (acted_on_naked_pair) break;
-        }
-        if (acted_on_naked_pair) break;
-
-        // check column
-        for (auto const &c1 : column) {
-            if (c1.isValue()) continue;   // only considering note cells
-            if (c1 == c) continue; // not considering this cell
-            auto c1_values = c1.notes().values();
-            if (c1_values.size() != 2) continue;    // only considering other cells with two possible values in notes
-            if (std::find(c1_values.begin(), c1_values.end(), v1) == c1_values.end()
-             || std::find(c1_values.begin(), c1_values.end(), v2) == c1_values.end()) continue; // it's a pair, but not the same pair
-
-            // we found a candidate pair on this column -> remove either note entry from the rest of the column
-            for (auto &c2 : column) {
-                if (c2.isValue()) continue;
-                if (c2 == c || c2 == c1) continue; // not looking at either of the cell pairs
-
-                if (c2.notes().check(v1)) {
-                    c2.notes().set(v1, false);
-                    std::cout << "[NP] note" << c2.coord() << " x" << v1 << " [r]" << std::endl;
-                    acted_on_naked_pair = true;
-                }
-                if (c2.notes().check(v2)) {
-                    c2.notes().set(v2, false);
-                    std::cout << "[NP] note" << c2.coord() << " x" << v2 << " [r]" << std::endl;
-                    acted_on_naked_pair = true;
-                }
-
-            }
-
-            if (acted_on_naked_pair) break;
-        }
-        if (acted_on_naked_pair) break;
-
-        // check nonet
-        for (auto const &c1 : nonet) {
-            if (c1.isValue()) continue;   // only considering note cells
-            if (c1 == c) continue; // not considering this cell
-            auto c1_values = c1.notes().values();
-            if (c1_values.size() != 2) continue;    // only considering other cells with two possible values in notes
-            if (std::find(c1_values.begin(), c1_values.end(), v1) == c1_values.end()
-             || std::find(c1_values.begin(), c1_values.end(), v2) == c1_values.end()) continue; // it's a pair, but not the same pair
-
-            // we found a candidate pair on this nonet -> remove either note entry from the rest of the nonet
-            for (auto &c2 : nonet) {
-                if (c2.isValue()) continue;
-                if (c2 == c || c2 == c1) continue; // not looking at either of the cell pairs
-
-                if (c2.notes().check(v1)) {
-                    c2.notes().set(v1, false);
-                    std::cout << "[NP] note" << c2.coord() << " x" << v1 << " [r]" << std::endl;
-                    acted_on_naked_pair = true;
-                }
-                if (c2.notes().check(v2)) {
-                    c2.notes().set(v2, false);
-                    std::cout << "[NP] note" << c2.coord() << " x" << v2 << " [r]" << std::endl;
-                    acted_on_naked_pair = true;
-                }
-
-            }
-
-            if (acted_on_naked_pair) break;
-        }
-        if (acted_on_naked_pair) break;
+        if (naked_pair(c, row(c))) { acted_on_naked_pair = true; break; }
+        if (naked_pair(c, column(c))) { acted_on_naked_pair = true; break; }
+        if (naked_pair(c, nonet(c))) { acted_on_naked_pair = true; break; }
     }
 
     return acted_on_naked_pair;
@@ -384,10 +327,6 @@ bool Board::hidden_pair() {
         auto c_values = c.notes().values();
         assert(c_values.size() >= 2); // otherwise would have been caught at single stage.
 
-        const Row &row = rowForCell(c);
-        const Column &column = columnForCell(c);
-        const Nonet &nonet = nonetForCell(c);
-
         for (auto pv1 = c_values.begin(); pv1 != c_values.end(); ++pv1) {
             bool consider_next_pv1 = false;
 
@@ -401,7 +340,7 @@ bool Board::hidden_pair() {
                     // can we find another note cell with the same pair in the same row, but no other cell with either candidate in the row?
                     Cell *pc1 = NULL; // "the" other potential candidate
                     bool condition_met = true;
-                    for (auto &c1 : row) {
+                    for (auto &c1 : row(c)) {
                         if (c1.isValue()) continue; // only considering note cells
                         if (c1 == c) continue;      // not considering this cell
                         if (!c1.notes().check(*pv1) && !c1.notes().check(*pv2)) continue; // no impact on algorithm; check next cell in row
@@ -456,7 +395,7 @@ bool Board::hidden_pair() {
                     // can we find another note cell with the same pair in the same column, but no other cell with either candidate in the column?
                     Cell *pc1 = NULL; // "the" other potential candidate
                     bool condition_met = true;
-                    for (auto &c1 : column) {
+                    for (auto &c1 : column(c)) {
                         if (c1.isValue()) continue; // only considering note cells
                         if (c1 == c) continue;      // not considering this cell
                         if (!c1.notes().check(*pv1) && !c1.notes().check(*pv2)) continue; // no impact on algorithm; check next cell in column
@@ -509,7 +448,7 @@ bool Board::hidden_pair() {
                     // can we find another note cell with the same pair in the same nonet, but no other cell with either candidate in the nonet?
                     Cell *pc1 = NULL; // "the" other potential candidate
                     bool condition_met = true;
-                    for (auto &c1 : nonet) {
+                    for (auto &c1 : nonet(c)) {
                         if (c1.isValue()) continue; // only considering note cells
                         if (c1 == c) continue;      // not considering this cell
                         if (!c1.notes().check(*pv1) && !c1.notes().check(*pv2)) continue; // no impact on algorithm; check next cell in nonet
