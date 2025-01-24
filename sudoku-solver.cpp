@@ -110,12 +110,20 @@ bool autosolve_one_step(Board &board) {
         return true;
     }
 
+    if (board.hidden_pair()) {
+        return true;
+    }
+
     return false;
 }
 
 void autosolve(Board &board) {
-    while (autosolve_one_step(board)) ;
-    std::cout << board << std::endl;
+    bool did_act = false;
+    while (autosolve_one_step(board)) did_act = true;
+
+    if (did_act) {
+        std::cout << board << std::endl;
+    };
 }
 
 void edit_note(Board &board, const std::string &entry) {
@@ -218,7 +226,13 @@ bool routine(Board &board) {
         case '%': // auto-solve until blocked (or finished)
             autosolve(board);
             break;
-
+#if 0
+        case '@': // special sauce
+            if (board.hidden_pair()) {
+                std::cout << board << std::endl;
+            }
+            break;
+#endif
         case 'x':
         case 'X': // edit a note
             edit_note(board, nowsline);

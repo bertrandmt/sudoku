@@ -32,6 +32,7 @@ public:
 
     bool check(const Value &v) const { return mNotes.at(v - 1); }
     bool set(const Value &v, bool set);
+    void set_all(bool set) { mNotes.assign(mNotes.size(), set); }
 
     size_t count() const;
     std::vector<Value> values() const;
@@ -55,6 +56,9 @@ public:
     const Notes &notes() const { assert(isNote()); return mNotes; }
 
     Cell &operator=(const Value &v);
+    bool operator==(const Cell &other) const {
+        return mCoord == other.mCoord;
+    }
 
     friend std::ostream& operator<< (std::ostream& outs, const Cell &);
 private:
