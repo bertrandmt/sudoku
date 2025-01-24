@@ -44,6 +44,9 @@ public:
     template<class Set>
     bool naked_pair(const Cell &, Set &);
     bool naked_pair();
+
+    template<class Set>
+    bool hidden_pair(Cell &, const Value &, const Value &, Set &, bool &);
     bool hidden_pair();
 
 
