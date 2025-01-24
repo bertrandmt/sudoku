@@ -13,6 +13,15 @@ namespace { // anonymous
 }
 
 Board::Board() {
+    reset();
+}
+
+void Board::reset() {
+    mCells.clear();
+    mRows.clear();
+    mColumns.clear();
+    mNonets.clear();
+
     for (size_t row = 0; row < height; row++) {
         for (size_t col = 0; col < width; col++) {
             Cell c(row, col);
@@ -39,6 +48,17 @@ Board::Board() {
         }
     }
     assert(mNonets.size() == (height / Nonet::height) * (width / Nonet::width));
+}
+
+void Board::print(std::ostream &out) {
+    size_t count = 0;
+    for (auto const &c : *this) {
+        if (c.isValue()) out << c.value();
+        else out << '.';
+        count++;
+        if (count % width == 0) out << std::endl;
+    }
+    out << std::endl;
 }
 
 Cell &Board::at(size_t row, size_t col) {
@@ -104,9 +124,9 @@ void Board::autonote(Cell &cell, Set &set) {
 }
 
 void Board::autonote(Cell &cell) {
-    autonote(cell, row(cell));
-    autonote(cell, column(cell));
     autonote(cell, nonet(cell));
+    autonote(cell, column(cell));
+    autonote(cell, row(cell));
 }
 
 void Board::autonote() {
@@ -170,9 +190,9 @@ bool Board::hidden_single() {
 
         for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
 
-            if (hidden_single(cell, row(cell), value)) { found_hidden_single = true; break; }
-            if (hidden_single(cell, column(cell), value)) { found_hidden_single = true; break; }
             if (hidden_single(cell, nonet(cell), value)) { found_hidden_single = true; break; }
+            if (hidden_single(cell, column(cell), value)) { found_hidden_single = true; break; }
+            if (hidden_single(cell, row(cell), value)) { found_hidden_single = true; break; }
         }
         if (found_hidden_single) break;
     }
@@ -180,17 +200,17 @@ bool Board::hidden_single() {
     return found_hidden_single;
 }
 
-template<class Set>
-bool Board::act_on_locked_candidates(const Cell &cell, const Value &value, const Set &set) {
+template<class Set1, class Set2>
+bool Board::act_on_locked_candidates(const Cell &cell, const Value &value, const Set1 &set_to_consider, const Set2 &set_to_ignore) {
     bool acted_on_locked_candidates = false;
 
-    for (auto &other_cell : set) {
+    for (auto &other_cell : set_to_consider) {
         if (other_cell == cell) continue;   // do not consider the current cell
         if (other_cell.isValue()) continue;              // only considering note cells
         if (!other_cell.notes().check(value)) continue;      // this note cell is _not_ a candidate for the same value
-        if (nonet(other_cell) == nonet(cell)) continue; // this is another candidate in the same nonet
+        if (std::find(set_to_ignore.begin(), set_to_ignore.end(), other_cell) != set_to_ignore.end()) continue; // this is one of the other candidates in the same set
 
-        std::cout << "[LC] note" << other_cell.coord() << " x" << value << " [" << set.tag() << "]" << std::endl;
+        std::cout << "[LC] note" << other_cell.coord() << " x" << value << " [" << set_to_consider.tag() << "]" << std::endl;
         other_cell.notes().set(value, false);
         acted_on_locked_candidates = true;
     }
@@ -198,9 +218,35 @@ bool Board::act_on_locked_candidates(const Cell &cell, const Value &value, const
     return acted_on_locked_candidates;
 }
 
+template<class Set1, class Set2>
+bool Board::locked_candidates(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore) {
+    bool acted_on_locked_candidates = false;
+
+    bool condition_met = true;
+    for (auto const &other_cell : set_to_ignore) {
+        if (other_cell.isValue()) continue;                                                                           // do not consider value cells
+        if (other_cell == cell) continue;                                                                             // do not consider the current cell
+        assert(other_cell.isNote() || other_cell.value() != value);
+        if (!other_cell.notes().check(value)) continue;                                                               // not a candidate
+        if (std::find(set_to_consider.begin(), set_to_consider.end(), other_cell) != set_to_consider.end()) continue; // we are looking for a candidate outside of this nonet
+
+        condition_met = false;
+        break;
+    }
+    if (condition_met) {
+        acted_on_locked_candidates = act_on_locked_candidates(cell, value, set_to_consider, set_to_ignore);
+    }
+
+    return acted_on_locked_candidates;
+}
+
 bool Board::locked_candidates() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#blocks
-    // When a candidate is possible in a certain block and row/column, and it is not possible anywhere else in the same block,
+    // Form 1:
+    // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same row/column,
+    // then it is also not possible anywhere else in the same nonet
+    // Form 2:
+    // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same nonet,
     // then it is also not possible anywhere else in the same row/column
 
     bool acted_on_locked_candidates = false;
@@ -209,38 +255,13 @@ bool Board::locked_candidates() {
         if (c.isValue()) continue; // only considering note cells
 
         for (auto const &v : c.notes().values()) { // for each candidate value in this note cell
-            bool condition_met = true;
-            bool same_row = false;
-            bool same_column = false;
+            // form 1
+            if (locked_candidates(c, v, row(c), nonet(c))) { acted_on_locked_candidates = true; break; }
+            if (locked_candidates(c, v, column(c), nonet(c))) { acted_on_locked_candidates = true; break; }
 
-            // is this candidate value possible elsewhere in the same nonet
-            for (auto const &c1 : nonet(c)) {
-                if (same_row && same_column) { condition_met = false; break; }
-
-                if (c1 == c) continue;                             // do not consider the current cell
-                assert(c1.isNote() || c1.value() != v);
-                if (c1.isValue()) continue;                                        // only considering note cells
-                if (!c1.notes().check(v)) continue;                                // this note cell is _not_ a candidate for the same value
-                if (row(c1) == row(c)) { same_row = true; continue; }          // ok, but are they on the same row
-                if (column(c1) == column(c)) { same_column = true; continue; } // ok, but are they on the same column
-
-                // we have a different note cell in the nonet, which is a candidate for this value and is not on the same row
-                condition_met = false;
-                break;
-            }
-            if (same_row && same_column) condition_met = false; // we exited the for loop just as we found a cell on the same row/column
-            if (!same_row && !same_column) condition_met = false; // this candidate is by itself in the nonet and this is for naked_single or hidden_single to handle
-
-            if (condition_met) {
-                if (same_row) {
-                    acted_on_locked_candidates = act_on_locked_candidates(c, v, row(c));
-                }
-                else {
-                    assert(same_column);
-                    acted_on_locked_candidates = act_on_locked_candidates(c, v, column(c));
-                }
-            }
-            if (acted_on_locked_candidates) break;
+            // form 2
+            if (locked_candidates(c, v, nonet(c), row(c))) { acted_on_locked_candidates = true; break; }
+            if (locked_candidates(c, v, nonet(c), column(c))) { acted_on_locked_candidates = true; break; }
         }
         if (acted_on_locked_candidates) break;
     }
@@ -305,9 +326,9 @@ bool Board::naked_pair() {
         assert(c_values.size() >= 2); // otherwise would have been caught at single stage.
         if (c_values.size() != 2) continue; // only considering candidates with two possible values in notes
 
-        if (naked_pair(c, row(c))) { acted_on_naked_pair = true; break; }
-        if (naked_pair(c, column(c))) { acted_on_naked_pair = true; break; }
         if (naked_pair(c, nonet(c))) { acted_on_naked_pair = true; break; }
+        if (naked_pair(c, column(c))) { acted_on_naked_pair = true; break; }
+        if (naked_pair(c, row(c))) { acted_on_naked_pair = true; break; }
     }
 
     return acted_on_naked_pair;
@@ -396,13 +417,13 @@ bool Board::hidden_pair() {
                 if (*pv2 == *pv1) continue; // we need a pair a different values
                 // *pv1,*pv2 is the candidate pair
 
-                if (hidden_pair(c, *pv1, *pv2, row(c), consider_next_pv1)) { acted_on_hidden_pair = true; break; }
+                if (hidden_pair(c, *pv1, *pv2, nonet(c), consider_next_pv1)) { acted_on_hidden_pair = true; break; }
                 if (consider_next_pv1) { assert(!acted_on_hidden_pair); break; }
 
                 if (hidden_pair(c, *pv1, *pv2, column(c), consider_next_pv1)) { acted_on_hidden_pair = true; break; }
                 if (consider_next_pv1) { assert(!acted_on_hidden_pair); break; }
 
-                if (hidden_pair(c, *pv1, *pv2, nonet(c), consider_next_pv1)) { acted_on_hidden_pair = true; break; }
+                if (hidden_pair(c, *pv1, *pv2, row(c), consider_next_pv1)) { acted_on_hidden_pair = true; break; }
                 if (consider_next_pv1) { assert(!acted_on_hidden_pair); break; }
             }
             if (acted_on_hidden_pair) { break; }
