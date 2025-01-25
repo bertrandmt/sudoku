@@ -51,12 +51,9 @@ void Board::reset() {
 }
 
 void Board::print(std::ostream &out) {
-    size_t count = 0;
     for (auto const &c : *this) {
         if (c.isValue()) out << c.value();
-        else out << '.';
-        count++;
-        if (count % width == 0) out << std::endl;
+        else             out << '.';
     }
     out << std::endl;
 }
@@ -335,7 +332,7 @@ bool Board::naked_pair() {
 }
 
 template<class Set>
-bool Board::hidden_pair(Cell &cell, const Value &v1, const Value &v2, Set &set, bool &consider_next_pv1) {
+bool Board::hidden_pair(Cell &cell, const Value &v1, const Value &v2, Set &set) {
     assert(cell.isNote());
     assert(cell.notes().check(v1));
     assert(cell.notes().check(v2));
@@ -350,27 +347,18 @@ bool Board::hidden_pair(Cell &cell, const Value &v1, const Value &v2, Set &set, 
         if (other_cell.isValue()) continue; // only considering note cells
         if (other_cell == cell) continue;      // not considering this cell
         if (!other_cell.notes().check(v1) && !other_cell.notes().check(v2)) continue; // no impact on algorithm; check next cell in row
+        if (other_cell.notes().check(v1) ^ other_cell.notes().check(v2)) { condition_met = false; break; } // either v1 or v2 is disqualified
         if (other_cell.notes().check(v1) && other_cell.notes().check(v2)) {
             if (!ppair_cell) { // no candidate yet
                 ppair_cell = &other_cell; // this is "the" other candidate
+                continue;
             }
             else { // this is disqualifying: we have more than two candidates in the row
                 condition_met = false;
                 break;
             }
         }
-        if (other_cell.notes().check(v2) && !other_cell.notes().check(v1)) { // this is disqualifying for pv2
-            condition_met = false;
-            break;
-        }
-        if (other_cell.notes().check(v1) && !other_cell.notes().check(v2)) { // this is disqualifying for pv1
-
-            condition_met = false;
-            consider_next_pv1 = true;
-            break;
-        }
     }
-    if (consider_next_pv1) { assert(!condition_met); }
     if (!ppair_cell) { condition_met = false; } // we did not, in fact, find another candidate
     if (!condition_met) { return acted_on_hidden_pair; }
 
@@ -409,22 +397,15 @@ bool Board::hidden_pair() {
         assert(c_values.size() >= 2); // otherwise would have been caught at single stage.
 
         for (auto pv1 = c_values.begin(); pv1 != c_values.end(); ++pv1) {
-            bool consider_next_pv1 = false;
 
             for (auto pv2 = pv1; pv2 != c_values.end(); ++pv2) {
-                assert(!consider_next_pv1);
 
                 if (*pv2 == *pv1) continue; // we need a pair a different values
                 // *pv1,*pv2 is the candidate pair
 
-                if (hidden_pair(c, *pv1, *pv2, nonet(c), consider_next_pv1)) { acted_on_hidden_pair = true; break; }
-                if (consider_next_pv1) { assert(!acted_on_hidden_pair); break; }
-
-                if (hidden_pair(c, *pv1, *pv2, column(c), consider_next_pv1)) { acted_on_hidden_pair = true; break; }
-                if (consider_next_pv1) { assert(!acted_on_hidden_pair); break; }
-
-                if (hidden_pair(c, *pv1, *pv2, row(c), consider_next_pv1)) { acted_on_hidden_pair = true; break; }
-                if (consider_next_pv1) { assert(!acted_on_hidden_pair); break; }
+                if (hidden_pair(c, *pv1, *pv2, nonet(c))) { acted_on_hidden_pair = true; break; }
+                if (hidden_pair(c, *pv1, *pv2, column(c))) { acted_on_hidden_pair = true; break; }
+                if (hidden_pair(c, *pv1, *pv2, row(c))) { acted_on_hidden_pair = true; break; }
             }
             if (acted_on_hidden_pair) { break; }
         }
