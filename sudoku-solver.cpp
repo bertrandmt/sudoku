@@ -26,6 +26,41 @@ void help(void) {
               << "  '!'           reset the state of the board" << std::endl;
 }
 
+void record_game(Board &board, const std::string &entries) {
+    if (entries.size() != board.width * board.height + 1) {
+        help();
+        return;
+    }
+
+    size_t index = 1;
+    for (auto &c : board) {
+        switch (entries[index]) {
+        case '.': // it's a note entry
+            break;
+
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9': // it's a value entry
+            c = static_cast<Value>(entries[index] - '0');
+            break;
+
+        default: // don't know what to do with this
+            help();
+            return;
+        }
+        index++;
+    }
+
+    board.autonote();
+    std::cout << board << std::endl;
+}
+
 bool record_entry(Board &board, const std::string &entry) {
     if (entry.size() != 3) {
         help();
@@ -154,6 +189,10 @@ bool routine(Board &board) {
         case '8':
         case '9': // it's recording one or more entries
             record_entries(board, nowsline);
+            break;
+
+        case ']': // it's recording a game
+            record_game(board, nowsline);
             break;
 
         case '.':
