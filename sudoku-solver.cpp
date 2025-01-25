@@ -19,9 +19,11 @@ void help(void) {
               << "Several entries on one line, separated by semicolons, are allowed." << std::endl
               << std::endl
               << "Other commands:" << std::endl
-              << "  '$'     run one step of auto-solving" << std::endl
-              << "  '%'     run auto-solving until blocked (or done)" << std::endl
-              << "  'xrcv'  edit note at row 'r' and column 'c' and unset value 'v'" << std::endl;
+              << "  '>' or '.'    run one step of auto-solving" << std::endl
+              << "  'r'           run auto-solving until blocked (or done)" << std::endl
+              << "  'xrcv'        edit note at row 'r' and column 'c' and unset value 'v'" << std::endl
+              << "  'p'           print the board in a compact format" << std::endl
+              << "  '!'           reset the state of the board" << std::endl;
 }
 
 bool record_entry(Board &board, const std::string &entry) {
@@ -30,44 +32,12 @@ bool record_entry(Board &board, const std::string &entry) {
         return false;
     }
 
-    size_t row = 0;
-    switch (entry[0]) {
-        case '1': row = 0; break;
-        case '2': row = 1; break;
-        case '3': row = 2; break;
-        case '4': row = 3; break;
-        case '5': row = 4; break;
-        case '6': row = 5; break;
-        case '7': row = 6; break;
-        case '8': row = 7; break;
-        case '9': row = 8; break;
-        default: help(); return false;
-    }
-    size_t col = 0;
-    switch (entry[1]) {
-        case '1': col = 0; break;
-        case '2': col = 1; break;
-        case '3': col = 2; break;
-        case '4': col = 3; break;
-        case '5': col = 4; break;
-        case '6': col = 5; break;
-        case '7': col = 6; break;
-        case '8': col = 7; break;
-        case '9': col = 8; break;
-        default: help(); return false;
-    }
-    Value val = kUnset;
-    switch (entry[2]) {
-        case '1': val = kOne; break;
-        case '2': val = kTwo; break;
-        case '3': val = kThree; break;
-        case '4': val = kFour; break;
-        case '5': val = kFive; break;
-        case '6': val = kSix; break;
-        case '7': val = kSeven; break;
-        case '8': val = kEight; break;
-        case '9': val = kNine; break;
-        default: help(); return false;
+    size_t row = entry[0] - '1';
+    size_t col = entry[1] - '1';
+    Value val = static_cast<Value>(entry[2] - '0');
+    if (val == kUnset) {
+        help();
+        return false;
     }
 
     board.at(row, col) = val;
@@ -132,44 +102,12 @@ void edit_note(Board &board, const std::string &entry) {
         return;
     }
 
-    size_t row = 0;
-    switch (entry[1]) {
-        case '1': row = 0; break;
-        case '2': row = 1; break;
-        case '3': row = 2; break;
-        case '4': row = 3; break;
-        case '5': row = 4; break;
-        case '6': row = 5; break;
-        case '7': row = 6; break;
-        case '8': row = 7; break;
-        case '9': row = 8; break;
-        default: help(); return;
-    }
-    size_t col = 0;
-    switch (entry[2]) {
-        case '1': col = 0; break;
-        case '2': col = 1; break;
-        case '3': col = 2; break;
-        case '4': col = 3; break;
-        case '5': col = 4; break;
-        case '6': col = 5; break;
-        case '7': col = 6; break;
-        case '8': col = 7; break;
-        case '9': col = 8; break;
-        default: help(); return;
-    }
-    Value val = kUnset;
-    switch (entry[3]) {
-        case '1': val = kOne; break;
-        case '2': val = kTwo; break;
-        case '3': val = kThree; break;
-        case '4': val = kFour; break;
-        case '5': val = kFive; break;
-        case '6': val = kSix; break;
-        case '7': val = kSeven; break;
-        case '8': val = kEight; break;
-        case '9': val = kNine; break;
-        default: help(); return;
+    size_t row = entry[1] - '1';
+    size_t col = entry[2] - '1';;
+    Value val = static_cast<Value>(entry[3] - '0');
+    if (val == kUnset) {
+        help();
+        return;
     }
 
     Cell &c = board.at(row, col);
@@ -218,22 +156,18 @@ bool routine(Board &board) {
             record_entries(board, nowsline);
             break;
 
-        case '$': // auto-solve one step
+        case '.':
+        case '>': // auto-solve one step
             if (autosolve_one_step(board)) {
                 std::cout << board << std::endl;
             }
             break;
 
-        case '%': // auto-solve until blocked (or finished)
+        case 'r':
+        case 'R': // auto-solve until blocked (or finished)
             autosolve(board);
             break;
-#if 0
-        case '@': // special sauce
-            if (board.hidden_pair()) {
-                std::cout << board << std::endl;
-            }
-            break;
-#endif
+
         case '!': // reset
             board.reset();
             std::cout << board << std::endl;

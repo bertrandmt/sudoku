@@ -7,6 +7,7 @@
 
 Cell &Cell::operator=(const Value &v) {
     assert(isNote());
+    assert(v != kUnset);
 
     mNotes.clear();
     mValue = v;
