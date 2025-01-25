@@ -51,7 +51,7 @@ public:
     bool naked_pair();
 
     template<class Set>
-    bool hidden_pair(Cell &, const Value &, const Value &, Set &, bool &);
+    bool hidden_pair(Cell &, const Value &, const Value &, Set &);
     bool hidden_pair();
 
 
