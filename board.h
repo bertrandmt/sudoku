@@ -75,7 +75,12 @@ private:
     std::vector<Nonet> mNonets;
 
     std::vector<Coord> mNakedSingles;
-    std::vector<std::pair<Coord, Value> > mHiddenSingles;
+    struct HiddenSingle {
+        Coord coord;
+        Value value;
+        std::string tag;
+    };
+    std::vector<HiddenSingle> mHiddenSingles;
 
     template<class Set>
     void autonote(Cell &, Set &);
@@ -87,11 +92,13 @@ private:
     void find_naked_singles();
 
     template<class Set>
-    bool test_hidden_single(const Cell &, const Value &, const Set &) const;
+    bool test_hidden_single(const Cell &, const Value &, const Set &, /*out*/std::string &) const;
     template<class Set>
     void find_hidden_singles_in_set(const Set &);
     void find_hidden_singles(const Cell &);
     void find_hidden_singles();
+
+    void find_locked_candidates();
 
     void analyze(const Cell &);
     void analyze();
