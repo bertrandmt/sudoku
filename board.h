@@ -32,10 +32,7 @@ public:
     void autonote();
 
     bool act_on_naked_single();
-
-    template<class Set>
-    bool hidden_single(Cell &, const Set &, const Value &);
-    bool hidden_single();
+    bool act_on_hidden_single();
 
     template<class Set1, class Set2>
     bool act_on_locked_candidates(const Cell &, const Value &, const Set1 &, const Set2 &);
@@ -76,15 +73,26 @@ private:
     std::vector<Nonet> mNonets;
 
     std::vector<Coord> mNakedSingles;
+    std::vector<std::pair<Coord, Value> > mHiddenSingles;
 
     template<class Set>
     void autonote(Cell &, Set &);
     void autonote(Cell &);
 
     template<class Set>
-    void find_naked_singles_in_set(Set &);
+    void find_naked_singles_in_set(const Set &);
     void find_naked_singles(const Cell &);
     void find_naked_singles();
+
+    template<class Set>
+    bool test_hidden_single(const Cell &, const Value &, const Set &) const;
+    template<class Set>
+    void find_hidden_singles_in_set(const Set &);
+    void find_hidden_singles(const Cell &);
+    void find_hidden_singles();
+
+    void analyze(const Cell &);
+    void analyze();
 
     void rebuild_subsets();
 };
