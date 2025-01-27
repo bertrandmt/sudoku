@@ -29,12 +29,9 @@ public:
     const Column &column(const Cell &) const;
     const Nonet &nonet(const Cell &) const;
 
-    template<class Set>
-    void autonote(Cell &, Set &);
-    void autonote(Cell &);
     void autonote();
 
-    bool naked_single();
+    bool act_on_naked_single();
 
     template<class Set>
     bool hidden_single(Cell &, const Set &, const Value &);
@@ -77,6 +74,17 @@ private:
     std::vector<Row> mRows;
     std::vector<Column> mColumns;
     std::vector<Nonet> mNonets;
+
+    std::vector<Coord> mNakedSingles;
+
+    template<class Set>
+    void autonote(Cell &, Set &);
+    void autonote(Cell &);
+
+    template<class Set>
+    void find_naked_singles_in_set(Set &);
+    void find_naked_singles(const Cell &);
+    void find_naked_singles();
 
     void rebuild_subsets();
 };
