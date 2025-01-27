@@ -15,11 +15,11 @@ class Nonet;
 class Board {
 public:
     Board();
+    Board(const Board &other);
 
     static const size_t width = 9;
     static const size_t height = 9;
 
-    void reset();
     void print(std::ostream &out);
 
     Cell &at(size_t row, size_t col);
@@ -93,6 +93,8 @@ private:
     std::vector<Row> mRows;
     std::vector<Column> mColumns;
     std::vector<Nonet> mNonets;
+
+    void rebuild_subsets();
 };
 
 #include "row.h"
