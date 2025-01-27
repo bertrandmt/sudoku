@@ -24,6 +24,8 @@ public:
 
     Cell &at(size_t row, size_t col);
     const Cell &at(size_t row, size_t col) const;
+    Cell &at(const Coord &coord) { return at(coord.row(), coord.column()); }
+    const Cell &at(const Coord &coord) const { return at(coord.row(), coord.column()); }
 
     const Row &row(const Cell &) const;
     const Column &column(const Cell &) const;
