@@ -10,7 +10,7 @@ bool Solver::solve_one_step(bool singles_only) {
 
     bool did_act = false;
 
-    if (nextBoard.naked_single()) {
+    if (nextBoard.act_on_naked_single()) {
         did_act = true;
     } else if (nextBoard.hidden_single()) {
         did_act = true;

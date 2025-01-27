@@ -22,7 +22,9 @@ Board::Board() {
 }
 
 Board::Board(const Board &other)
-    : mCells(other.mCells) {
+    : mCells(other.mCells)
+    , mNakedSingles(other.mNakedSingles) {
+
     rebuild_subsets();
 }
 
@@ -135,29 +137,54 @@ void Board::autonote() {
     for (auto &cell : mCells) {
         autonote(cell);
     }
+    find_naked_singles();
 }
 
-bool Board::naked_single() {
+template<class Set>
+void Board::find_naked_singles_in_set(Set &set) {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
     // A naked single arises when there is only one possible candidate for a cell
-    bool found_naked_single = false;
-
-    for (auto &c : mCells) {
+    for (auto const &c : set) {
         if (c.isValue()) continue; // only considering note cells
         if (c.notes().count() != 1) continue; // this is the naked single rule: notes have only one entry
 
-        std::vector<Value> vs = c.notes().values();
-        assert(vs.size() == 1);
-        Value v = vs.at(0);
+        if (std::find(mNakedSingles.begin(), mNakedSingles.end(), c.coord()) == mNakedSingles.end()) {
+            mNakedSingles.push_back(c.coord());
+            std::cout << "  [NS] note" << c.coord() << std::endl;
+        }
+    }
+}
 
-        std::cout << "[NS] cell" << c.coord() << " =" << v << std::endl;
-        c = v;
-        autonote(c);
-        found_naked_single = true;
-        break;
+void Board::find_naked_singles(const Cell &cell) {
+    assert(cell.isValue());
+    find_naked_singles_in_set(nonet(cell));
+    find_naked_singles_in_set(column(cell));
+    find_naked_singles_in_set(row(cell));
+}
+
+void Board::find_naked_singles() {
+    find_naked_singles_in_set(mCells);
+}
+
+bool Board::act_on_naked_single() {
+    if (mNakedSingles.empty()) {
+        return false;
     }
 
-    return found_naked_single;
+    Coord coord = mNakedSingles.back();
+    mNakedSingles.pop_back();
+    Cell &cell(at(coord.row(), coord.column()));
+
+    std::vector<Value> values = cell.notes().values();
+    assert(values.size() == 1);
+    Value value = values.at(0);
+
+    std::cout << "[NS] cell" << cell.coord() << " =" << value << std::endl;
+    cell = value;
+    autonote(cell);
+    find_naked_singles(cell);
+
+    return true;
 }
 
 template<class Set>
@@ -432,6 +459,15 @@ std::ostream& operator<<(std::ostream& outs, const Board &b) {
             outs << std::endl;
         }
     }
-    outs << "+=====+=====+=====++=====+=====+=====++=====+=====+=====+";
+    outs << "+=====+=====+=====++=====+=====+=====++=====+=====+=====+" << std::endl
+         << "[NS] {";
+    bool is_first = true;
+    for (auto const &coord : b.mNakedSingles) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << coord;
+    }
+    outs << "}";
+
     return outs;
 }
