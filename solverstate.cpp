@@ -28,7 +28,7 @@ bool SolverState::record_entry_form1(const std::string &entry) {
     Value val = static_cast<Value>(entry[2] - '0');
     if (val == kUnset) { return false; }
 
-    mBoard.at(row, col) = val;
+    mBoard.at(row, col).set(val);
     return true;
 }
 
@@ -63,7 +63,7 @@ bool SolverState::record_entries_form2(const std::string &entries) {
         case '7':
         case '8':
         case '9': // it's a value entry
-            c = static_cast<Value>(entries[index] - '0');
+            c.set(static_cast<Value>(entries[index] - '0'));
             break;
 
         default: // don't know what to do with this

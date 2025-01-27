@@ -57,8 +57,8 @@ public:
     bool check(const Value &v) const { return isNote() && mNotes.check(v); }
     bool set(const Value &v, bool set) { return isNote() && mNotes.set(v, set); }
     bool set_all(bool set) { return isNote() && mNotes.set_all(set); }
+    void set(const Value &v);
 
-    Cell &operator=(const Value &v);
     bool operator==(const Cell &other) const {
         return mCoord == other.mCoord;
     }
