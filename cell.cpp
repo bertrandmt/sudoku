@@ -5,14 +5,12 @@
 
 #include <cassert>
 
-Cell &Cell::operator=(const Value &v) {
+void Cell::set(const Value &v) {
     assert(isNote());
     assert(v != kUnset);
 
     mNotes.clear();
     mValue = v;
-
-    return *this;
 }
 
 bool Notes::set(const Value &v, bool set) {

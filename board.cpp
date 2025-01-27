@@ -245,7 +245,7 @@ bool Board::act_on_naked_single() {
     Value value = values.at(0);
 
     std::cout << "[NS] cell" << cell.coord() << " =" << value << std::endl;
-    cell = value;
+    cell.set(value);
 
     mNakedSingles.pop_back();
 
@@ -264,7 +264,7 @@ bool Board::act_on_hidden_single() {
     auto &cell = at(pair.first);
 
     std::cout << "[HS] cell" << cell.coord() << " =" << pair.second /*<< " [" << set.tag() << "]"*/ << std::endl;
-    cell = pair.second;
+    cell.set(pair.second);
 
     mHiddenSingles.pop_back();
 
