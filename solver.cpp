@@ -12,7 +12,7 @@ bool Solver::solve_one_step(bool singles_only) {
 
     if (nextBoard.act_on_naked_single()) {
         did_act = true;
-    } else if (nextBoard.hidden_single()) {
+    } else if (nextBoard.act_on_hidden_single()) {
         did_act = true;
     } else if (!singles_only && nextBoard.locked_candidates()) {
         did_act = true;

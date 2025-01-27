@@ -23,7 +23,8 @@ Board::Board() {
 
 Board::Board(const Board &other)
     : mCells(other.mCells)
-    , mNakedSingles(other.mNakedSingles) {
+    , mNakedSingles(other.mNakedSingles)
+    , mHiddenSingles(other.mHiddenSingles) {
 
     rebuild_subsets();
 }
@@ -137,26 +138,31 @@ void Board::autonote() {
     for (auto &cell : mCells) {
         autonote(cell);
     }
-    find_naked_singles();
+    analyze();
 }
 
 template<class Set>
-void Board::find_naked_singles_in_set(Set &set) {
+void Board::find_naked_singles_in_set(const Set &set) {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
     // A naked single arises when there is only one possible candidate for a cell
-    for (auto const &c : set) {
-        if (c.isValue()) continue; // only considering note cells
-        if (c.notes().count() != 1) continue; // this is the naked single rule: notes have only one entry
+    for (auto const &cell : set) {
+        if (cell.isValue()) continue; // only considering note cells
+        if (cell.notes().count() != 1) continue; // this is the naked single rule: notes have only one entry
 
-        if (std::find(mNakedSingles.begin(), mNakedSingles.end(), c.coord()) == mNakedSingles.end()) {
-            mNakedSingles.push_back(c.coord());
-            std::cout << "  [NS] note" << c.coord() << std::endl;
+        if (std::find(mNakedSingles.begin(), mNakedSingles.end(), cell.coord()) == mNakedSingles.end()) {
+            mNakedSingles.push_back(cell.coord());
+            std::cout << "  [NS] note" << cell.coord() << std::endl;
         }
     }
 }
 
 void Board::find_naked_singles(const Cell &cell) {
     assert(cell.isValue());
+    const auto &it = std::find(mNakedSingles.begin(), mNakedSingles.end(), cell.coord());
+    if (it != mNakedSingles.end()) {
+        mNakedSingles.erase(it);
+    }
+
     find_naked_singles_in_set(nonet(cell));
     find_naked_singles_in_set(column(cell));
     find_naked_singles_in_set(row(cell));
@@ -166,14 +172,73 @@ void Board::find_naked_singles() {
     find_naked_singles_in_set(mCells);
 }
 
+template<class Set>
+bool Board::test_hidden_single(const Cell &cell, const Value &value, const Set &set) const {
+    for (auto const &other_cell : set) {
+        if (other_cell == cell) continue;               // do not consider the current cell
+        assert(other_cell.isNote() || other_cell.value() != value);
+        if (other_cell.isValue()) continue;             // only considering note cells
+        if (!other_cell.notes().check(value)) continue; // this note cell is _not_ a candidate
+
+        return false;
+    }
+    return true;
+}
+
+template<class Set>
+void Board::find_hidden_singles_in_set(const Set &set) {
+    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
+    // A hidden single arises when there is only one possible cell for a candidate
+    for (auto &cell : set) {
+        if (cell.isValue()) continue; // only considering note cells
+
+        for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
+
+            if (test_hidden_single(cell, value, nonet(cell))
+             || test_hidden_single(cell, value, column(cell))
+             || test_hidden_single(cell, value, row(cell))) {
+                if (std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](const auto &pair) { return cell.coord() == pair.first; }) == mHiddenSingles.end()) {
+                    mHiddenSingles.push_back(std::make_pair(cell.coord(), value));
+                    std::cout << "  [HS] note" << cell.coord() << "#" << value << std::endl;
+                }
+            }
+        }
+    }
+}
+
+void Board::find_hidden_singles(const Cell &cell) {
+    assert(cell.isValue());
+    const auto &it = std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](const auto &pair) { return cell.coord() == pair.first; });
+    if (it != mHiddenSingles.end()) {
+        mHiddenSingles.erase(it);
+    }
+
+    find_hidden_singles_in_set(nonet(cell));
+    find_hidden_singles_in_set(column(cell));
+    find_hidden_singles_in_set(row(cell));
+}
+
+void Board::find_hidden_singles() {
+    find_hidden_singles_in_set(mCells);
+}
+
+void Board::analyze(const Cell &cell) {
+    find_naked_singles(cell);
+    find_hidden_singles(cell);
+}
+
+void Board::analyze() {
+    find_naked_singles();
+    find_hidden_singles();
+}
+
 bool Board::act_on_naked_single() {
     if (mNakedSingles.empty()) {
         return false;
     }
 
-    Coord coord = mNakedSingles.back();
-    mNakedSingles.pop_back();
-    Cell &cell(at(coord.row(), coord.column()));
+    auto const &coord = mNakedSingles.back();
+    auto &cell = at(coord.row(), coord.column());
 
     std::vector<Value> values = cell.notes().values();
     assert(values.size() == 1);
@@ -181,52 +246,32 @@ bool Board::act_on_naked_single() {
 
     std::cout << "[NS] cell" << cell.coord() << " =" << value << std::endl;
     cell = value;
+
+    mNakedSingles.pop_back();
+
     autonote(cell);
-    find_naked_singles(cell);
+    analyze(cell);
 
     return true;
 }
 
-template<class Set>
-bool Board::hidden_single(Cell &cell, const Set &set, const Value &value) {
-    bool other_possible_cell_candidate = false;
-
-    for (auto const &other_cell : set) {
-        if (other_cell == cell) continue;               // do not consider the current cell
-        assert(other_cell.isNote() || other_cell.value() != value);
-        if (other_cell.isValue()) continue;             // only considering note cells
-        if (!other_cell.notes().check(value)) continue; // this note cell is _not_ a candidate
-
-        other_possible_cell_candidate = true;
-        break;
-    }
-    if (!other_possible_cell_candidate) {
-        std::cout << "[HS] cell" << cell.coord() << " =" << value << " [" << set.tag() << "]" << std::endl;
-        cell = value;
-        autonote(cell);
-        return true;
-    }
-    return false;
-}
-
-bool Board::hidden_single() {
-    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
-    // A hidden single arises when there is only one possible cell for a candidate
-    bool found_hidden_single = false;
-
-    for (auto &cell : mCells) {
-        if (cell.isValue()) continue; // only considering note cells
-
-        for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
-
-            if (hidden_single(cell, nonet(cell), value)) { found_hidden_single = true; break; }
-            if (hidden_single(cell, column(cell), value)) { found_hidden_single = true; break; }
-            if (hidden_single(cell, row(cell), value)) { found_hidden_single = true; break; }
-        }
-        if (found_hidden_single) break;
+bool Board::act_on_hidden_single() {
+    if (mHiddenSingles.empty()) {
+        return false;
     }
 
-    return found_hidden_single;
+    auto const &pair = mHiddenSingles.back();
+    auto &cell = at(pair.first.row(), pair.first.column());
+
+    std::cout << "[HS] cell" << cell.coord() << " =" << pair.second /*<< " [" << set.tag() << "]"*/ << std::endl;
+    cell = pair.second;
+
+    mHiddenSingles.pop_back();
+
+    autonote(cell);
+    analyze(cell);
+
+    return true;
 }
 
 template<class Set1, class Set2>
@@ -466,6 +511,14 @@ std::ostream& operator<<(std::ostream& outs, const Board &b) {
         if (!is_first) { outs << ", "; }
         is_first = false;
         outs << coord;
+    }
+    outs << "}" << std::endl
+         << "[HS] {";
+    is_first = true;
+    for (auto const &pair : b.mHiddenSingles) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << pair.first << "#" << pair.second;
     }
     outs << "}";
 
