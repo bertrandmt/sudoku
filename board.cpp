@@ -13,25 +13,30 @@ namespace { // anonymous
 }
 
 Board::Board() {
-    reset();
+    for (size_t row = 0; row < height; row++) {
+        for (size_t col = 0; col < width; col++) {
+            mCells.push_back(Cell(row, col));
+        }
+    }
+    rebuild_subsets();
 }
 
-void Board::reset() {
-    mCells.clear();
+Board::Board(const Board &other)
+    : mCells(other.mCells) {
+    rebuild_subsets();
+}
+
+void Board::rebuild_subsets() {
+    assert(mCells.size() == kSUDOKU_BOARD_SIZE);
+
     mRows.clear();
     mColumns.clear();
     mNonets.clear();
 
     for (size_t row = 0; row < height; row++) {
-        for (size_t col = 0; col < width; col++) {
-            Cell c(row, col);
-            mCells.push_back(c);
-        }
-
         Row r(*this, row);
         mRows.push_back(r);
     }
-    assert(mCells.size() == kSUDOKU_BOARD_SIZE);
     assert(mRows.size() == height);
 
     for (size_t col = 0; col < width; col++) {

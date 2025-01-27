@@ -3,6 +3,8 @@
 
 #include "board.h"
 #include "cell.h"
+#include "solverstate.h"
+#include "solver.h"
 
 #include <iostream>
 #include <string>
@@ -10,152 +12,32 @@
 namespace {
 
 void help(void) {
-    std::cout << "Enter table entries in the format:" << std::endl
-              << "    rcv[;...]" << std::endl
-              << "  where:" << std::endl
-              << "    * \"r\" is the row, with value between 1 and 9, and" << std::endl
-              << "    * \"c\" is the column, with value between 1 and 9, and" << std::endl
-              << "    * \"v\" is the value, with value between 1 and 9." << std::endl
-              << "Several entries on one line, separated by semicolons, are allowed." << std::endl
+    std::cout << "Commands:" << std::endl
+              << "  'n'          Start a new game" << std::endl
+              << "               Enter table entries in one of two formats:" << std::endl
+              << "                 ;rcv[;...]" << std::endl
+              << "                   where:" << std::endl
+              << "                     * \"r\" is the row, with value between 1 and 9, and" << std::endl
+              << "                     * \"c\" is the column, with value between 1 and 9, and" << std::endl
+              << "                     * \"v\" is the value, with value between 1 and 9." << std::endl
+              << "                   Enter all entries, on one line, separated by semicolons." << std::endl
+              << "                 .[v|.]*" << std::endl
+              << "                   where:" << std::endl
+              << "                     * \"v\" is a value between 1 and 9, and" << std::endl
+              << "                     * \".\" indicates an unset cell." << std::endl
+              << "                   All 81 cells in a board must be entered." << std::endl
               << std::endl
               << "Other commands:" << std::endl
               << "  '>' or '.'    run one step of auto-solving" << std::endl
+              << "  '<' or ','    go back one auto-solveing step" << std::endl
+              << "  '!'           reset the solver to its initial state" << std::endl
               << "  'r'           run auto-solving until blocked (or done)" << std::endl
+              << "  's'           run auto-solving using only 'singles' heuristics" << std::endl
               << "  'xrcv'        edit note at row 'r' and column 'c' and unset value 'v'" << std::endl
-              << "  'p'           print the board in a compact format" << std::endl
-              << "  '!'           reset the state of the board" << std::endl;
+              << "  'p'           print the board in a compact format" << std::endl;
 }
 
-void record_game(Board &board, const std::string &entries) {
-    if (entries.size() != board.width * board.height + 1) {
-        help();
-        return;
-    }
-
-    size_t index = 1;
-    for (auto &c : board) {
-        switch (entries[index]) {
-        case '.': // it's a note entry
-            break;
-
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9': // it's a value entry
-            c = static_cast<Value>(entries[index] - '0');
-            break;
-
-        default: // don't know what to do with this
-            help();
-            return;
-        }
-        index++;
-    }
-
-    board.autonote();
-    std::cout << board << std::endl;
-}
-
-bool record_entry(Board &board, const std::string &entry) {
-    if (entry.size() != 3) {
-        help();
-        return false;
-    }
-
-    size_t row = entry[0] - '1';
-    size_t col = entry[1] - '1';
-    Value val = static_cast<Value>(entry[2] - '0');
-    if (val == kUnset) {
-        help();
-        return false;
-    }
-
-    board.at(row, col) = val;
-    return true;
-}
-
-void record_entries(Board &board, const std::string &entries) {
-    std::vector<std::string> v_entries;
-    size_t ofsb = 0, ofse = 0;
-    while (ofse != std::string::npos) {
-        ofse = entries.find(';', ofsb);
-        std::string entry = entries.substr(ofsb, ofse - ofsb);
-        v_entries.push_back(entry);
-        ofsb = ofse + 1;
-    }
-
-    for (auto const &entry : v_entries) {
-        bool ok = record_entry(board, entry);
-        if (!ok) return;
-    }
-
-    board.autonote();
-    std::cout << board << std::endl;
-}
-
-bool autosolve_one_step(Board &board) {
-    if (board.naked_single()) {
-        return true;
-    }
-
-    if (board.hidden_single()) {
-        return true;
-    }
-
-    if (board.locked_candidates()) {
-        return true;
-    }
-
-    if (board.naked_pair()) {
-        return true;
-    }
-
-    if (board.hidden_pair()) {
-        return true;
-    }
-
-    return false;
-}
-
-void autosolve(Board &board) {
-    bool did_act = false;
-    while (autosolve_one_step(board)) did_act = true;
-
-    if (did_act) {
-        std::cout << board << std::endl;
-    };
-}
-
-void edit_note(Board &board, const std::string &entry) {
-    if (entry.size() != 4) {
-        help();
-        return;
-    }
-
-    size_t row = entry[1] - '1';
-    size_t col = entry[2] - '1';;
-    Value val = static_cast<Value>(entry[3] - '0');
-    if (val == kUnset) {
-        help();
-        return;
-    }
-
-    Cell &c = board.at(row, col);
-    if (!c.isNote()) {
-        std::cout << "note" << c.coord() << " is a value cell, not a note cell" << std::endl;
-        return;
-    }
-
-    c.notes().set(val, false);
-    std::cout << board << std::endl;
-}
-
-bool routine(Board &board) {
+bool routine(Solver::ptr &solver) {
     bool done = false;
 
     std::string line;
@@ -179,47 +61,58 @@ bool routine(Board &board) {
             std::cout << line << std::endl;
             return done;
 
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9': // it's recording one or more entries
-            record_entries(board, nowsline);
-            break;
-
-        case ']': // it's recording a game
-            record_game(board, nowsline);
+        case 'n': { // it's a new game
+            Solver::ptr s(new Solver(nowsline.substr(1)));
+            if (!s->isValid()) {
+                help();
+                break;
+            }
+            solver = s;
+            std::cout << *solver << std::endl;
+            }
             break;
 
         case '.':
         case '>': // auto-solve one step
-            if (autosolve_one_step(board)) {
-                std::cout << board << std::endl;
-            }
+            if (!solver->isValid()) { help(); break; }
+            if (solver->solve_one_step(false)) { std::cout << *solver << std::endl; }
+            else                               { std::cout << "???" << std::endl; }
+            break;
+
+        case ',':
+        case '<': // back one step
+            if (!solver->isValid()) { help(); break; }
+            if (solver->back_one_step()) { std::cout << *solver << std::endl; }
             break;
 
         case 'r':
         case 'R': // auto-solve until blocked (or finished)
-            autosolve(board);
+            if (!solver->isValid()) { help(); break; }
+            if (solver->solve()) { std::cout << *solver << std::endl; }
+            break;
+
+        case 's':
+        case 'S':
+            if (!solver->isValid()) { help(); break; }
+            if (solver->solve_singles()) { std::cout << *solver << std::endl; }
             break;
 
         case '!': // reset
-            board.reset();
-            std::cout << board << std::endl;
+            if (!solver->isValid()) { help(); break; }
+            if (solver->reset()) { std::cout << *solver << std::endl; }
             break;
 
         case 'x':
         case 'X': // edit a note
-            edit_note(board, nowsline);
+            if (!solver->isValid()) { help(); break; }
+            if (solver->edit_note(nowsline.substr(1))) { std::cout << *solver << std::endl; }
+            else                                       { help(); }
             break;
 
         case 'p':
         case 'P':
-            board.print(std::cout);
+            if (!solver->isValid()) { help(); break; }
+            solver->currentState()->board().print(std::cout);
             break;
 
         default:
@@ -233,11 +126,12 @@ bool routine(Board &board) {
 } // namespace anonymous
 
 int main(void) {
-    Board board;
+    Solver::ptr solver(new Solver());
+
     bool done = false;
 
     do {
-        done = routine(board);
+        done = routine(solver);
     } while (!done);
 
     return 0;

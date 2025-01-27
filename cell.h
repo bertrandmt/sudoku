@@ -32,7 +32,7 @@ public:
 
     bool check(const Value &v) const { return mNotes.at(v - 1); }
     bool set(const Value &v, bool set);
-    void set_all(bool set) { mNotes.assign(mNotes.size(), set); }
+    bool set_all(bool set) { mNotes.assign(mNotes.size(), set); return true; }
 
     size_t count() const;
     std::vector<Value> values() const;
@@ -54,6 +54,9 @@ public:
     Value value() const { return mValue; }
     Notes &notes() { assert(isNote()); return mNotes; }
     const Notes &notes() const { assert(isNote()); return mNotes; }
+    bool check(const Value &v) const { return isNote() && mNotes.check(v); }
+    bool set(const Value &v, bool set) { return isNote() && mNotes.set(v, set); }
+    bool set_all(bool set) { return isNote() && mNotes.set_all(set); }
 
     Cell &operator=(const Value &v);
     bool operator==(const Cell &other) const {
