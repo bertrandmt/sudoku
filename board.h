@@ -55,33 +55,17 @@ public:
     bool hidden_pair();
 
 
-    auto begin() { return mCells.begin(); }
-    auto end() { return mCells.end(); }
+    std::vector<Cell> &cells() { return mCells; }
+    const std::vector<Cell> &cells() const { return mCells; }
 
-    auto begin() const { return mCells.begin(); }
-    auto end() const { return mCells.end(); }
+    std::vector<Row> &rows() { return mRows; }
+    const std::vector<Row> &rows() const { return mRows; }
 
+    std::vector<Column> &columns() { return mColumns; }
+    const std::vector<Column> &columns() const { return mColumns; }
 
-    auto row_begin() { return mRows.begin(); }
-    auto row_end() { return mRows.end(); }
-
-    auto row_begin() const { return mRows.begin(); }
-    auto row_end() const { return mRows.end(); }
-
-
-    auto column_begin() { return mColumns.begin(); }
-    auto column_end() { return mColumns.end(); }
-
-    auto column_begin() const { return mColumns.begin(); }
-    auto column_end() const { return mColumns.end(); }
-
-
-    auto nonet_begin() { return mNonets.begin(); }
-    auto nonet_end() { return mNonets.end(); }
-
-    auto nonet_begin() const { return mNonets.begin(); }
-    auto nonet_end() const { return mNonets.end(); }
-
+    std::vector<Nonet> &nonets() { return mNonets; }
+    const std::vector<Nonet> &nonets() const { return mNonets; }
 
     friend std::ostream& operator<< (std::ostream& outs, const Board &);
     friend class Row;

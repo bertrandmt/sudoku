@@ -56,7 +56,7 @@ void Board::rebuild_subsets() {
 }
 
 void Board::print(std::ostream &out) {
-    for (auto const &c : *this) {
+    for (auto const &c : mCells) {
         if (c.isValue()) out << c.value();
         else             out << '.';
     }
@@ -132,7 +132,7 @@ void Board::autonote(Cell &cell) {
 }
 
 void Board::autonote() {
-    for (auto &cell : *this) {
+    for (auto &cell : mCells) {
         autonote(cell);
     }
 }
@@ -142,7 +142,7 @@ bool Board::naked_single() {
     // A naked single arises when there is only one possible candidate for a cell
     bool found_naked_single = false;
 
-    for (auto &c : *this) {
+    for (auto &c : mCells) {
         if (c.isValue()) continue; // only considering note cells
         if (c.notes().count() != 1) continue; // this is the naked single rule: notes have only one entry
 
@@ -187,7 +187,7 @@ bool Board::hidden_single() {
     // A hidden single arises when there is only one possible cell for a candidate
     bool found_hidden_single = false;
 
-    for (auto &cell : *this) {
+    for (auto &cell : mCells) {
         if (cell.isValue()) continue; // only considering note cells
 
         for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
@@ -253,7 +253,7 @@ bool Board::locked_candidates() {
 
     bool acted_on_locked_candidates = false;
 
-    for (auto const &c : *this) {
+    for (auto const &c : mCells) {
         if (c.isValue()) continue; // only considering note cells
 
         for (auto const &v : c.notes().values()) { // for each candidate value in this note cell
@@ -322,7 +322,7 @@ bool Board::naked_pair() {
 
     bool acted_on_naked_pair = false;
 
-    for (auto const &c : *this) {
+    for (auto const &c : mCells) {
         if (c.isValue()) continue; // only considering note cells
         auto c_values = c.notes().values();
         assert(c_values.size() >= 2); // otherwise would have been caught at single stage.
@@ -396,7 +396,7 @@ bool Board::hidden_pair() {
 
     bool acted_on_hidden_pair = false;
 
-    for (auto &c : *this) {
+    for (auto &c : mCells) {
         if (c.isValue()) continue; // only considering note cells
         auto c_values = c.notes().values();
         assert(c_values.size() >= 2); // otherwise would have been caught at single stage.

@@ -49,7 +49,7 @@ bool SolverState::record_entries_form2(const std::string &entries) {
     }
 
     size_t index = 0;
-    for (auto &c : mBoard) {
+    for (auto &c : mBoard.cells()) {
         switch (entries[index]) {
         case '.': // it's a note entry
             break;
