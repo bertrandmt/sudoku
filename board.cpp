@@ -151,7 +151,7 @@ void Board::find_naked_singles_in_set(const Set &set) {
 
         if (std::find(mNakedSingles.begin(), mNakedSingles.end(), cell.coord()) == mNakedSingles.end()) {
             mNakedSingles.push_back(cell.coord());
-            std::cout << "  [NS] note" << cell.coord() << std::endl;
+            std::cout << "  [fNS] note" << cell.coord() << std::endl;
         }
     }
 }
@@ -173,7 +173,7 @@ void Board::find_naked_singles() {
 }
 
 template<class Set>
-bool Board::test_hidden_single(const Cell &cell, const Value &value, const Set &set) const {
+bool Board::test_hidden_single(const Cell &cell, const Value &value, const Set &set, std::string &tag) const {
     for (auto const &other_cell : set) {
         if (other_cell == cell) continue;               // do not consider the current cell
         assert(other_cell.isNote() || other_cell.value() != value);
@@ -182,6 +182,7 @@ bool Board::test_hidden_single(const Cell &cell, const Value &value, const Set &
 
         return false;
     }
+    tag.append(set.tag());
     return true;
 }
 
@@ -194,12 +195,13 @@ void Board::find_hidden_singles_in_set(const Set &set) {
 
         for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
 
-            if (test_hidden_single(cell, value, nonet(cell))
-             || test_hidden_single(cell, value, column(cell))
-             || test_hidden_single(cell, value, row(cell))) {
-                if (std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](const auto &pair) { return cell.coord() == pair.first; }) == mHiddenSingles.end()) {
-                    mHiddenSingles.push_back(std::make_pair(cell.coord(), value));
-                    std::cout << "  [HS] note" << cell.coord() << "#" << value << std::endl;
+            std::string tag;
+            if (test_hidden_single(cell, value, nonet(cell), tag)
+             || test_hidden_single(cell, value, column(cell), tag)
+             || test_hidden_single(cell, value, row(cell), tag)) {
+                if (std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](const auto &entry) { return cell.coord() == entry.coord; }) == mHiddenSingles.end()) {
+                    mHiddenSingles.push_back(HiddenSingle(cell.coord(), value, tag));
+                    std::cout << "  [fHS] note" << cell.coord() << "#" << value << "[" << tag << "]" << std::endl;
                 }
             }
         }
@@ -208,7 +210,7 @@ void Board::find_hidden_singles_in_set(const Set &set) {
 
 void Board::find_hidden_singles(const Cell &cell) {
     assert(cell.isValue());
-    const auto &it = std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](const auto &pair) { return cell.coord() == pair.first; });
+    const auto &it = std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](const auto &entry) { return cell.coord() == entry.coord; });
     if (it != mHiddenSingles.end()) {
         mHiddenSingles.erase(it);
     }
@@ -260,11 +262,11 @@ bool Board::act_on_hidden_single() {
         return false;
     }
 
-    auto const &pair = mHiddenSingles.back();
-    auto &cell = at(pair.first);
+    auto const &entry = mHiddenSingles.back();
+    auto &cell = at(entry.coord);
 
-    std::cout << "[HS] cell" << cell.coord() << " =" << pair.second /*<< " [" << set.tag() << "]"*/ << std::endl;
-    cell.set(pair.second);
+    std::cout << "[HS] cell" << cell.coord() << " =" << entry.value << " [" << entry.tag << "]" << std::endl;
+    cell.set(entry.value);
 
     mHiddenSingles.pop_back();
 
@@ -515,10 +517,10 @@ std::ostream& operator<<(std::ostream& outs, const Board &b) {
     outs << "}" << std::endl
          << "[HS] {";
     is_first = true;
-    for (auto const &pair : b.mHiddenSingles) {
+    for (auto const &entry: b.mHiddenSingles) {
         if (!is_first) { outs << ", "; }
         is_first = false;
-        outs << pair.first << "#" << pair.second;
+        outs << entry.coord << "#" << entry.value << "[" << entry.tag << "]";
     }
     outs << "}";
 
