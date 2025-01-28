@@ -81,6 +81,10 @@ public:
              && mCoord == other.mCoord;
     }
 
+    bool contains(const Cell &other) const {
+        return std::find(begin(), end(), other) != end();
+    }
+
     friend std::ostream& operator<< (std::ostream& outs, const Nonet &);
 
 private:

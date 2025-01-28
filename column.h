@@ -59,6 +59,10 @@ public:
     auto begin() const { return Iterator(mBoard, mCellStart); }
     auto end() const { return Iterator(mBoard, mCellSentinel); }
 
+    bool contains(const Cell &other) const {
+        return std::find(begin(), end(), other) != end();
+    }
+
     bool operator==(const Column &other) const {
         return &mBoard == &other.mBoard
              && mIndex == other.mIndex;
