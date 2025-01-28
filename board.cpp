@@ -337,10 +337,21 @@ void Board::find_naked_pair(const Cell &cell, const Set &set) {
         auto pc_v2 = pair_cell_values.at(1);
         if (!((v1 == pc_v1 && v2 == pc_v2) || (v1 == pc_v2 && v2 == pc_v1))) continue; // it's a pair, but not the same pair
 
-        NakedPair np(std::make_pair(cell.coord(), pair_cell.coord()), std::make_pair(v1, v2));
-        mNakedPairs.push_back(np);
-        std::cout << "  [fNP] " << np << std::endl;
-        break;
+        // ok, it's a pair, but would acting on it have an effect?
+        bool would_act = false;
+        for (auto const &other_cell : set) {
+            if (other_cell.isValue()) continue;
+            if (other_cell == pair_cell || other_cell == cell) continue;
+            if (!other_cell.check(v1) && !other_cell.check(v2)) continue; // no impact on this cell
+
+            would_act = true;
+        }
+        if (would_act) {
+            NakedPair np(std::make_pair(cell.coord(), pair_cell.coord()), std::make_pair(v1, v2));
+            mNakedPairs.push_back(np);
+            std::cout << "  [fNP] " << np << std::endl;
+            break;
+        }
     }
 }
 
