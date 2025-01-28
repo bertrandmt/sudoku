@@ -4,6 +4,8 @@
 
 #include "board.h"
 
+#include <memory>
+
 class SolverState {
 public:
     using ptr = std::shared_ptr<SolverState>;

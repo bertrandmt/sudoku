@@ -4,6 +4,8 @@
 
 #include "solverstate.h"
 
+#include <memory>
+
 class Solver {
 public:
     using ptr = std::shared_ptr<Solver>;
