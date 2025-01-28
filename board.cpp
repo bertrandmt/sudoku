@@ -194,7 +194,15 @@ void Board::find_hidden_singles_in_set(const Set &set) {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
     // A hidden single arises when there is only one possible cell for a candidate
     for (auto &cell : set) {
-        if (cell.isValue()) continue; // only considering note cells
+        if (cell.isValue()) continue;           // only considering note cells
+        if (cell.notes().count() == 1) {        // if there's only one note, the single is not really "hidden"
+            auto it = std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](auto const &entry) { return cell.coord() == entry.coord;});
+            if (it != mHiddenSingles.end()) {   // if it was previously recorded as "hidden", remove it
+                mHiddenSingles.erase(it);
+                std::cout << "  [xHS] " << cell.coord() << " [NS]" << std::endl;
+            }
+            continue;                           // also, don't continue processing
+        }
 
         for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
 
