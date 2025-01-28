@@ -24,7 +24,8 @@ Board::Board() {
 Board::Board(const Board &other)
     : mCells(other.mCells)
     , mNakedSingles(other.mNakedSingles)
-    , mHiddenSingles(other.mHiddenSingles) {
+    , mHiddenSingles(other.mHiddenSingles)
+    , mLockedCandidates(other.mLockedCandidates) {
 
     rebuild_subsets();
 }
@@ -109,7 +110,7 @@ void Board::autonote(Cell &cell, Set &set) {
             if (other_cell.isNote()) continue; // other note cells do not participate in this update
             if (!cell.notes().check(other_cell.value())) continue; // the value of other_cell is already checked off cell's notes
 
-            std::cout << "  [ANn] note" << cell.coord() << " x" << other_cell.value()
+            std::cout << "  [ANn] " << cell.coord() << " x" << other_cell.value()
                       << " " << set.tag() << "(" << other_cell.coord() << ")" << std::endl;
             cell.notes().set(other_cell.value(), false);
         }
@@ -121,7 +122,7 @@ void Board::autonote(Cell &cell, Set &set) {
             if (other_cell.isValue()) continue; // other value cells do not get changed by this process
             if (!other_cell.notes().check(cell.value())) continue; // the value of cell is already checked off other_cell's notes
 
-            std::cout << "  [ANv] note" << other_cell.coord() << " x" << cell.value()
+            std::cout << "  [ANv] " << other_cell.coord() << " x" << cell.value()
                       << " " << set.tag() << "(" << cell.coord() << ")" << std::endl;
             other_cell.notes().set(cell.value(), false);
         }
@@ -151,16 +152,17 @@ void Board::find_naked_singles_in_set(const Set &set) {
 
         if (std::find(mNakedSingles.begin(), mNakedSingles.end(), cell.coord()) == mNakedSingles.end()) {
             mNakedSingles.push_back(cell.coord());
-            std::cout << "  [fNS] note" << cell.coord() << std::endl;
+            std::cout << "  [fNS] " << cell.coord() << std::endl;
         }
     }
 }
 
 void Board::find_naked_singles(const Cell &cell) {
-    assert(cell.isValue());
-    const auto &it = std::find(mNakedSingles.begin(), mNakedSingles.end(), cell.coord());
-    if (it != mNakedSingles.end()) {
-        mNakedSingles.erase(it);
+    if (cell.isValue()) {
+        const auto &it = std::find(mNakedSingles.begin(), mNakedSingles.end(), cell.coord());
+        if (it != mNakedSingles.end()) {
+            mNakedSingles.erase(it);
+        }
     }
 
     find_naked_singles_in_set(nonet(cell));
@@ -200,8 +202,9 @@ void Board::find_hidden_singles_in_set(const Set &set) {
              || test_hidden_single(cell, value, column(cell), tag)
              || test_hidden_single(cell, value, row(cell), tag)) {
                 if (std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](const auto &entry) { return cell.coord() == entry.coord; }) == mHiddenSingles.end()) {
-                    mHiddenSingles.push_back(HiddenSingle(cell.coord(), value, tag));
-                    std::cout << "  [fHS] note" << cell.coord() << "#" << value << "[" << tag << "]" << std::endl;
+                    HiddenSingle hs(cell.coord(), value, tag);
+                    mHiddenSingles.push_back(hs);
+                    std::cout << "  [fHS] " << hs << std::endl;
                 }
             }
         }
@@ -209,10 +212,11 @@ void Board::find_hidden_singles_in_set(const Set &set) {
 }
 
 void Board::find_hidden_singles(const Cell &cell) {
-    assert(cell.isValue());
-    const auto &it = std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](const auto &entry) { return cell.coord() == entry.coord; });
-    if (it != mHiddenSingles.end()) {
-        mHiddenSingles.erase(it);
+    if (cell.isValue()) {
+        const auto &it = std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](const auto &entry) { return cell.coord() == entry.coord; });
+        if (it != mHiddenSingles.end()) {
+            mHiddenSingles.erase(it);
+        }
     }
 
     find_hidden_singles_in_set(nonet(cell));
@@ -224,20 +228,113 @@ void Board::find_hidden_singles() {
     find_hidden_singles_in_set(mCells);
 }
 
+template<class Set1, class Set2>
+bool Board::test_locked_candidate(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore, std::vector<Coord> &lc_coords) {
+    for (auto const &other_cell : set_to_consider) {
+        if (other_cell.isValue()) continue;                                                             // do not consider value cells
+        if (other_cell == cell) continue;                                                               // do not consider the current cell
+        assert(other_cell.isNote() || other_cell.value() != value);
+        if (!other_cell.check(value)) continue;                                                         // not a candidate
+        if (std::find(set_to_ignore.begin(), set_to_ignore.end(), other_cell) != set_to_ignore.end()) { // this is another one of the candidates
+            lc_coords.push_back(other_cell.coord());    // record it
+            continue;                                   // and continue the search
+        }
+
+        return false;
+    }
+
+    // ensure that this set of locked candidates, if acted on, *would* have an effect
+    for (auto const &other_cell : set_to_ignore) {
+        if (other_cell.isValue()) continue;                                                                           // do not consider value cells
+        if (other_cell == cell) continue;                                                                             // do not consider the current cell
+        if (!other_cell.check(value)) continue;                                                                       // not a candidate
+        if (std::find(set_to_consider.begin(), set_to_consider.end(), other_cell) != set_to_consider.end()) continue; // this is one of the locked candidaets
+
+        // we found a note cell that is in the rest of the "set_to_ignore" and also is a candidate for this value:
+        // we *would* act on it
+        return true;
+    }
+
+    return false;
+}
+
+template<class Set>
+void Board::find_locked_candidates_in_set(const Set &set) {
+    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#blocks
+    // Form 1:
+    // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same row/column,
+    // then it is also not possible anywhere else in the same nonet
+    // Form 2:
+    // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same nonet,
+    // then it is also not possible anywhere else in the same row/column
+
+    for (auto const &c : set) {
+        if (c.isValue()) continue; // only considering note cells
+
+        for (auto const &v : c.notes().values()) { // for each candidate value in this note cell
+
+            // form 1
+            std::vector<Coord> lc_coords(1, c.coord());
+            if (std::find_if(mLockedCandidates.begin(), mLockedCandidates.end(), [c,v](const auto &entry) { return entry.contains(c.coord(), v, "n"); }) == mLockedCandidates.end()
+             && test_locked_candidate(c, v, row(c), nonet(c), lc_coords)) {
+                LockedCandidates lc(lc_coords, v, "n");
+                mLockedCandidates.push_back(lc);
+                std::cout << "  [fLC] " << lc << std::endl;
+            }
+
+            lc_coords.erase(lc_coords.begin() + 1, lc_coords.end());
+            if (std::find_if(mLockedCandidates.begin(), mLockedCandidates.end(), [c,v](const auto &entry) { return entry.contains(c.coord(), v, "n"); }) == mLockedCandidates.end()
+             && test_locked_candidate(c, v, column(c), nonet(c), lc_coords)) {
+                LockedCandidates lc(lc_coords, v, "n");
+                mLockedCandidates.push_back(lc);
+                std::cout << "  [fLC] " << lc << std::endl;
+            }
+
+            // form 2
+            lc_coords.erase(lc_coords.begin() + 1, lc_coords.end());
+            if (std::find_if(mLockedCandidates.begin(), mLockedCandidates.end(), [c,v](const auto &entry) { return entry.contains(c.coord(), v, "r"); }) == mLockedCandidates.end()
+             && test_locked_candidate(c, v, nonet(c), row(c), lc_coords)) {
+                LockedCandidates lc(lc_coords, v, "r");
+                mLockedCandidates.push_back(lc);
+                std::cout << "  [fLC] " << lc << std::endl;
+            }
+
+            lc_coords.erase(lc_coords.begin() + 1, lc_coords.end());
+            if (std::find_if(mLockedCandidates.begin(), mLockedCandidates.end(), [c,v](const auto &entry) { return entry.contains(c.coord(), v, "c"); }) == mLockedCandidates.end()
+             && test_locked_candidate(c, v, nonet(c), column(c), lc_coords)) {
+                LockedCandidates lc(lc_coords, v, "c");
+                mLockedCandidates.push_back(lc);
+                std::cout << "  [fLC] " << lc << std::endl;
+            }
+        }
+    }
+}
+
+void Board::find_locked_candidates(const Cell &) {
+    mLockedCandidates.erase(mLockedCandidates.begin(), mLockedCandidates.end());
+    find_locked_candidates_in_set(mCells);
+}
+
+void Board::find_locked_candidates() {
+    mLockedCandidates.erase(mLockedCandidates.begin(), mLockedCandidates.end());
+    find_locked_candidates_in_set(mCells);
+}
+
+
 void Board::analyze(const Cell &cell) {
     find_naked_singles(cell);
     find_hidden_singles(cell);
+    find_locked_candidates(cell);
 }
 
 void Board::analyze() {
     find_naked_singles();
     find_hidden_singles();
+    find_locked_candidates();
 }
 
 bool Board::act_on_naked_single() {
-    if (mNakedSingles.empty()) {
-        return false;
-    }
+    if (mNakedSingles.empty()) { return false; }
 
     auto const &coord = mNakedSingles.back();
     auto &cell = at(coord);
@@ -258,9 +355,7 @@ bool Board::act_on_naked_single() {
 }
 
 bool Board::act_on_hidden_single() {
-    if (mHiddenSingles.empty()) {
-        return false;
-    }
+    if (mHiddenSingles.empty()) { return false; }
 
     auto const &entry = mHiddenSingles.back();
     auto &cell = at(entry.coord);
@@ -276,73 +371,47 @@ bool Board::act_on_hidden_single() {
     return true;
 }
 
-template<class Set1, class Set2>
-bool Board::act_on_locked_candidates(const Cell &cell, const Value &value, const Set1 &set_to_consider, const Set2 &set_to_ignore) {
+template<class Set>
+bool Board::act_on_locked_candidate(const LockedCandidates &entry, Set &set) {
     bool acted_on_locked_candidates = false;
 
-    for (auto &other_cell : set_to_consider) {
-        if (other_cell == cell) continue;   // do not consider the current cell
-        if (other_cell.isValue()) continue;              // only considering note cells
-        if (!other_cell.notes().check(value)) continue;      // this note cell is _not_ a candidate for the same value
-        if (std::find(set_to_ignore.begin(), set_to_ignore.end(), other_cell) != set_to_ignore.end()) continue; // this is one of the other candidates in the same set
+    for (auto &other_cell : set) {
+        if (other_cell.isValue()) continue;      // only considering note cells
+        if (std::find(entry.coords.begin(), entry.coords.end(), other_cell.coord())
+                != entry.coords.end()) continue; // this is one of the locked candidates
+        if (!other_cell.check(entry.value)) continue;  // this note cell is _not_ a candidate for the same value
 
-        std::cout << "[LC] note" << other_cell.coord() << " x" << value << " [" << set_to_consider.tag() << "]" << std::endl;
-        other_cell.notes().set(value, false);
+        std::cout << "[LC] " << other_cell.coord() << " x" << entry.value << " [" << entry.tag << "]" << std::endl;
+        other_cell.set(entry.value, false);
         acted_on_locked_candidates = true;
+
+        autonote(other_cell);
+        analyze(other_cell);
     }
 
+    assert(acted_on_locked_candidates);
     return acted_on_locked_candidates;
 }
 
-template<class Set1, class Set2>
-bool Board::locked_candidates(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore) {
-    bool acted_on_locked_candidates = false;
+bool Board::act_on_locked_candidate() {
+    if (mLockedCandidates.empty()) { return false; }
 
-    bool condition_met = true;
-    for (auto const &other_cell : set_to_ignore) {
-        if (other_cell.isValue()) continue;                                                                           // do not consider value cells
-        if (other_cell == cell) continue;                                                                             // do not consider the current cell
-        assert(other_cell.isNote() || other_cell.value() != value);
-        if (!other_cell.notes().check(value)) continue;                                                               // not a candidate
-        if (std::find(set_to_consider.begin(), set_to_consider.end(), other_cell) != set_to_consider.end()) continue; // we are looking for a candidate outside of this nonet
+    auto const entry = mLockedCandidates.back(); // copy
+    auto &cell = at(entry.coords.at(0));
 
-        condition_met = false;
+    switch (entry.tag[0]) {
+    case 'n':
+        (void) act_on_locked_candidate(entry, nonet(cell));
+        break;
+    case 'c':
+        (void) act_on_locked_candidate(entry, column(cell));
+        break;
+    case 'r':
+        (void) act_on_locked_candidate(entry, row(cell));
         break;
     }
-    if (condition_met) {
-        acted_on_locked_candidates = act_on_locked_candidates(cell, value, set_to_consider, set_to_ignore);
-    }
 
-    return acted_on_locked_candidates;
-}
-
-bool Board::locked_candidates() {
-    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#blocks
-    // Form 1:
-    // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same row/column,
-    // then it is also not possible anywhere else in the same nonet
-    // Form 2:
-    // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same nonet,
-    // then it is also not possible anywhere else in the same row/column
-
-    bool acted_on_locked_candidates = false;
-
-    for (auto const &c : mCells) {
-        if (c.isValue()) continue; // only considering note cells
-
-        for (auto const &v : c.notes().values()) { // for each candidate value in this note cell
-            // form 1
-            if (locked_candidates(c, v, row(c), nonet(c))) { acted_on_locked_candidates = true; break; }
-            if (locked_candidates(c, v, column(c), nonet(c))) { acted_on_locked_candidates = true; break; }
-
-            // form 2
-            if (locked_candidates(c, v, nonet(c), row(c))) { acted_on_locked_candidates = true; break; }
-            if (locked_candidates(c, v, nonet(c), column(c))) { acted_on_locked_candidates = true; break; }
-        }
-        if (acted_on_locked_candidates) break;
-    }
-
-    return acted_on_locked_candidates;
+    return true;
 }
 
 template<class Set>
@@ -407,6 +476,7 @@ bool Board::naked_pair() {
         if (naked_pair(c, row(c))) { acted_on_naked_pair = true; break; }
     }
 
+    if (acted_on_naked_pair) analyze();
     return acted_on_naked_pair;
 }
 
@@ -494,6 +564,7 @@ bool Board::hidden_pair() {
 }
 
 std::ostream& operator<<(std::ostream& outs, const Board &b) {
+    // the board itself
     for (size_t i = 0; i < b.height; i++) {
         outs << (i % 3 == 0 ? "+=====+=====+=====++=====+=====+=====++=====+=====+=====+"
                             : "+-----+-----+-----++-----+-----+-----++-----+-----+-----+")
@@ -507,7 +578,8 @@ std::ostream& operator<<(std::ostream& outs, const Board &b) {
         }
     }
     outs << "+=====+=====+=====++=====+=====+=====++=====+=====+=====+" << std::endl
-         << "[NS] {";
+    // naked singles
+         << "[NS](" << b.mNakedSingles.size() << ") {";
     bool is_first = true;
     for (auto const &coord : b.mNakedSingles) {
         if (!is_first) { outs << ", "; }
@@ -515,14 +587,41 @@ std::ostream& operator<<(std::ostream& outs, const Board &b) {
         outs << coord;
     }
     outs << "}" << std::endl
-         << "[HS] {";
+    // hidden singles
+         << "[HS](" << b.mHiddenSingles.size() << ") {";
     is_first = true;
     for (auto const &entry: b.mHiddenSingles) {
         if (!is_first) { outs << ", "; }
         is_first = false;
-        outs << entry.coord << "#" << entry.value << "[" << entry.tag << "]";
+        outs << entry;
+    }
+    outs << "}" << std::endl
+    // locked candidates
+         << "[LC](" << b.mLockedCandidates.size() << ") {";
+    is_first = true;
+    for (auto const &entry: b.mLockedCandidates) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << "{" << entry << "}";
     }
     outs << "}";
 
     return outs;
+}
+
+
+std::ostream& operator<<(std::ostream& outs, const Board::LockedCandidates &lc) {
+    outs << "{";
+    bool is_first = true;
+    for (auto const &coord : lc.coords) {
+        if (!is_first) { std::cout << ","; }
+        is_first = false;
+        outs << coord;
+    }
+    outs << "}#" << lc.value << "[^" << lc.tag << "]";
+    return outs;
+}
+
+std::ostream& operator<<(std::ostream& outs, const Board::HiddenSingle &hs) {
+    return outs << hs.coord << "#" << hs.value << "[" << hs.tag << "]";
 }

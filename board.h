@@ -35,12 +35,7 @@ public:
 
     bool act_on_naked_single();
     bool act_on_hidden_single();
-
-    template<class Set1, class Set2>
-    bool act_on_locked_candidates(const Cell &, const Value &, const Set1 &, const Set2 &);
-    template<class Set1, class Set2>
-    bool locked_candidates(const Cell &, const Value &, Set1 &, Set2 &);
-    bool locked_candidates();
+    bool act_on_locked_candidate();
 
     template<class Set>
     bool naked_pair(const Cell &, Set &);
@@ -74,23 +69,23 @@ private:
     std::vector<Column> mColumns;
     std::vector<Nonet> mNonets;
 
-    std::vector<Coord> mNakedSingles;
-    struct HiddenSingle {
-        Coord coord;
-        Value value;
-        std::string tag;
-    };
-    std::vector<HiddenSingle> mHiddenSingles;
-
     template<class Set>
     void autonote(Cell &, Set &);
     void autonote(Cell &);
 
+    std::vector<Coord> mNakedSingles;
     template<class Set>
     void find_naked_singles_in_set(const Set &);
     void find_naked_singles(const Cell &);
     void find_naked_singles();
 
+    struct HiddenSingle {
+        Coord coord;
+        Value value;
+        std::string tag;
+    };
+    friend std::ostream& operator<<(std::ostream& outs, const HiddenSingle &);
+    std::vector<HiddenSingle> mHiddenSingles;
     template<class Set>
     bool test_hidden_single(const Cell &, const Value &, const Set &, /*out*/std::string &) const;
     template<class Set>
@@ -98,6 +93,29 @@ private:
     void find_hidden_singles(const Cell &);
     void find_hidden_singles();
 
+    struct LockedCandidates {
+        std::vector<Coord> coords;
+        Value value;
+        std::string tag;
+        bool contains(const Coord &c, const Value &v) const {
+            return value == v
+                && std::find(coords.begin(), coords.end(), c) != coords.end();
+        }
+        bool contains(const Coord &c, const Value &v, const std::string &t) const {
+            return value == v
+                && tag == t
+                && std::find(coords.begin(), coords.end(), c) != coords.end();
+        }
+    };
+    friend std::ostream& operator<<(std::ostream& outs, const LockedCandidates &);
+    std::vector<LockedCandidates> mLockedCandidates;
+    template<class Set>
+    bool act_on_locked_candidate(const LockedCandidates &, Set &);
+    template<class Set1, class Set2>
+    bool test_locked_candidate(const Cell &, const Value &, Set1 &set_to_consider, Set2 &set_to_ignore, std::vector<Coord> &);
+    template<class Set>
+    void find_locked_candidates_in_set(const Set &);
+    void find_locked_candidates(const Cell &);
     void find_locked_candidates();
 
     void analyze(const Cell &);

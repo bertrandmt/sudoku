@@ -14,7 +14,7 @@ bool Solver::solve_one_step(bool singles_only) {
         did_act = true;
     } else if (nextBoard.act_on_hidden_single()) {
         did_act = true;
-    } else if (!singles_only && nextBoard.locked_candidates()) {
+    } else if (!singles_only && nextBoard.act_on_locked_candidate()) {
         did_act = true;
     } else if (!singles_only && nextBoard.naked_pair()) {
         did_act = true;
