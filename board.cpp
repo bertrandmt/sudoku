@@ -25,7 +25,8 @@ Board::Board(const Board &other)
     : mCells(other.mCells)
     , mNakedSingles(other.mNakedSingles)
     , mHiddenSingles(other.mHiddenSingles)
-    , mLockedCandidates(other.mLockedCandidates) {
+    , mLockedCandidates(other.mLockedCandidates)
+    , mNakedPairs(other.mNakedPairs) {
 
     rebuild_subsets();
 }
@@ -229,7 +230,16 @@ void Board::find_hidden_singles() {
 }
 
 template<class Set1, class Set2>
-bool Board::test_locked_candidate(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore, std::vector<Coord> &lc_coords) {
+bool Board::test_locked_candidate(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore) {
+    if (std::find_if(mLockedCandidates.begin(), mLockedCandidates.end(),
+                [cell, value, set_to_ignore](const auto &entry) { return entry.contains(cell.coord(), value, set_to_ignore.tag()); }) != mLockedCandidates.end()) {
+        // we've already record the entry containing this cell, for this set and value
+        return false;
+    }
+
+    std::vector<Coord> lc_coords;
+    lc_coords.push_back(cell.coord());
+
     for (auto const &other_cell : set_to_consider) {
         if (other_cell.isValue()) continue;                                                             // do not consider value cells
         if (other_cell == cell) continue;                                                               // do not consider the current cell
@@ -252,6 +262,9 @@ bool Board::test_locked_candidate(const Cell &cell, const Value &value, Set1 &se
 
         // we found a note cell that is in the rest of the "set_to_ignore" and also is a candidate for this value:
         // we *would* act on it
+        LockedCandidates lc(lc_coords, value, set_to_ignore.tag());
+        mLockedCandidates.push_back(lc);
+        std::cout << "  [fLC] " << lc << std::endl;
         return true;
     }
 
@@ -268,51 +281,24 @@ void Board::find_locked_candidates_in_set(const Set &set) {
     // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same nonet,
     // then it is also not possible anywhere else in the same row/column
 
-    for (auto const &c : set) {
-        if (c.isValue()) continue; // only considering note cells
+    for (auto const &cell : set) {
+        if (cell.isValue()) continue; // only considering note cells
 
-        for (auto const &v : c.notes().values()) { // for each candidate value in this note cell
+        for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
 
             // form 1
-            std::vector<Coord> lc_coords(1, c.coord());
-            if (std::find_if(mLockedCandidates.begin(), mLockedCandidates.end(), [c,v](const auto &entry) { return entry.contains(c.coord(), v, "n"); }) == mLockedCandidates.end()
-             && test_locked_candidate(c, v, row(c), nonet(c), lc_coords)) {
-                LockedCandidates lc(lc_coords, v, "n");
-                mLockedCandidates.push_back(lc);
-                std::cout << "  [fLC] " << lc << std::endl;
-            }
-
-            lc_coords.erase(lc_coords.begin() + 1, lc_coords.end());
-            if (std::find_if(mLockedCandidates.begin(), mLockedCandidates.end(), [c,v](const auto &entry) { return entry.contains(c.coord(), v, "n"); }) == mLockedCandidates.end()
-             && test_locked_candidate(c, v, column(c), nonet(c), lc_coords)) {
-                LockedCandidates lc(lc_coords, v, "n");
-                mLockedCandidates.push_back(lc);
-                std::cout << "  [fLC] " << lc << std::endl;
-            }
+            test_locked_candidate(cell, value, row(cell), nonet(cell));
+            test_locked_candidate(cell, value, column(cell), nonet(cell));
 
             // form 2
-            lc_coords.erase(lc_coords.begin() + 1, lc_coords.end());
-            if (std::find_if(mLockedCandidates.begin(), mLockedCandidates.end(), [c,v](const auto &entry) { return entry.contains(c.coord(), v, "r"); }) == mLockedCandidates.end()
-             && test_locked_candidate(c, v, nonet(c), row(c), lc_coords)) {
-                LockedCandidates lc(lc_coords, v, "r");
-                mLockedCandidates.push_back(lc);
-                std::cout << "  [fLC] " << lc << std::endl;
-            }
-
-            lc_coords.erase(lc_coords.begin() + 1, lc_coords.end());
-            if (std::find_if(mLockedCandidates.begin(), mLockedCandidates.end(), [c,v](const auto &entry) { return entry.contains(c.coord(), v, "c"); }) == mLockedCandidates.end()
-             && test_locked_candidate(c, v, nonet(c), column(c), lc_coords)) {
-                LockedCandidates lc(lc_coords, v, "c");
-                mLockedCandidates.push_back(lc);
-                std::cout << "  [fLC] " << lc << std::endl;
-            }
+            test_locked_candidate(cell, value, nonet(cell), row(cell));
+            test_locked_candidate(cell, value, nonet(cell), column(cell));
         }
     }
 }
 
 void Board::find_locked_candidates(const Cell &) {
-    mLockedCandidates.erase(mLockedCandidates.begin(), mLockedCandidates.end());
-    find_locked_candidates_in_set(mCells);
+    find_locked_candidates();
 }
 
 void Board::find_locked_candidates() {
@@ -320,17 +306,76 @@ void Board::find_locked_candidates() {
     find_locked_candidates_in_set(mCells);
 }
 
+template<class Set>
+void Board::find_naked_pair(const Cell &cell, const Set &set) {
+    assert(cell.isNote());
+    auto c_values = cell.notes().values();
+    assert(c_values.size() == 2);
+
+    if (std::find_if(mNakedPairs.begin(), mNakedPairs.end(),
+                [cell](auto const &entry) { return cell.coord() == entry.coords.first || cell.coord() == entry.coords.second; })
+            != mNakedPairs.end()) return; // we've already recorded this pair
+
+    auto v1 = c_values[0];
+    auto v2 = c_values[1];
+
+    for (auto const &pair_cell : set) {
+        if (pair_cell.isValue()) continue;              // only considering note cells
+        if (pair_cell == cell) continue;                // not considering this cell
+        auto pair_cell_values = pair_cell.notes().values();
+        if (pair_cell_values.size() != 2) continue;     // only considering other cells with two possible values in notes
+
+        auto pc_v1 = pair_cell_values.at(0);
+        auto pc_v2 = pair_cell_values.at(1);
+        if (!((v1 == pc_v1 && v2 == pc_v2) || (v1 == pc_v2 && v2 == pc_v1))) continue; // it's a pair, but not the same pair
+
+        NakedPair np(std::make_pair(cell.coord(), pair_cell.coord()), std::make_pair(v1, v2));
+        mNakedPairs.push_back(np);
+        std::cout << "  [fNP] " << np << std::endl;
+        break;
+    }
+}
+
+template<class Set>
+void Board::find_naked_pairs_in_set(const Set &set) {
+    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#subsets
+    // When n candidates are possible in a certain set of n cells all in the same block, row,
+    // or column, and no other candidates are possible in those cells, then those n candidates
+    // are not possible elsewhere in that same block, row, or column.
+    // Applied for n = 2
+
+    for (auto const &cell : set) {
+        if (cell.isValue()) continue; // only considering note cells
+        auto c_values = cell.notes().values();
+        if (c_values.size() != 2) continue; // only considering candidates with two possible values in notes
+
+        find_naked_pair(cell, nonet(cell));
+        find_naked_pair(cell, column(cell));
+        find_naked_pair(cell, row(cell));
+    }
+}
+
+void Board::find_naked_pairs(const Cell &) {
+    find_naked_pairs();
+}
+
+void Board::find_naked_pairs() {
+    mNakedPairs.erase(mNakedPairs.begin(), mNakedPairs.end());
+    find_naked_pairs_in_set(mCells);
+};
 
 void Board::analyze(const Cell &cell) {
     find_naked_singles(cell);
     find_hidden_singles(cell);
     find_locked_candidates(cell);
+    find_naked_pairs(cell);
 }
 
 void Board::analyze() {
     find_naked_singles();
     find_hidden_singles();
     find_locked_candidates();
+    find_naked_pairs();
 }
 
 bool Board::act_on_naked_single() {
@@ -415,68 +460,52 @@ bool Board::act_on_locked_candidate() {
 }
 
 template<class Set>
-bool Board::naked_pair(const Cell &cell, Set &set) {
+bool Board::act_on_naked_pair(const NakedPair &entry, Set &set) {
     bool acted_on_naked_pair = false;
 
-    assert(cell.isNote());
-    auto c_values = cell.notes().values();
-    assert(c_values.size() == 2);
+    auto const &cell1 = at(entry.coords.first);
+    auto const &cell2 = at(entry.coords.second);
 
-    auto v1 = c_values[0];
-    auto v2 = c_values[1];
+    if (!set.contains(cell2)) return acted_on_naked_pair; // this is not the set to act on
 
-    for (auto const &pair_cell : set) {
-        if (pair_cell.isValue()) continue;   // only considering note cells
-        if (pair_cell == cell) continue; // not considering this cell
-        auto pair_cell_values = pair_cell.notes().values();
-        if (pair_cell_values.size() != 2) continue;    // only considering other cells with two possible values in notes
-        if (std::find(pair_cell_values.begin(), pair_cell_values.end(), v1) == pair_cell_values.end()
-         || std::find(pair_cell_values.begin(), pair_cell_values.end(), v2) == pair_cell_values.end()) continue; // it's a pair, but not the same pair
+    for (auto &other_cell : set) {
+        if (other_cell.isValue()) continue;
+        if (other_cell == cell1 || other_cell == cell2) continue; // not looking at either of the cell pairs
 
-        // we found a candidate pair in this set -> remove either note entry from the rest of the set
-        for (auto &other_cell : set) {
-            if (other_cell.isValue()) continue;
-            if (other_cell == cell || other_cell == pair_cell) continue; // not looking at either of the cell pairs
-
-            if (other_cell.notes().check(v1)) {
-                other_cell.notes().set(v1, false);
-                std::cout << "[NP] note" << other_cell.coord() << " x" << v1 << " [" << set.tag() << "]" << std::endl;
-                acted_on_naked_pair = true;
-            }
-            if (other_cell.notes().check(v2)) {
-                other_cell.notes().set(v2, false);
-                std::cout << "[NP] note" << other_cell.coord() << " x" << v2 << " [" << set.tag() << "]" << std::endl;
-                acted_on_naked_pair = true;
-            }
+        bool acted_on_other_cell = false;
+        if (other_cell.check(entry.values.first)) {
+            other_cell.set(entry.values.first, false);
+            std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.first << " [" << set.tag() << "]" << std::endl;
+            acted_on_other_cell = true;
+        }
+        if (other_cell.check(entry.values.second)) {
+            other_cell.set(entry.values.second, false);
+            std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.second << " [" << set.tag() << "]" << std::endl;
+            acted_on_other_cell = true;
         }
 
-        if (acted_on_naked_pair) break;
+        if (acted_on_other_cell) {
+            autonote(other_cell);
+            analyze(other_cell);
+            acted_on_naked_pair = true;
+        }
     }
 
     return acted_on_naked_pair;
 }
 
-bool Board::naked_pair() {
-    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#subsets
-    // When n candidates are possible in a certain set of n cells all in the same block, row,
-    // or column, and no other candidates are possible in those cells, then those n candidates
-    // are not possible elsewhere in that same block, row, or column.
-    // Applied for n = 2
-
+bool Board::act_on_naked_pair() {
     bool acted_on_naked_pair = false;
 
-    for (auto const &c : mCells) {
-        if (c.isValue()) continue; // only considering note cells
-        auto c_values = c.notes().values();
-        assert(c_values.size() >= 2); // otherwise would have been caught at single stage.
-        if (c_values.size() != 2) continue; // only considering candidates with two possible values in notes
+    if (mNakedPairs.empty()) { return acted_on_naked_pair; }
 
-        if (naked_pair(c, nonet(c))) { acted_on_naked_pair = true; break; }
-        if (naked_pair(c, column(c))) { acted_on_naked_pair = true; break; }
-        if (naked_pair(c, row(c))) { acted_on_naked_pair = true; break; }
-    }
+    auto const entry = mNakedPairs.back(); // copy
+    auto const &cell1 = at(entry.coords.first);
 
-    if (acted_on_naked_pair) analyze();
+    acted_on_naked_pair |= act_on_naked_pair(entry, nonet(cell1));
+    acted_on_naked_pair |= act_on_naked_pair(entry, column(cell1));
+    acted_on_naked_pair |= act_on_naked_pair(entry, row(cell1));
+
     return acted_on_naked_pair;
 }
 
@@ -604,11 +633,23 @@ std::ostream& operator<<(std::ostream& outs, const Board &b) {
         is_first = false;
         outs << "{" << entry << "}";
     }
+    outs << "}" << std::endl
+    // naked pairs
+         << "[NP](" << b.mNakedPairs.size() << ") {";
+    is_first = true;
+    for (auto const &entry: b.mNakedPairs) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << "{" << entry << "}";
+    }
     outs << "}";
 
     return outs;
 }
 
+std::ostream& operator<<(std::ostream& outs, const Board::HiddenSingle &hs) {
+    return outs << hs.coord << "#" << hs.value << "[" << hs.tag << "]";
+}
 
 std::ostream& operator<<(std::ostream& outs, const Board::LockedCandidates &lc) {
     outs << "{";
@@ -622,6 +663,6 @@ std::ostream& operator<<(std::ostream& outs, const Board::LockedCandidates &lc) 
     return outs;
 }
 
-std::ostream& operator<<(std::ostream& outs, const Board::HiddenSingle &hs) {
-    return outs << hs.coord << "#" << hs.value << "[" << hs.tag << "]";
+std::ostream& operator<<(std::ostream& outs, const Board::NakedPair &np) {
+    return outs << "{" << np.coords.first << "," << np.coords.second << "}#{" << np.values.first << "," << np.values.second << "}";
 }

@@ -36,10 +36,7 @@ public:
     bool act_on_naked_single();
     bool act_on_hidden_single();
     bool act_on_locked_candidate();
-
-    template<class Set>
-    bool naked_pair(const Cell &, Set &);
-    bool naked_pair();
+    bool act_on_naked_pair();
 
     template<class Set>
     bool hidden_pair(Cell &, const Value &, const Value &, Set &);
@@ -73,12 +70,14 @@ private:
     void autonote(Cell &, Set &);
     void autonote(Cell &);
 
+    // naked singles
     std::vector<Coord> mNakedSingles;
     template<class Set>
     void find_naked_singles_in_set(const Set &);
     void find_naked_singles(const Cell &);
     void find_naked_singles();
 
+    // hidden singles
     struct HiddenSingle {
         Coord coord;
         Value value;
@@ -93,6 +92,7 @@ private:
     void find_hidden_singles(const Cell &);
     void find_hidden_singles();
 
+    // locked candidates
     struct LockedCandidates {
         std::vector<Coord> coords;
         Value value;
@@ -112,11 +112,27 @@ private:
     template<class Set>
     bool act_on_locked_candidate(const LockedCandidates &, Set &);
     template<class Set1, class Set2>
-    bool test_locked_candidate(const Cell &, const Value &, Set1 &set_to_consider, Set2 &set_to_ignore, std::vector<Coord> &);
+    bool test_locked_candidate(const Cell &, const Value &, Set1 &set_to_consider, Set2 &set_to_ignore);
     template<class Set>
     void find_locked_candidates_in_set(const Set &);
     void find_locked_candidates(const Cell &);
     void find_locked_candidates();
+
+    // naked pairs
+    struct NakedPair {
+        std::pair<Coord, Coord> coords;
+        std::pair<Value, Value> values;
+    };
+    friend std::ostream& operator<<(std::ostream& outs, const NakedPair &);
+    std::vector<NakedPair> mNakedPairs;
+    template<class Set>
+    bool act_on_naked_pair(const NakedPair &, Set &);
+    template<class Set>
+    void find_naked_pair(const Cell &, const Set &);
+    template<class Set>
+    void find_naked_pairs_in_set(const Set &);
+    void find_naked_pairs(const Cell &);
+    void find_naked_pairs();
 
     void analyze(const Cell &);
     void analyze();
