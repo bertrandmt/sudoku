@@ -5,14 +5,17 @@
 #include "cell.h"
 #include "solverstate.h"
 #include "solver.h"
+#include "verbose.h"
 
 #include <iostream>
 #include <string>
 
+bool sVerbose = false;
+
 namespace {
 
 void help(void) {
-    std::cout << "Commands:" << std::endl
+    std::cout << "New game commands:" << std::endl
               << "  'n'          Start a new game" << std::endl
               << "               Enter table entries in one of two formats:" << std::endl
               << "                 ;rcv[;...]" << std::endl
@@ -27,14 +30,18 @@ void help(void) {
               << "                     * \".\" indicates an unset cell." << std::endl
               << "                   All 81 cells in a board must be entered." << std::endl
               << std::endl
-              << "Other commands:" << std::endl
+              << "Solver commands:" << std::endl
               << "  '>' or '.'    run one step of auto-solving" << std::endl
               << "  '<' or ','    go back one auto-solveing step" << std::endl
               << "  '!'           reset the solver to its initial state" << std::endl
               << "  'r'           run auto-solving until blocked (or done)" << std::endl
               << "  's'           run auto-solving using only 'singles' heuristics" << std::endl
               << "  'xrcv'        edit note at row 'r' and column 'c' and unset value 'v'" << std::endl
-              << "  'p'           print the board in a compact format" << std::endl;
+              << std::endl
+              << "Other commands:" << std::endl
+              << "  'p'           print the board in a compact format" << std::endl
+              << "  'v'           toggle verbosity for board analysis" << std::endl
+              << std::endl;
 }
 
 bool routine(Solver::ptr &solver) {
@@ -92,7 +99,7 @@ bool routine(Solver::ptr &solver) {
             break;
 
         case 's':
-        case 'S':
+        case 'S': // auto-solve with single heuristics only
             if (!solver->isValid()) { help(); break; }
             if (solver->solve_singles()) { std::cout << *solver << std::endl; }
             break;
@@ -110,9 +117,15 @@ bool routine(Solver::ptr &solver) {
             break;
 
         case 'p':
-        case 'P':
+        case 'P': // print the board in . notation
             if (!solver->isValid()) { help(); break; }
             solver->currentState()->board().print(std::cout);
+            break;
+
+        case 'v':
+        case 'V': // toggle verbosity of analysis steps
+            sVerbose = !sVerbose;
+            std::cout << "Verbose analysis: " << (sVerbose ? "ON" : "OFF") << std::endl;
             break;
 
         default:

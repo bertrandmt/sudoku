@@ -2,6 +2,7 @@
 // See LICENSE for details of BSD 3-Clause License
 
 #include "board.h"
+#include "verbose.h"
 
 #include <cassert>
 #include <iostream>
@@ -111,7 +112,7 @@ void Board::autonote(Cell &cell, Set &set) {
             if (other_cell.isNote()) continue; // other note cells do not participate in this update
             if (!cell.notes().check(other_cell.value())) continue; // the value of other_cell is already checked off cell's notes
 
-            std::cout << "  [ANn] " << cell.coord() << " x" << other_cell.value()
+            if (sVerbose) std::cout << "  [ANn] " << cell.coord() << " x" << other_cell.value()
                       << " " << set.tag() << "(" << other_cell.coord() << ")" << std::endl;
             cell.notes().set(other_cell.value(), false);
         }
@@ -123,7 +124,7 @@ void Board::autonote(Cell &cell, Set &set) {
             if (other_cell.isValue()) continue; // other value cells do not get changed by this process
             if (!other_cell.notes().check(cell.value())) continue; // the value of cell is already checked off other_cell's notes
 
-            std::cout << "  [ANv] " << other_cell.coord() << " x" << cell.value()
+            if (sVerbose) std::cout << "  [ANv] " << other_cell.coord() << " x" << cell.value()
                       << " " << set.tag() << "(" << cell.coord() << ")" << std::endl;
             other_cell.notes().set(cell.value(), false);
         }
@@ -153,7 +154,7 @@ void Board::find_naked_singles_in_set(const Set &set) {
 
         if (std::find(mNakedSingles.begin(), mNakedSingles.end(), cell.coord()) == mNakedSingles.end()) {
             mNakedSingles.push_back(cell.coord());
-            std::cout << "  [fNS] " << cell.coord() << std::endl;
+            if (sVerbose) std::cout << "  [fNS] " << cell.coord() << std::endl;
         }
     }
 }
@@ -199,7 +200,7 @@ void Board::find_hidden_singles_in_set(const Set &set) {
             auto it = std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](auto const &entry) { return cell.coord() == entry.coord;});
             if (it != mHiddenSingles.end()) {   // if it was previously recorded as "hidden", remove it
                 mHiddenSingles.erase(it);
-                std::cout << "  [xHS] " << cell.coord() << " [NS]" << std::endl;
+                if (sVerbose) std::cout << "  [xHS] " << cell.coord() << " [NS]" << std::endl;
             }
             continue;                           // also, don't continue processing
         }
@@ -213,7 +214,7 @@ void Board::find_hidden_singles_in_set(const Set &set) {
                 if (std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(), [cell](const auto &entry) { return cell.coord() == entry.coord; }) == mHiddenSingles.end()) {
                     HiddenSingle hs(cell.coord(), value, tag);
                     mHiddenSingles.push_back(hs);
-                    std::cout << "  [fHS] " << hs << std::endl;
+                    if (sVerbose) std::cout << "  [fHS] " << hs << std::endl;
                 }
             }
         }
@@ -272,7 +273,7 @@ bool Board::test_locked_candidate(const Cell &cell, const Value &value, Set1 &se
         // we *would* act on it
         LockedCandidates lc(lc_coords, value, set_to_ignore.tag());
         mLockedCandidates.push_back(lc);
-        std::cout << "  [fLC] " << lc << std::endl;
+        if (sVerbose) std::cout << "  [fLC] " << lc << std::endl;
         return true;
     }
 
@@ -349,7 +350,7 @@ void Board::find_naked_pair(const Cell &cell, const Set &set) {
         if (would_act) {
             NakedPair np(std::make_pair(cell.coord(), pair_cell.coord()), std::make_pair(v1, v2));
             mNakedPairs.push_back(np);
-            std::cout << "  [fNP] " << np << std::endl;
+            if (sVerbose) std::cout << "  [fNP] " << np << std::endl;
             break;
         }
     }
