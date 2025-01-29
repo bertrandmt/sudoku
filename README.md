@@ -181,3 +181,33 @@ Naked single indicates a note cell where only one possible value remains. The co
 [NS](2) {[8, 5], [7, 8]}
 ```
 This is interpreted as saying there are two naked singles on the board, at row 8, column 5 and at row 7, column 8.
+
+A hidden single is a note cell where one of the possible values is the only possible value in its row, column or nonet. For each possible hidden single, the coordinates of the hidden single cell, the corresponding value and the set (row, column or nonet) where that value is single are all recorded. In the example above:
+```
+[HS](2) {[2, 6]#6[n], [4, 5]#2[n]}
+```
+This indicates there are two hidden singles in the board. The cell at row 2, column 6 is the only possibiliy for value 6 in its nonet. The cell at row 4, column 5 is the only possible cell for value 2 in its nonet.
+
+Borrowing from the Sudoku Assistant [explainer page](https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#blocks), the locked candidate rule states that when a given candidate is possible at the intersection of a nonet and a row (or column), and that same candidate is not possible in the rest of the same nonet, then it is not possible in the rest of the same row/column either. The same goes when the candidate is not possible in the rest of the same row/column, in which case it will not be possible in the rest of the same nonet. In the example above:
+```
+[LC](5) {{{[1, 6],[2, 6],[3, 6]}#2[^n]}, {{[2, 6],[3, 6]}#1[^n]}, {{[4, 5]}#2[^c]}, {{[8, 5]}#1[^r]}, {{[8, 5]}#1[^c]}}
+```
+This indicates there are five possible locked candidates in the board. The first entry is:
+```
+{{[1, 6],[2, 6],[3, 6]}#2[^n]}
+```
+This indicates that cells at row 1, column 6, and row 2, column 6 and row 3, column 6 are all candidates for value 2 and that no other cell in their nonet can be a candidate for value 2 (since, though this is not explicitly stated, but can be readily verified in the board above, no other cell in their column is a candidate for value 2). The action for this particular locked candidates finding would therefore be to remove 2 as candidate for cells 1,5 and 2,5 (with celll 3,5 being a value cell, so not impacted, and none of the cells in column 4 for this nonet being candidates for value 2).
+
+Finally, naked pairs are pairs of note cells with the same two possible candidate values, in the same set (row, column or nonet). In the example above:
+```
+[NP](1) {{{[5, 6],[6, 6]}#{7,9}}}
+```
+This indicates there is one naked pair in the board, in cells at row 5, column 6 and row 6, column 6. Their common pair of possible values is 7 and 9. The action taken if acting on this entry would be to remove 7 and 9 as candidates in the cells in their common column and common nonet. In practice, this translates in removing candidate 9 in cell 1,6, candidates 7 and 9 in cell 2,6, candidate 9 in cell 3,6, candidate 9 in cells 4,5 and 5,5 and candidate 7 in cell 6,4.
+
+The solver will process naked singles as long as there are some available, followe by hidden singles, followed by locked candidates, followed by naked pairs.
+
+# Other commands
+
+The command `p` prints the current state of the board in `.` notation (see [Form 1](#form-1) above).
+
+The command `v` toggles verbosity of the analysis of the board state. By default, analysis is *not* verbose.
