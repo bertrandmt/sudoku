@@ -149,6 +149,15 @@ template<class Set>
 void Board::find_naked_singles_in_set(const Set &set) {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
     // A naked single arises when there is only one possible candidate for a cell
+    mNakedSingles.erase(std::remove_if(mNakedSingles.begin(), mNakedSingles.end(),
+                [this](const auto &coord) {
+                auto const &cell(this->at(coord));
+                bool remove_me = cell.isValue() || cell.notes().count() == 0;
+                if (remove_me) {
+                    if (sVerbose) std::cout << "  [xNS] " << cell.coord() << std::endl;
+                }
+                return remove_me; }), mNakedSingles.end());
+
     for (auto const &cell : set) {
         if (cell.isValue()) continue; // only considering note cells
         if (cell.notes().count() != 1) continue; // this is the naked single rule: notes have only one entry
