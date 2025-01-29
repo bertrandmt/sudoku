@@ -27,7 +27,8 @@ Board::Board(const Board &other)
     , mNakedSingles(other.mNakedSingles)
     , mHiddenSingles(other.mHiddenSingles)
     , mLockedCandidates(other.mLockedCandidates)
-    , mNakedPairs(other.mNakedPairs) {
+    , mNakedPairs(other.mNakedPairs)
+    , mHiddenPairs(other.mHiddenPairs) {
 
     rebuild_subsets();
 }
@@ -382,13 +383,136 @@ void Board::find_naked_pairs(const Cell &) {
 void Board::find_naked_pairs() {
     mNakedPairs.erase(mNakedPairs.begin(), mNakedPairs.end());
     find_naked_pairs_in_set(mCells);
-};
+}
+
+bool Board::test_hidden_pair(const HiddenPair &entry) {
+    auto const &c1 = at(entry.coords.first);
+    auto const &c2 = at(entry.coords.second);
+
+    if (c1.isValue()) return false;
+    if (c2.isValue()) return false;
+
+    if (c1.notes().count() <= 2 && c2.notes().count() <= 2) return false; // the pair may not have a pair of candidates
+                                                                          // or may not be hidden any longer
+    if (!c1.check(entry.values.first) || !c1.check(entry.values.second))  return false;
+    if (!c2.check(entry.values.first) || !c2.check(entry.values.second))  return false;
+
+    // both cells in the entry are still notes with one of them having strictly more than two candidates
+    // and they both have both entry values as candidates
+
+    return true;
+}
+
+template<class Set>
+void Board::test_hidden_pairs_in_set(const Set &set) {
+    if (mHiddenPairs.size() != 0) {
+        // all cells in the set have potentially been changed; for each, see
+        // if it is in one of the hidden pair records, and if so re-validate that it
+        // is still a hidden pair
+        for (auto const &cell : set) {
+            auto it = std::find_if(mHiddenPairs.begin(), mHiddenPairs.end(),
+                    [cell](auto const &entry){ return cell.coord() == entry.coords.first || cell.coord() == entry.coords.second; });
+            if (it != mHiddenPairs.end()) {
+                if (!test_hidden_pair(*it)) {
+                    if (sVerbose) std::cout << "  [xHP] " << *it << std::endl;
+                    mHiddenPairs.erase(it);
+                }
+            }
+        }
+    }
+}
+
+template<class Set>
+void Board::test_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set) {
+    assert(cell.isNote());
+    assert(cell.notes().check(v1));
+    assert(cell.notes().check(v2));
+
+    if (std::find_if(mHiddenPairs.begin(), mHiddenPairs.end(),
+                [cell](auto const &entry) { return cell.coord() == entry.coords.first || cell.coord() == entry.coords.second; })
+            != mHiddenPairs.end()) return; // we've already recorded this pair
+
+    // can we find another note cell with the same pair in the same set, but no other cell with either candidate in the set?
+    Cell *ppair_cell = NULL; // "the" other potential candidate
+    bool condition_met = true;
+
+    for (auto &other_cell : set) {
+        if (other_cell.isValue()) continue;                                                // only considering note cells
+        if (other_cell == cell) continue;                                                  // not considering this cell
+        if (!other_cell.check(v1) && !other_cell.check(v2)) continue;                      // no impact on algorithm; check next cell in row
+        if (other_cell.check(v1) ^ other_cell.check(v2)) { condition_met = false; break; } // either v1 or v2 is disqualified
+        if (other_cell.notes().check(v1) && other_cell.notes().check(v2)) {
+            if (!ppair_cell) {              // no candidate yet
+                ppair_cell = &other_cell;   // this is "the" other candidate
+                continue;
+            }
+            else {                          // this is disqualifying: we have more than two candidates in the row
+                condition_met = false;
+                break;
+            }
+        }
+    }
+    if (!ppair_cell) condition_met = false;                      // we did not, in fact, find another candidate
+    if (cell.notes().count() == 2
+     && (ppair_cell && ppair_cell->notes().count() == 2)) condition_met = false; // condition was met, in a way, but there is no action to take
+
+    if (!condition_met) return;                                  // we're done here
+
+    HiddenPair hp(std::make_pair(cell.coord(), ppair_cell->coord()), std::make_pair(v1, v2));
+    mHiddenPairs.push_back(hp);
+    if (sVerbose) std::cout << "  [fHP] " << hp << std::endl;
+}
+
+template<class Set>
+void Board::find_hidden_pairs_in_set(const Set &set) {
+    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#subsets
+    // When n candidates are possible in a certain set of n cells all in the same block, row, or column,
+    // and those n candidates are not possible elsewhere in that same block, row, or column, then no other
+    // candidates are possible in those cells.
+    // Applied for n = 2
+
+    for (auto &c : set) {
+        if (c.isValue())         continue; // only considering note cells
+        auto c_values = c.notes().values();
+        if (c_values.size() < 2) continue; // cannot possibly be hidden pair candidate
+
+        for (auto pv1 = c_values.begin(); pv1 != c_values.end(); ++pv1) {
+            for (auto pv2 = pv1 + 1; pv2 != c_values.end(); ++pv2) {
+
+                assert(*pv2 != *pv1);
+                // *pv1,*pv2 is the candidate pair
+
+                test_hidden_pair(c, *pv1, *pv2, nonet(c));
+                test_hidden_pair(c, *pv1, *pv2, column(c));
+                test_hidden_pair(c, *pv1, *pv2, row(c));
+            }
+        }
+    }
+}
+
+void Board::find_hidden_pairs(const Cell &cell) {
+    // step 1: cell was changed; for all cells in its row, column and nonet
+    // revalidate that, should it have been a member of a hidden pair, the
+    // hidden pair is still valid
+    test_hidden_pairs_in_set(nonet(cell));
+    test_hidden_pairs_in_set(column(cell));
+    test_hidden_pairs_in_set(row(cell));
+
+    find_hidden_pairs_in_set(nonet(cell));
+    find_hidden_pairs_in_set(column(cell));
+    find_hidden_pairs_in_set(row(cell));
+}
+
+void Board::find_hidden_pairs() {
+    find_hidden_pairs_in_set(mCells);
+}
 
 void Board::analyze(const Cell &cell) {
     find_naked_singles(cell);
     find_hidden_singles(cell);
     find_locked_candidates(cell);
     find_naked_pairs(cell);
+    find_hidden_pairs(cell);
 }
 
 void Board::analyze() {
@@ -396,6 +520,7 @@ void Board::analyze() {
     find_hidden_singles();
     find_locked_candidates();
     find_naked_pairs();
+    find_hidden_pairs();
 }
 
 bool Board::act_on_naked_single() {
@@ -529,85 +654,43 @@ bool Board::act_on_naked_pair() {
     return acted_on_naked_pair;
 }
 
-template<class Set>
-bool Board::hidden_pair(Cell &cell, const Value &v1, const Value &v2, Set &set) {
-    assert(cell.isNote());
-    assert(cell.notes().check(v1));
-    assert(cell.notes().check(v2));
-
+bool Board::act_on_hidden_pair(Cell &cell, const HiddenPair &entry) {
     bool acted_on_hidden_pair = false;
 
-    // can we find another note cell with the same pair in the same set, but no other cell with either candidate in the set?
-    Cell *ppair_cell = NULL; // "the" other potential candidate
-    bool condition_met = true;
+    auto const &v1 = entry.values.first;
+    auto const &v2 = entry.values.second;
 
-    for (auto &other_cell : set) {
-        if (other_cell.isValue()) continue; // only considering note cells
-        if (other_cell == cell) continue;      // not considering this cell
-        if (!other_cell.notes().check(v1) && !other_cell.notes().check(v2)) continue; // no impact on algorithm; check next cell in row
-        if (other_cell.notes().check(v1) ^ other_cell.notes().check(v2)) { condition_met = false; break; } // either v1 or v2 is disqualified
-        if (other_cell.notes().check(v1) && other_cell.notes().check(v2)) {
-            if (!ppair_cell) { // no candidate yet
-                ppair_cell = &other_cell; // this is "the" other candidate
-                continue;
-            }
-            else { // this is disqualifying: we have more than two candidates in the row
-                condition_met = false;
-                break;
-            }
-        }
-    }
-    if (!ppair_cell) { condition_met = false; } // we did not, in fact, find another candidate
-    if (!condition_met) { return acted_on_hidden_pair; }
+    for (auto const &value : cell.notes().values()) {
+        if (value == v1) continue;
+        if (value == v2) continue;
 
-    if (cell.notes().values().size() == 2 && ppair_cell->notes().values().size() == 2) { // condition was met, in a way, but there is no action to take
-        return acted_on_hidden_pair;
+        cell.set(value, false);
+        std::cout << "[HP] " << cell.coord() << " x" << value << " " << entry << std::endl;
+        acted_on_hidden_pair = true;
     }
 
-    // we have a pair of cells cell,*ppair_cell with a pair of values v1,v2 and nobody else in the row has those values
-    cell.notes().set_all(false);
-    cell.notes().set(v1, true);
-    cell.notes().set(v2, true);
-    std::cout << "[HP] note" << cell.coord() << " ={" << v1 << "," << v2 << "} [" << set.tag() << "]" << std::endl;
-
-    assert(ppair_cell);
-    ppair_cell->notes().set_all(false);
-    ppair_cell->notes().set(v1, true);
-    ppair_cell->notes().set(v2, true);
-    std::cout << "[HP] note" << ppair_cell->coord() << " ={" << v1 << "," << v2 << "} [" << set.tag() << "]" << std::endl;
-
-    acted_on_hidden_pair = true;
     return acted_on_hidden_pair;
 }
 
-bool Board::hidden_pair() {
-    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#subsets
-    // When n candidates are possible in a certain set of n cells all in the same block, row, or column,
-    // and those n candidates are not possible elsewhere in that same block, row, or column, then no other
-    // candidates are possible in those cells.
-    // Applied for n = 2
-
+bool Board::act_on_hidden_pair() {
     bool acted_on_hidden_pair = false;
 
-    for (auto &c : mCells) {
-        if (c.isValue()) continue; // only considering note cells
-        auto c_values = c.notes().values();
-        assert(c_values.size() >= 2); // otherwise would have been caught at single stage.
+    if (mHiddenPairs.empty()) { return acted_on_hidden_pair; }
 
-        for (auto pv1 = c_values.begin(); pv1 != c_values.end(); ++pv1) {
+    auto const &entry = mHiddenPairs.back();
+    auto &c1 = at(entry.coords.first);
+    auto &c2 = at(entry.coords.second);
 
-            for (auto pv2 = pv1; pv2 != c_values.end(); ++pv2) {
+    acted_on_hidden_pair |= act_on_hidden_pair(c1, entry);
+    acted_on_hidden_pair |= act_on_hidden_pair(c2, entry);
 
-                if (*pv2 == *pv1) continue; // we need a pair a different values
-                // *pv1,*pv2 is the candidate pair
+    mHiddenPairs.pop_back();
 
-                if (hidden_pair(c, *pv1, *pv2, nonet(c))) { acted_on_hidden_pair = true; break; }
-                if (hidden_pair(c, *pv1, *pv2, column(c))) { acted_on_hidden_pair = true; break; }
-                if (hidden_pair(c, *pv1, *pv2, row(c))) { acted_on_hidden_pair = true; break; }
-            }
-            if (acted_on_hidden_pair) { break; }
-        }
-        if (acted_on_hidden_pair) break;
+    if (acted_on_hidden_pair) {
+        autonote(c1);
+        autonote(c2);
+        analyze(c1);
+        analyze(c2);
     }
     return acted_on_hidden_pair;
 }
@@ -662,6 +745,15 @@ std::ostream& operator<<(std::ostream& outs, const Board &b) {
         is_first = false;
         outs << "{" << entry << "}";
     }
+    outs << "}" << std::endl
+    // hidden pairs
+         << "[HP](" << b.mHiddenPairs.size() << ") {";
+    is_first = true;
+    for (auto const &entry: b.mHiddenPairs) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << "{" << entry << "}";
+    }
     outs << "}";
 
     return outs;
@@ -685,4 +777,8 @@ std::ostream& operator<<(std::ostream& outs, const Board::LockedCandidates &lc) 
 
 std::ostream& operator<<(std::ostream& outs, const Board::NakedPair &np) {
     return outs << "{" << np.coords.first << "," << np.coords.second << "}#{" << np.values.first << "," << np.values.second << "}";
+}
+
+std::ostream& operator<<(std::ostream& outs, const Board::HiddenPair &hp) {
+    return outs << "{" << hp.coords.first << "," << hp.coords.second << "}#{" << hp.values.first << "," << hp.values.second << "}";
 }

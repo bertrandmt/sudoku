@@ -37,11 +37,7 @@ public:
     bool act_on_hidden_single();
     bool act_on_locked_candidate();
     bool act_on_naked_pair();
-
-    template<class Set>
-    bool hidden_pair(Cell &, const Value &, const Value &, Set &);
-    bool hidden_pair();
-
+    bool act_on_hidden_pair();
 
     std::vector<Cell> &cells() { return mCells; }
     const std::vector<Cell> &cells() const { return mCells; }
@@ -85,6 +81,7 @@ private:
     };
     friend std::ostream& operator<<(std::ostream& outs, const HiddenSingle &);
     std::vector<HiddenSingle> mHiddenSingles;
+
     template<class Set>
     bool test_hidden_single(const Cell &, const Value &, const Set &, /*out*/std::string &) const;
     template<class Set>
@@ -109,6 +106,7 @@ private:
     };
     friend std::ostream& operator<<(std::ostream& outs, const LockedCandidates &);
     std::vector<LockedCandidates> mLockedCandidates;
+
     template<class Set>
     bool act_on_locked_candidate(const LockedCandidates &, Set &);
     template<class Set1, class Set2>
@@ -125,6 +123,7 @@ private:
     };
     friend std::ostream& operator<<(std::ostream& outs, const NakedPair &);
     std::vector<NakedPair> mNakedPairs;
+
     template<class Set>
     bool act_on_naked_pair(const NakedPair &, Set &);
     template<class Set>
@@ -133,6 +132,25 @@ private:
     void find_naked_pairs_in_set(const Set &);
     void find_naked_pairs(const Cell &);
     void find_naked_pairs();
+
+    // hidden pairs
+    struct HiddenPair {
+        std::pair<Coord, Coord> coords;
+        std::pair<Value, Value> values;
+    };
+    friend std::ostream& operator<<(std::ostream& outs, const HiddenPair &);
+    std::vector<HiddenPair> mHiddenPairs;
+
+    bool act_on_hidden_pair(Cell &, const HiddenPair &);
+    template<class Set>
+    void test_hidden_pair(const Cell &, const Value &, const Value &, const Set &);
+    bool test_hidden_pair(const HiddenPair &);
+    template<class Set>
+    void test_hidden_pairs_in_set(const Set &);
+    template<class Set>
+    void find_hidden_pairs_in_set(const Set &);
+    void find_hidden_pairs(const Cell &);
+    void find_hidden_pairs();
 
     void analyze(const Cell &);
     void analyze();
