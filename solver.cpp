@@ -76,6 +76,20 @@ bool Solver::edit_note(const std::string &entry) {
     return did_act;
 }
 
+bool Solver::set_value(const std::string &entry) {
+    SolverState::ptr nextState(new SolverState(*mStates.back()));
+
+    bool did_act = false;
+
+    if (nextState->set_value(entry)) {
+        did_act = true;
+        std::cout << "Step #" << nextState->generation() << ":" << std::endl;
+    }
+
+    if (did_act) mStates.push_back(nextState);
+    return did_act;
+}
+
 std::ostream &operator<<(std::ostream &outs, const Solver &solver) {
     return outs << *solver.mStates.back();
 }

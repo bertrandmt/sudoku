@@ -17,6 +17,27 @@ bool SolverState::edit_note(const std::string &entry) {
 
     c.set(val, false);
 
+    mBoard.analyze(c);
+
+    return true;
+}
+
+bool SolverState::set_value(const std::string &entry) {
+    if (entry.size() != 3) { return false; }
+
+    size_t row = entry[0] - '1';
+    size_t col = entry[1] - '1';
+    Value val = static_cast<Value>(entry[2] - '0');
+    if (val == kUnset) { return false; }
+
+    Cell &c = mBoard.at(row, col);
+    if (!c.isNote()) { return false; }
+
+    c.set(val);
+
+    mBoard.autonote(c);
+    mBoard.analyze(c);
+
     return true;
 }
 

@@ -31,6 +31,9 @@ public:
     const Column &column(const Cell &) const;
     const Nonet &nonet(const Cell &) const;
 
+    void analyze(const Cell &);
+    void analyze();
+    void autonote(Cell &);
     void autonote();
 
     bool act_on_naked_single();
@@ -64,7 +67,6 @@ private:
 
     template<class Set>
     void autonote(Cell &, Set &);
-    void autonote(Cell &);
 
     // naked singles
     std::vector<Coord> mNakedSingles;
@@ -151,9 +153,6 @@ private:
     void find_hidden_pairs_in_set(const Set &);
     void find_hidden_pairs(const Cell &);
     void find_hidden_pairs();
-
-    void analyze(const Cell &);
-    void analyze();
 
     void rebuild_subsets();
 };

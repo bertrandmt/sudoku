@@ -116,6 +116,12 @@ bool routine(Solver::ptr &solver) {
             else                                       { help(); }
             break;
 
+        case '=': // set a value
+            if (!solver->isValid()) { help(); break; }
+            if (solver->set_value(nowsline.substr(1))) { std::cout << *solver << std::endl; }
+            else                                       { help(); }
+            break;
+
         case 'p':
         case 'P': // print the board in . notation
             if (!solver->isValid()) { help(); break; }

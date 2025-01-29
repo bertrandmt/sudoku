@@ -29,6 +29,7 @@ public:
     bool back_one_step();
     bool reset();
     bool edit_note(const std::string &);
+    bool set_value(const std::string &);
 
     friend std::ostream &operator<<(std::ostream &, const Solver &);
 

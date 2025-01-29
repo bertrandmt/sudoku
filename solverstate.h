@@ -41,6 +41,7 @@ public:
     size_t generation() const { return mGeneration; }
 
     bool edit_note(const std::string &);
+    bool set_value(const std::string &);
 
     friend std::ostream &operator<<(std::ostream &, const SolverState &);
 

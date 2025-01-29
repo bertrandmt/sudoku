@@ -209,6 +209,108 @@ Hidden pairs are pairs of note cells with two common candidate values (among oth
 
 The solver will process naked singles as long as there are some available, followed by hidden singles, followed by locked candidates, followed by naked pairs, finally followed by hidden pairs.
 
+# Editing the table
+
+Sometimes, the solver is not able to solve the whole board. For example:
+```
+λ n.6..1.825.5.....9848.2.4..1.4....1.3228..9.74.7..4.2.9.926.1..7..58.6..2.......56.
+[...]
+λ r
+Step #1:
+[LC] [9, 4] x7 [r]
+[LC] [9, 5] x7 [r]
+[LC] [9, 6] x7 [r]
+Step #2:
+[LC] [9, 6] x4 [r]
+Step #3:
+[LC] [9, 2] x3 [n]
+[LC] [9, 3] x3 [n]
+Step #4:
+[LC] [9, 2] x1 [n]
+[LC] [9, 3] x1 [n]
+Step #5:
+[LC] [4, 4] x5 [n]
+[LC] [5, 4] x5 [n]
+[LC] [5, 6] x5 [n]
+Step #6:
+[LC] [3, 4] x6 [r]
+[LC] [3, 6] x6 [r]
+Step #7:
+[LC] [3, 2] x9 [r]
+Step #8:
+[NP] [4, 4] x6 [n]
+[NP] [6, 5] x3 [n]
+[NP] [5, 3] x3 [r]
+[NP] [5, 9] x6 [r]
+Step #9:
+[NP] [1, 2] x3 [r]
+[NP] [1, 2] x7 [r]
+[NP] [1, 3] x3 [r]
+[NP] [1, 3] x7 [r]
+Step #10:
+[HP] [3, 4] x3 {[3, 4],[3, 6]}#{5,9}
+[HP] [3, 4] x7 {[3, 4],[3, 6]}#{5,9}
+[HP] [3, 6] x3 {[3, 4],[3, 6]}#{5,9}
+[HP] [3, 6] x7 {[3, 4],[3, 6]}#{5,9}
+Step #11:
+???
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][     |    *|     ][     |     |    *]
+[  6  |*    |*    ][  1  |     |  8  ][  2  |  5  |     ]
+[     |    *|    *][     |*    |     ][     |     |*    ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |*   *|*   *][  * *|  * *|    *][     |     |     ]
+[  5  |     |     ][    *|     |    *][  9  |  8  |  4  ]
+[     |*    |*    ][*    |*    |*    ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |    *|     ][     |     |     ][    *|     |    *]
+[  8  |     |  2  ][  *  |  4  |  *  ][    *|  1  |    *]
+[     |*    |     ][    *|     |    *][     |     |*    ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][     |     |     ][     |     |     ]
+[  4  |    *|  *  ][     |  *  |  1  ][    *|  3  |  2  ]
+[     |    *|    *][* *  |* *  |     ][  *  |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |*    ][    *|     |    *][     |     |*    ]
+[  2  |  8  |  *  ][    *|  9  |    *][  7  |  4  |  *  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |*   *|*   *][     |     |     ][*    |     |*    ]
+[  7  |    *|  *  ][  4  |  *  |  2  ][    *|  9  |  * *]
+[     |     |     ][     |  *  |     ][  *  |     |  *  ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][    *|     |    *][    *|     |    *]
+[  9  |  2  |  6  ][  *  |  1  |* *  ][*    |  7  |     ]
+[     |     |     ][  *  |     |     ][  *  |     |  *  ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[*   *|     |     ][    *|     |    *][*   *|     |*   *]
+[     |  5  |  8  ][     |  6  |*    ][*    |  2  |     ]
+[     |     |     ][*   *|     |*   *][     |     |    *]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[*   *|     |     ][  * *|  * *|    *][     |     |*   *]
+[     |*    |*    ][     |     |     ][  5  |  6  |     ]
+[     |*    |*    ][  * *|  *  |    *][     |     |  * *]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[NS](0) {}
+[HS](0) {}
+[LC](0) {}
+[NP](0) {}
+[HP](0) {}
+λ 
+```
+
+In this case, subtle "[weak chain](https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#weak)" analysis shows that candidate 7 in cell at line 9, column 2 is not possible. The solver has not implemented weak chain analysis, as of yet, and is stuck here. From there, it is possible to edit the board, for example to reflect this "knowledge", in order to help the solver resume. Two commands are available for this purpose:
+
+* `x` removes a candidate in a given note
+* `=` sets a given board entry to a value
+
+The syntax for both is `Crcv` where `C` is the command (`x` or `=`), `r` is the row, `c` is the column for the cell to be changed, `v` is the value for the command.
+
+The `x` command fails and takes no action if the cell at row `r`, column `c` is a value cell, or if value `v` is not a candidate for it.
+The `=` command succeeds unconditionally.
+
+It must be noted that manual edition of the board has the potential of rendering it impossible to solve. As an example above, setting the value 7 in the cell at row 9, column 2 quickly leads the autosolver to a condition where a note cell has no candidates. The solver is *not* equipped to handle such cases and will likely fail with an assertion when encountering such a case.
+ 
 # Other commands
 
 The command `p` prints the current state of the board in `.` notation (see [Form 1](#form-1) above).
