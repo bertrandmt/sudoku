@@ -1,8 +1,15 @@
 # Copyright (c) 2025, Bertrand Mollinier Toublet
 # See LICENSE for details of BSD 3-Clause License
-CPPFLAGS=-std=c++2a -Wall -O0 -g -Wsign-compare -Werror -Werror=return-type # -g
-CC=$(CXX)
-LDLIBS=
+
+CPPFLAGS = -std=c++2a -Wall -Wsign-compare -Werror -Werror=return-type # -g
+ifeq ($(debug),1)
+CPPFLAGS += -O0 -g
+else
+CPPFLAGS += -O3
+endif
+
+CC = $(CXX)
+LDLIBS =
 
 src = coord.cpp \
 	  cell.cpp \
