@@ -10,9 +10,13 @@
 #include <iostream>
 #include <string>
 
+#include <unistd.h>
+
 bool sVerbose = false;
 
 namespace {
+
+bool sInteractive = true;
 
 void help(void) {
     std::cout << "New game commands:" << std::endl
@@ -48,7 +52,7 @@ bool routine(Solver::ptr &solver) {
     bool done = false;
 
     std::string line;
-    std::cout << "λ " << std::flush;
+    if (sInteractive) std::cout << "λ " << std::flush;
     std::getline(std::cin, line);
     if (!std::cin) {
         std::cout << std::endl;
@@ -150,6 +154,9 @@ int main(void) {
     Solver::ptr solver;
 
     bool done = false;
+
+    // interactive?
+    sInteractive = isatty(fileno(stdin));
 
     do {
         done = routine(solver);
