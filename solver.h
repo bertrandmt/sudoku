@@ -10,17 +10,10 @@ class Solver {
 public:
     using ptr = std::shared_ptr<Solver>;
 
-    Solver()
-        : mValid(false) { }
-
     Solver(const std::string &board_desc) {
         SolverState::ptr initial_state(new SolverState(board_desc));
         mStates.push_back(initial_state);
-
-        mValid = initial_state->valid();
     }
-
-    bool valid() const { return mValid; }
 
     bool solve_one_step(bool singles_only);
     bool solve();
@@ -38,6 +31,5 @@ public:
     friend std::ostream &operator<<(std::ostream &, const Solver &);
 
 private:
-    bool mValid;
     std::vector<SolverState::ptr> mStates;
 };

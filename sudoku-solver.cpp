@@ -69,62 +69,64 @@ bool routine(Solver::ptr &solver) {
             return done;
 
         case 'n': { // it's a new game
-            Solver::ptr s(new Solver(nowsline.substr(1)));
-            if (!s->valid()) {
+            try {
+                solver.reset(new Solver(nowsline.substr(1)));
+            }
+            catch (const std::runtime_error &) {
                 help();
                 break;
             }
-            solver = s;
+            assert(solver);
             std::cout << *solver << std::endl;
             }
             break;
 
         case '.':
         case '>': // auto-solve one step
-            if (!solver->valid()) { help(); break; }
+            if (!solver) { help(); break; }
             if (solver->solve_one_step(false)) { std::cout << *solver << std::endl; }
             else                               { std::cout << "???" << std::endl; }
             break;
 
         case ',':
         case '<': // back one step
-            if (!solver->valid()) { help(); break; }
+            if (!solver) { help(); break; }
             if (solver->back_one_step()) { std::cout << *solver << std::endl; }
             break;
 
         case 'r':
         case 'R': // auto-solve until blocked (or finished)
-            if (!solver->valid()) { help(); break; }
+            if (!solver) { help(); break; }
             if (solver->solve()) { std::cout << *solver << std::endl; }
             break;
 
         case 's':
         case 'S': // auto-solve with single heuristics only
-            if (!solver->valid()) { help(); break; }
+            if (!solver) { help(); break; }
             if (solver->solve_singles()) { std::cout << *solver << std::endl; }
             break;
 
         case '!': // reset
-            if (!solver->valid()) { help(); break; }
+            if (!solver) { help(); break; }
             if (solver->reset()) { std::cout << *solver << std::endl; }
             break;
 
         case 'x':
         case 'X': // edit a note
-            if (!solver->valid()) { help(); break; }
+            if (!solver) { help(); break; }
             if (solver->edit_note(nowsline.substr(1))) { std::cout << *solver << std::endl; }
             else                                       { help(); }
             break;
 
         case '=': // set a value
-            if (!solver->valid()) { help(); break; }
+            if (!solver) { help(); break; }
             if (solver->set_value(nowsline.substr(1))) { std::cout << *solver << std::endl; }
             else                                       { help(); }
             break;
 
         case 'p':
         case 'P': // print the board in . notation
-            if (!solver->valid()) { help(); break; }
+            if (!solver) { help(); break; }
             solver->print_current_state(std::cout);
             break;
 
@@ -145,7 +147,7 @@ bool routine(Solver::ptr &solver) {
 } // namespace anonymous
 
 int main(void) {
-    Solver::ptr solver(new Solver());
+    Solver::ptr solver;
 
     bool done = false;
 

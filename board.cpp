@@ -6,6 +6,8 @@
 
 #include <cassert>
 #include <iostream>
+#include <stdexcept>
+#include <format>
 
 namespace { // anonymous
     const size_t kSUDOKU_BOARD_SIZE = 81;
@@ -13,13 +15,80 @@ namespace { // anonymous
     //const size_t kSUDOKU_BOARD_HEIGHT = 9;
 }
 
-Board::Board() {
+void Board::record_entry_form1(const std::string &entry) {
+    if (entry.size() != 3) throw std::format_error("cannot parse entry");
+
+
+    size_t row = entry[0] - '1';
+    size_t col = entry[1] - '1';
+    Value val = static_cast<Value>(entry[2] - '0');
+    if (val == kUnset) throw std::format_error("unset value");
+
+    auto &cell = at(row, col);
+
+    if (!cell.isNote()) throw std::format_error("did not succeed in setting entry");
+
+    cell.set(val);
+}
+
+void Board::record_entries_form1(const std::string &entries) {
+    size_t ofsb = 0, ofse = 0;
+    while (ofse != std::string::npos) {
+        ofse = entries.find(';', ofsb);
+        std::string entry = entries.substr(ofsb, ofse - ofsb);
+        record_entry_form1(entry);
+        ofsb = ofse + 1;
+    }
+}
+
+void Board::record_entries_form2(const std::string &entries) {
+    if (entries.size() != width * height) throw std::format_error("not the right number of entries");
+
+    size_t index = 0;
+    for (auto &c : mCells) {
+        switch (entries[index]) {
+        case '.': // it's a note entry
+            break;
+
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9': // it's a value entry
+            c.set(static_cast<Value>(entries[index] - '0'));
+            break;
+
+        default: // don't know what to do with this
+            throw std::format_error("bad character in entry");
+        }
+        index++;
+    }
+}
+
+Board::Board(const std::string &board_desc) {
     for (size_t row = 0; row < height; row++) {
         for (size_t col = 0; col < width; col++) {
             mCells.push_back(Cell(row, col));
         }
     }
     rebuild_subsets();
+
+    switch(board_desc[0]) {
+    case ';':
+        record_entries_form1(board_desc.substr(1));
+        break;
+
+    case '.':
+        record_entries_form2(board_desc.substr(1));
+        break;
+
+    default:
+        throw std::format_error("don't know how to parse this");
+    }
 }
 
 Board::Board(const Board &other)
@@ -70,6 +139,32 @@ void Board::print(std::ostream &out) const {
         if (cnt++ % 9 == 0) out <<  " ";
     }
     out << std::endl;
+}
+
+bool Board::edit_note_at(size_t row, size_t col, const Value &value) {
+    auto &cell = at(row, col);
+
+    if (!cell.isNote()) return false;
+    if (!cell.check(value)) return false;
+
+    cell.set(value, false);
+
+    analyze(cell);
+
+    return true;
+}
+
+bool Board::set_value_at(size_t row, size_t col, const Value &value) {
+    auto &cell = at(row, col);
+
+    if (!cell.isNote()) return false;
+
+    cell.set(value);
+
+    autonote(cell);
+    analyze(cell);
+
+    return true;
 }
 
 Cell &Board::at(size_t row, size_t col) {

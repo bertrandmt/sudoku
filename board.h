@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <iterator>
 #include <cstddef>
+#include <memory>
 
 class Row;
 class Column;
@@ -15,19 +16,31 @@ class Nonet;
 
 class Board {
 public:
-    Board();
+    Board(const std::string &board_desc);
+private:
+    void record_entries_form1(const std::string &);
+    void record_entry_form1(const std::string &);
+    void record_entries_form2(const std::string &);
+public:
     Board(const Board &other);
+
+    using ptr = std::shared_ptr<Board>;
 
     static const size_t width = 9;
     static const size_t height = 9;
 
     void print(std::ostream &out) const;
 
+    bool edit_note_at(size_t row, size_t col, const Value &);
+    bool set_value_at(size_t row, size_t col, const Value &);
+
+private:
     Cell &at(size_t row, size_t col);
     const Cell &at(size_t row, size_t col) const;
     Cell &at(const Coord &coord) { return at(coord.row(), coord.column()); }
     const Cell &at(const Coord &coord) const { return at(coord.row(), coord.column()); }
 
+public:
     const Row &row(const Cell &) const;
     const Column &column(const Cell &) const;
     const Nonet &nonet(const Cell &) const;

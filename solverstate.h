@@ -11,31 +11,16 @@ public:
     using ptr = std::shared_ptr<SolverState>;
 
     SolverState(const std::string &board_desc)
-        : mValid(false)
+        : mBoard(new Board(board_desc))
         , mGeneration(0) {
 
-        switch(board_desc[0]) {
-        case ';':
-            if (!record_entries_form1(board_desc.substr(1))) return;
-            break;
-        case '.':
-            if (!record_entries_form2(board_desc.substr(1))) return;
-            break;
-        default:
-            // don't know how to parse this
-            return;
-        }
-
-        mBoard.autonote();
-        mValid = true;
+        mBoard->autonote();
     }
 
     SolverState(const SolverState &other)
-        : mValid(other.mValid)
-        , mBoard(other.mBoard)
+        : mBoard(new Board(*other.mBoard))
         , mGeneration(other.mGeneration + 1) { }
 
-    bool valid() const { return mValid; }
     size_t generation() const { return mGeneration; }
 
     bool act(const bool);
@@ -43,18 +28,11 @@ public:
     bool set_value(const std::string &);
 
     void print(std::ostream &outs) const {
-        if (valid()) {
-            mBoard.print(outs);
-        }
+        mBoard->print(outs);
     }
     friend std::ostream &operator<<(std::ostream &, const SolverState &);
 
 private:
-    bool mValid;
-    Board mBoard;
+    Board::ptr mBoard;
     size_t mGeneration;
-
-    bool record_entries_form1(const std::string &);
-    bool record_entry_form1(const std::string &);
-    bool record_entries_form2(const std::string &);
 };
