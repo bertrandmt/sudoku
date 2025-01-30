@@ -63,9 +63,11 @@ void Board::rebuild_subsets() {
 }
 
 void Board::print(std::ostream &out) {
+    size_t cnt = 1;
     for (auto const &c : mCells) {
         if (c.isValue()) out << c.value();
         else             out << '.';
+        if (cnt++ % 9 == 0) out <<  " ";
     }
     out << std::endl;
 }
