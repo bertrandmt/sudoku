@@ -4,7 +4,7 @@
 #include "solverstate.h"
 
 bool SolverState::act(const bool singles_only) {
-    if (!isValid()) return false;
+    if (!valid()) return false;
     return mBoard.act(singles_only);
 }
 

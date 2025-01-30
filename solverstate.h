@@ -35,7 +35,7 @@ public:
         , mBoard(other.mBoard)
         , mGeneration(other.mGeneration + 1) { }
 
-    bool isValid() const { return mValid; }
+    bool valid() const { return mValid; }
     size_t generation() const { return mGeneration; }
 
     bool act(const bool);
@@ -43,7 +43,7 @@ public:
     bool set_value(const std::string &);
 
     void print(std::ostream &outs) const {
-        if (isValid()) {
+        if (valid()) {
             mBoard.print(outs);
         }
     }

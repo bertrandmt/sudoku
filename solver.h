@@ -17,10 +17,10 @@ public:
         SolverState::ptr initial_state(new SolverState(board_desc));
         mStates.push_back(initial_state);
 
-        mValid = initial_state->isValid();
+        mValid = initial_state->valid();
     }
 
-    bool isValid() const { return mValid; }
+    bool valid() const { return mValid; }
 
     bool solve_one_step(bool singles_only);
     bool solve();
