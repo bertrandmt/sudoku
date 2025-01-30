@@ -23,3 +23,8 @@ private:
 };
 
 std::ostream& operator<< (std::ostream& outs, const Coord &);
+
+template<>
+struct std::hash<Coord> {
+    std::size_t operator()(const Coord &) const noexcept;
+};

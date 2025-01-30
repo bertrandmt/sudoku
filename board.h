@@ -5,6 +5,7 @@
 #include "cell.h"
 
 #include <vector>
+#include <unordered_set>
 #include <iterator>
 #include <cstddef>
 
@@ -20,7 +21,7 @@ public:
     static const size_t width = 9;
     static const size_t height = 9;
 
-    void print(std::ostream &out);
+    void print(std::ostream &out) const;
 
     Cell &at(size_t row, size_t col);
     const Cell &at(size_t row, size_t col) const;
@@ -36,11 +37,7 @@ public:
     void autonote(Cell &);
     void autonote();
 
-    bool act_on_naked_single();
-    bool act_on_hidden_single();
-    bool act_on_locked_candidate();
-    bool act_on_naked_pair();
-    bool act_on_hidden_pair();
+    bool act(const bool singles_only);
 
     std::vector<Cell> &cells() { return mCells; }
     const std::vector<Cell> &cells() const { return mCells; }
@@ -64,6 +61,10 @@ private:
     std::vector<Row> mRows;
     std::vector<Column> mColumns;
     std::vector<Nonet> mNonets;
+
+    using DirtySet = std::unordered_set<Coord>;
+    DirtySet mNotesFilterDirty;
+    void markCellSetsDirtyFor(const Cell &, DirtySet &);
 
     template<class Set>
     void autonote(Cell &, Set &);
@@ -153,6 +154,12 @@ private:
     void find_hidden_pairs_in_set(const Set &);
     void find_hidden_pairs(const Cell &);
     void find_hidden_pairs();
+
+    bool act_on_naked_single();
+    bool act_on_hidden_single();
+    bool act_on_locked_candidate();
+    bool act_on_naked_pair();
+    bool act_on_hidden_pair();
 
     void rebuild_subsets();
 };

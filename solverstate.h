@@ -36,13 +36,17 @@ public:
         , mGeneration(other.mGeneration + 1) { }
 
     bool isValid() const { return mValid; }
-    const Board &board() const { return mBoard; }
-    Board &board() { return mBoard; }
     size_t generation() const { return mGeneration; }
 
+    bool act(const bool);
     bool edit_note(const std::string &);
     bool set_value(const std::string &);
 
+    void print(std::ostream &outs) const {
+        if (isValid()) {
+            mBoard.print(outs);
+        }
+    }
     friend std::ostream &operator<<(std::ostream &, const SolverState &);
 
 private:

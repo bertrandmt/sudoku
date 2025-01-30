@@ -21,7 +21,6 @@ public:
     }
 
     bool isValid() const { return mValid; }
-    const SolverState::ptr &currentState() const { return mStates.back(); }
 
     bool solve_one_step(bool singles_only);
     bool solve();
@@ -30,6 +29,11 @@ public:
     bool reset();
     bool edit_note(const std::string &);
     bool set_value(const std::string &);
+    void print_current_state(std::ostream &outs) const {
+        if (!mStates.empty()) {
+            mStates.back()->print(outs);
+        }
+    }
 
     friend std::ostream &operator<<(std::ostream &, const Solver &);
 

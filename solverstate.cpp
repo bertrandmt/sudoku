@@ -3,6 +3,11 @@
 
 #include "solverstate.h"
 
+bool SolverState::act(const bool singles_only) {
+    if (!isValid()) return false;
+    return mBoard.act(singles_only);
+}
+
 bool SolverState::edit_note(const std::string &entry) {
     if (entry.size() != 3) { return false; }
 
@@ -101,5 +106,3 @@ std::ostream &operator<<(std::ostream &outs, const SolverState &state) {
 
     return outs << state.mBoard;
 }
-
-

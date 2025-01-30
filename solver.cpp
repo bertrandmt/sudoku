@@ -5,25 +5,14 @@
 
 bool Solver::solve_one_step(bool singles_only) {
     SolverState::ptr nextState(new SolverState(*mStates.back()));
-    Board &nextBoard = nextState->board();
     std::cout << "Step #" << nextState->generation() << ":" << std::endl;
 
-    bool did_act = false;
-
-    if (nextBoard.act_on_naked_single()) {
-        did_act = true;
-    } else if (nextBoard.act_on_hidden_single()) {
-        did_act = true;
-    } else if (!singles_only && nextBoard.act_on_locked_candidate()) {
-        did_act = true;
-    } else if (!singles_only && nextBoard.act_on_naked_pair()) {
-        did_act = true;
-    } else if (!singles_only && nextBoard.act_on_hidden_pair()) {
-        did_act = true;
+    if (nextState->act(singles_only)) {
+        mStates.push_back(nextState);
+        return true;
     }
 
-    if (did_act) mStates.push_back(nextState);
-    return did_act;
+    return false;
 }
 
 bool Solver::solve() {

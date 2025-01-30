@@ -35,7 +35,7 @@ void help(void) {
               << "  '<' or ','    go back one auto-solveing step" << std::endl
               << "  '!'           reset the solver to its initial state" << std::endl
               << "  'r'           run auto-solving until blocked (or done)" << std::endl
-              << "  's'           run auto-solving using only 'singles' heuristics" << std::endl
+              << "  's'           run auto-solving using only 'naked' and 'singles' heuristics" << std::endl
               << "  'xrcv'        edit note at row 'r' and column 'c' and unset value 'v'" << std::endl
               << std::endl
               << "Other commands:" << std::endl
@@ -125,7 +125,7 @@ bool routine(Solver::ptr &solver) {
         case 'p':
         case 'P': // print the board in . notation
             if (!solver->isValid()) { help(); break; }
-            solver->currentState()->board().print(std::cout);
+            solver->print_current_state(std::cout);
             break;
 
         case 'v':

@@ -62,7 +62,7 @@ void Board::rebuild_subsets() {
     assert(mNonets.size() == (height / Nonet::height) * (width / Nonet::width));
 }
 
-void Board::print(std::ostream &out) {
+void Board::print(std::ostream &out) const {
     size_t cnt = 1;
     for (auto const &c : mCells) {
         if (c.isValue()) out << c.value();
@@ -534,6 +534,14 @@ void Board::analyze() {
     find_hidden_pairs();
 }
 
+void Board::markCellSetsDirtyFor(const Cell &cell, DirtySet &dirty_set) {
+    dirty_set.clear();
+
+    for (const auto &other_cell : nonet(cell)) dirty_set.insert(other_cell.coord());
+    for (const auto &other_cell : column(cell)) dirty_set.insert(other_cell.coord());
+    for (const auto &other_cell : row(cell)) dirty_set.insert(other_cell.coord());
+}
+
 bool Board::act_on_naked_single() {
     if (mNakedSingles.empty()) { return false; }
 
@@ -548,6 +556,8 @@ bool Board::act_on_naked_single() {
     cell.set(value);
 
     mNakedSingles.pop_back();
+
+    markCellSetsDirtyFor(cell, mNotesFilterDirty);
 
     autonote(cell);
     analyze(cell);
@@ -663,6 +673,21 @@ bool Board::act_on_naked_pair() {
     acted_on_naked_pair |= act_on_naked_pair(entry, row(cell1));
 
     return acted_on_naked_pair;
+}
+
+bool Board::act(const bool singles_only) {
+    bool did_act = false;
+
+    did_act = act_on_naked_single();
+    if (!did_act) did_act = act_on_naked_pair();
+    if (!did_act) did_act = act_on_hidden_single();
+
+    if (!singles_only) {
+        if (!did_act) did_act = act_on_locked_candidate();
+        if (!did_act) did_act = act_on_hidden_pair();
+    }
+
+    return did_act;
 }
 
 bool Board::act_on_hidden_pair(Cell &cell, const HiddenPair &entry) {
