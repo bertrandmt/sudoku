@@ -12,10 +12,7 @@ public:
 
     SolverState(const std::string &board_desc)
         : mBoard(new Board(board_desc))
-        , mGeneration(0) {
-
-        mBoard->autonote();
-    }
+        , mGeneration(0) { }
 
     SolverState(const SolverState &other)
         : mBoard(new Board(*other.mBoard))

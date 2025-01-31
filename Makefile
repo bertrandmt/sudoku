@@ -17,6 +17,7 @@ src = coord.cpp \
 	  column.cpp \
 	  nonet.cpp \
 	  board.cpp \
+	  analyzer.cpp \
 	  solverstate.cpp \
 	  solver.cpp
 
@@ -33,14 +34,17 @@ clean:
 
 # DO NOT DELETE
 
-sudoku-solver.o: board.h cell.h coord.h row.h column.h nonet.h solverstate.h
-sudoku-solver.o: solver.h
+sudoku-solver.o: board.h cell.h coord.h analyzer.h row.h column.h nonet.h
+sudoku-solver.o: solverstate.h solver.h verbose.h
 coord.o: coord.h
 cell.o: cell.h coord.h
-row.o: row.h board.h cell.h coord.h column.h nonet.h
-column.o: column.h board.h cell.h coord.h row.h nonet.h
-nonet.o: row.h board.h cell.h coord.h column.h nonet.h
-board.o: board.h cell.h coord.h row.h column.h nonet.h
-solverstate.o: solverstate.h board.h cell.h coord.h row.h column.h nonet.h
-solver.o: solver.h solverstate.h board.h cell.h coord.h row.h column.h
-solver.o: nonet.h
+row.o: row.h board.h cell.h coord.h analyzer.h column.h nonet.h
+column.o: column.h board.h cell.h coord.h analyzer.h row.h nonet.h
+nonet.o: nonet.h board.h cell.h coord.h analyzer.h row.h column.h
+board.o: board.h cell.h coord.h analyzer.h row.h column.h nonet.h verbose.h
+analyzer.o: analyzer.h cell.h coord.h board.h row.h column.h nonet.h
+analyzer.o: verbose.h
+solverstate.o: solverstate.h board.h cell.h coord.h analyzer.h row.h column.h
+solverstate.o: nonet.h
+solver.o: solver.h solverstate.h board.h cell.h coord.h analyzer.h row.h
+solver.o: column.h nonet.h
