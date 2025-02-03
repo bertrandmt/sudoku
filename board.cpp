@@ -11,18 +11,17 @@
 #include <cassert>
 #include <iostream>
 #include <stdexcept>
-#include <format>
 
 void Board::record_entry_form1(const std::string &entry) {
-    if (entry.size() != 3) throw std::format_error("cannot parse entry");
+    if (entry.size() != 3) throw std::runtime_error("cannot parse entry");
 
 
     size_t row = entry[0] - '1';
     size_t col = entry[1] - '1';
     Value val = static_cast<Value>(entry[2] - '0');
-    if (val == kUnset) throw std::format_error("unset value");
+    if (val == kUnset) throw std::runtime_error("unset value");
 
-    if (set_value_at(row, col, val)) throw std::format_error("did not succeed in setting entry");
+    if (set_value_at(row, col, val)) throw std::runtime_error("did not succeed in setting entry");
 }
 
 void Board::record_entries_form1(const std::string &entries) {
@@ -36,7 +35,7 @@ void Board::record_entries_form1(const std::string &entries) {
 }
 
 void Board::record_entries_form2(const std::string &entries) {
-    if (entries.size() != width * height) throw std::format_error("not the right number of entries");
+    if (entries.size() != width * height) throw std::runtime_error("not the right number of entries");
 
     size_t index = 0;
     for (auto &c : mCells) {
@@ -57,7 +56,7 @@ void Board::record_entries_form2(const std::string &entries) {
             break;
 
         default: // don't know what to do with this
-            throw std::format_error("bad character in entry");
+            throw std::runtime_error("bad character in entry");
         }
         index++;
     }
@@ -82,7 +81,7 @@ Board::Board(Analyzer &analyzer, const std::string &board_desc)
         break;
 
     default:
-        throw std::format_error("don't know how to parse this");
+        throw std::runtime_error("don't know how to parse this");
     }
 }
 
