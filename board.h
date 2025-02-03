@@ -18,13 +18,14 @@ class Nonet;
 
 class Board {
 public:
-    Board(const std::string &board_desc);
+    friend class Analyzer;
+    Board(Analyzer &analyzer, const std::string &board_desc);
 private:
     void record_entries_form1(const std::string &);
     void record_entry_form1(const std::string &);
     void record_entries_form2(const std::string &);
 public:
-    Board(const Board &other);
+    Board(Analyzer &analyzer, const Board &other);
 
     using ptr = std::shared_ptr<Board>;
 
@@ -74,8 +75,7 @@ private:
     std::vector<Column> mColumns;
     std::vector<Nonet> mNonets;
 
-    friend class Analyzer;
-    Analyzer::ptr mAnalyzer;
+    Analyzer &mAnalyzer;
 
     // naked singles
     std::vector<Coord> mNakedSingles;

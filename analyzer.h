@@ -11,12 +11,11 @@ class Board;
 
 class Analyzer {
 public:
-    Analyzer(Board &board)
-        : mBoard(board) { }
+    Analyzer() { }
 
     using ptr = std::shared_ptr<Analyzer>;
 
-    void analyze();
+    void analyze(Board &board);
 
     void value_dirty(const Cell &);
     void notes_dirty(const Cell &);
@@ -66,5 +65,5 @@ private:
     DirtySet mValueDirtySet;    // this set of note cells is dirty because their value was set
     DirtySet mNotesDirtySet;    // this set of cells is dirty, because one of their notes was cleared
 
-    Board &mBoard;
+    Board *mBoard;
 };

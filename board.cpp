@@ -63,15 +63,14 @@ void Board::record_entries_form2(const std::string &entries) {
     }
 }
 
-Board::Board(const std::string &board_desc) {
+Board::Board(Analyzer &analyzer, const std::string &board_desc)
+    : mAnalyzer(analyzer) {
     for (size_t row = 0; row < height; row++) {
         for (size_t col = 0; col < width; col++) {
             mCells.push_back(Cell(row, col));
         }
     }
     rebuild_subsets();
-
-    mAnalyzer.reset(new Analyzer(*this));
 
     switch(board_desc[0]) {
     case ';':
@@ -85,12 +84,11 @@ Board::Board(const std::string &board_desc) {
     default:
         throw std::format_error("don't know how to parse this");
     }
-
-    mAnalyzer->analyze();
 }
 
-Board::Board(const Board &other)
+Board::Board(Analyzer &analyzer, const Board &other)
     : mCells(other.mCells)
+    , mAnalyzer(analyzer)
     , mNakedSingles(other.mNakedSingles)
     , mNakedPairs(other.mNakedPairs)
     , mHiddenSingles(other.mHiddenSingles)
@@ -151,7 +149,7 @@ bool Board::clear_note_at(const Coord &coord, const Value &value) {
 
     cell.set(value, false);
 
-    mAnalyzer->notes_dirty(cell);
+    mAnalyzer.notes_dirty(cell);
 
     return true;
 }
@@ -167,7 +165,7 @@ bool Board::set_value_at(const Coord &coord, const Value &value) {
 
     cell.set(value);
 
-    mAnalyzer->value_dirty(cell);
+    mAnalyzer.value_dirty(cell);
 
     return true;
 }
@@ -208,18 +206,14 @@ const Nonet &Board::nonet(const Cell &c) const {
 bool Board::act(const bool singles_only) {
     bool did_act = false;
 
-    mAnalyzer.reset(new Analyzer(*this));
-
     did_act = act_on_naked_single();
-    if (!did_act) did_act = act_on_naked_pair();
     if (!did_act) did_act = act_on_hidden_single();
+    if (!did_act) did_act = act_on_naked_pair();
 
     if (!singles_only) {
         if (!did_act) did_act = act_on_locked_candidate();
         if (!did_act) did_act = act_on_hidden_pair();
     }
-
-    mAnalyzer->analyze();
 
     return did_act;
 }

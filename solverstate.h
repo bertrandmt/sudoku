@@ -11,11 +11,14 @@ public:
     using ptr = std::shared_ptr<SolverState>;
 
     SolverState(const std::string &board_desc)
-        : mBoard(new Board(board_desc))
-        , mGeneration(0) { }
+        : mBoard(mAnalyzer, board_desc)
+        , mGeneration(0) {
+
+        mAnalyzer.analyze(mBoard);
+    }
 
     SolverState(const SolverState &other)
-        : mBoard(new Board(*other.mBoard))
+        : mBoard(mAnalyzer, other.mBoard)
         , mGeneration(other.mGeneration + 1) { }
 
     size_t generation() const { return mGeneration; }
@@ -25,11 +28,12 @@ public:
     bool set_value(const std::string &);
 
     void print(std::ostream &outs) const {
-        mBoard->print(outs);
+        mBoard.print(outs);
     }
     friend std::ostream &operator<<(std::ostream &, const SolverState &);
 
 private:
-    Board::ptr mBoard;
+    Analyzer mAnalyzer;
+    Board mBoard;
     size_t mGeneration;
 };

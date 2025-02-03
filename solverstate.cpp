@@ -4,7 +4,11 @@
 #include "solverstate.h"
 
 bool SolverState::act(const bool singles_only) {
-    return mBoard->act(singles_only);
+    bool did_act = mBoard.act(singles_only);
+    if (did_act) {
+        mAnalyzer.analyze(mBoard);
+    }
+    return did_act;
 }
 
 bool SolverState::edit_note(const std::string &entry) {
@@ -15,7 +19,11 @@ bool SolverState::edit_note(const std::string &entry) {
     Value val = static_cast<Value>(entry[2] - '0');
     if (val == kUnset) { return false; }
 
-    return mBoard->clear_note_at(row, col, val);
+    bool did_clear_note = mBoard.clear_note_at(row, col, val);
+    if (did_clear_note) {
+        mAnalyzer.analyze(mBoard);
+    }
+    return did_clear_note;
 }
 
 bool SolverState::set_value(const std::string &entry) {
@@ -26,9 +34,13 @@ bool SolverState::set_value(const std::string &entry) {
     Value val = static_cast<Value>(entry[2] - '0');
     if (val == kUnset) { return false; }
 
-    return mBoard->set_value_at(row, col, val);
+    bool did_set_value = mBoard.set_value_at(row, col, val);
+    if (did_set_value) {
+        mAnalyzer.analyze(mBoard);
+    }
+    return did_set_value;
 }
 
 std::ostream &operator<<(std::ostream &outs, const SolverState &state) {
-    return outs << *state.mBoard;
+    return outs << state.mBoard;
 }
