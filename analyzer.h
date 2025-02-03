@@ -58,6 +58,8 @@ private:
     void filter_hidden_pairs() const;
     template<class Set>
     void find_hidden_pair(const Cell &, const Value &v1, const Value &v2, const Set &) const;
+    template<class Set>
+    void find_hidden_pairs(Set const &) const;
     void find_hidden_pairs() const;
 
 private:

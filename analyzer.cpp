@@ -164,6 +164,14 @@ void Analyzer::find_hidden_singles(const Set &set) const {
 void Analyzer::find_hidden_singles() const {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
     // A hidden single arises when there is only one possible cell for a candidate
+    for (auto const &coord : mValueDirtySet) {
+        auto &cell = mBoard->at(coord);
+
+        // are there now-single hidden singles in any of this cell's blocks
+        find_hidden_singles(mBoard->nonet(cell));
+        find_hidden_singles(mBoard->column(cell));
+        find_hidden_singles(mBoard->row(cell));
+    }
     for (auto const &coord : mNotesDirtySet) {
         auto &cell = mBoard->at(coord);
 
@@ -519,16 +527,15 @@ void Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &
     if (sVerbose) std::cout << "  [fHP] " << hp << std::endl;
 }
 
-void Analyzer::find_hidden_pairs() const {
+template<class Set>
+void Analyzer::find_hidden_pairs(Set const &set) const {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#subsets
     // When n candidates are possible in a certain set of n cells all in the same block, row, or column,
     // and those n candidates are not possible elsewhere in that same block, row, or column, then no other
     // candidates are possible in those cells.
     // Applied for n = 2
 
-    for (auto const &coord : mNotesDirtySet) {
-        auto &cell = mBoard->at(coord);
-
+    for (auto const &cell: set) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
@@ -547,6 +554,25 @@ void Analyzer::find_hidden_pairs() const {
                 find_hidden_pair(cell, *pv1, *pv2, mBoard->row(cell));
             }
         }
+    }
+}
+
+void Analyzer::find_hidden_pairs() const {
+    for (auto const &coord : mValueDirtySet) {
+        auto &cell = mBoard->at(coord);
+
+        // are there now-revealed hidden pairs in any of this cell's blocks
+        find_hidden_pairs(mBoard->nonet(cell));
+        find_hidden_pairs(mBoard->column(cell));
+        find_hidden_pairs(mBoard->row(cell));
+    }
+    for (auto const &coord : mNotesDirtySet) {
+        auto &cell = mBoard->at(coord);
+
+        // are there now-revealed hidden pairs in any of this cell's blocks
+        find_hidden_pairs(mBoard->nonet(cell));
+        find_hidden_pairs(mBoard->column(cell));
+        find_hidden_pairs(mBoard->row(cell));
     }
 }
 
