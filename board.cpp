@@ -40,6 +40,7 @@ void Board::record_entries_form2(const std::string &entries) {
     size_t index = 0;
     for (auto &c : mCells) {
         switch (entries[index]) {
+        case '0':
         case '.': // it's a note entry
             break;
 
