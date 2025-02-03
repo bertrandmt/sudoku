@@ -3,6 +3,7 @@
 #pragma once
 
 #include "cell.h"
+#include "analyzer.h"
 
 #include <vector>
 #include <unordered_set>
@@ -14,15 +15,17 @@ class Row;
 class Column;
 class Nonet;
 
+
 class Board {
 public:
-    Board(const std::string &board_desc);
+    friend class Analyzer;
+    Board(Analyzer &analyzer, const std::string &board_desc);
 private:
     void record_entries_form1(const std::string &);
     void record_entry_form1(const std::string &);
     void record_entries_form2(const std::string &);
 public:
-    Board(const Board &other);
+    Board(Analyzer &analyzer, const Board &other);
 
     using ptr = std::shared_ptr<Board>;
 
@@ -31,7 +34,9 @@ public:
 
     void print(std::ostream &out) const;
 
-    bool edit_note_at(size_t row, size_t col, const Value &);
+    bool clear_note_at(const Coord &, const Value &);
+    bool clear_note_at(size_t row, size_t col, const Value &);
+    bool set_value_at(const Coord &, const Value &);
     bool set_value_at(size_t row, size_t col, const Value &);
 
 private:
@@ -44,11 +49,6 @@ public:
     const Row &row(const Cell &) const;
     const Column &column(const Cell &) const;
     const Nonet &nonet(const Cell &) const;
-
-    void analyze(const Cell &);
-    void analyze();
-    void autonote(Cell &);
-    void autonote();
 
     bool act(const bool singles_only);
 
@@ -75,19 +75,18 @@ private:
     std::vector<Column> mColumns;
     std::vector<Nonet> mNonets;
 
-    using DirtySet = std::unordered_set<Coord>;
-    DirtySet mNotesFilterDirty;
-    void markCellSetsDirtyFor(const Cell &, DirtySet &);
-
-    template<class Set>
-    void autonote(Cell &, Set &);
+    Analyzer &mAnalyzer;
 
     // naked singles
     std::vector<Coord> mNakedSingles;
-    template<class Set>
-    void find_naked_singles_in_set(const Set &);
-    void find_naked_singles(const Cell &);
-    void find_naked_singles();
+
+    // naked pairs
+    struct NakedPair {
+        std::pair<Coord, Coord> coords;
+        std::pair<Value, Value> values;
+    };
+    friend std::ostream& operator<<(std::ostream& outs, const NakedPair &);
+    std::vector<NakedPair> mNakedPairs;
 
     // hidden singles
     struct HiddenSingle {
@@ -97,13 +96,6 @@ private:
     };
     friend std::ostream& operator<<(std::ostream& outs, const HiddenSingle &);
     std::vector<HiddenSingle> mHiddenSingles;
-
-    template<class Set>
-    bool test_hidden_single(const Cell &, const Value &, const Set &, /*out*/std::string &) const;
-    template<class Set>
-    void find_hidden_singles_in_set(const Set &);
-    void find_hidden_singles(const Cell &);
-    void find_hidden_singles();
 
     // locked candidates
     struct LockedCandidates {
@@ -123,32 +115,6 @@ private:
     friend std::ostream& operator<<(std::ostream& outs, const LockedCandidates &);
     std::vector<LockedCandidates> mLockedCandidates;
 
-    template<class Set>
-    bool act_on_locked_candidate(const LockedCandidates &, Set &);
-    template<class Set1, class Set2>
-    bool test_locked_candidate(const Cell &, const Value &, Set1 &set_to_consider, Set2 &set_to_ignore);
-    template<class Set>
-    void find_locked_candidates_in_set(const Set &);
-    void find_locked_candidates(const Cell &);
-    void find_locked_candidates();
-
-    // naked pairs
-    struct NakedPair {
-        std::pair<Coord, Coord> coords;
-        std::pair<Value, Value> values;
-    };
-    friend std::ostream& operator<<(std::ostream& outs, const NakedPair &);
-    std::vector<NakedPair> mNakedPairs;
-
-    template<class Set>
-    bool act_on_naked_pair(const NakedPair &, Set &);
-    template<class Set>
-    void find_naked_pair(const Cell &, const Set &);
-    template<class Set>
-    void find_naked_pairs_in_set(const Set &);
-    void find_naked_pairs(const Cell &);
-    void find_naked_pairs();
-
     // hidden pairs
     struct HiddenPair {
         std::pair<Coord, Coord> coords;
@@ -157,21 +123,15 @@ private:
     friend std::ostream& operator<<(std::ostream& outs, const HiddenPair &);
     std::vector<HiddenPair> mHiddenPairs;
 
-    bool act_on_hidden_pair(Cell &, const HiddenPair &);
-    template<class Set>
-    void test_hidden_pair(const Cell &, const Value &, const Value &, const Set &);
-    bool test_hidden_pair(const HiddenPair &);
-    template<class Set>
-    void test_hidden_pairs_in_set(const Set &);
-    template<class Set>
-    void find_hidden_pairs_in_set(const Set &);
-    void find_hidden_pairs(const Cell &);
-    void find_hidden_pairs();
-
     bool act_on_naked_single();
-    bool act_on_hidden_single();
-    bool act_on_locked_candidate();
+    template<class Set>
+    bool act_on_naked_pair(const NakedPair &, Set &);
     bool act_on_naked_pair();
+    bool act_on_hidden_single();
+    template<class Set>
+    bool act_on_locked_candidate(const LockedCandidates &, Set &);
+    bool act_on_locked_candidate();
+    bool act_on_hidden_pair(Cell &, const HiddenPair &);
     bool act_on_hidden_pair();
 
     void rebuild_subsets();

@@ -54,6 +54,7 @@ public:
     Value value() const { return mValue; }
     Notes &notes() { assert(isNote()); return mNotes; }
     const Notes &notes() const { assert(isNote()); return mNotes; }
+
     bool check(const Value &v) const { return isNote() && mNotes.check(v); }
     bool set(const Value &v, bool set) { return isNote() && mNotes.set(v, set); }
     bool set_all(bool set) { return isNote() && mNotes.set_all(set); }
