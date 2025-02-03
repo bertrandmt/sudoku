@@ -19,6 +19,10 @@ src = coord.cpp \
 	  board.cpp \
 	  analyzer.cpp \
 	  analyzer-nakedsingles.cpp \
+	  analyzer-hiddensingles.cpp \
+	  analyzer-nakedpairs.cpp \
+	  analyzer-lockedcandidates.cpp \
+	  analyzer-hiddenpairs.cpp \
 	  solverstate.cpp \
 	  solver.cpp
 
