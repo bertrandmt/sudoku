@@ -55,47 +55,11 @@ void Analyzer::filter_notes(const Set &set) {
 
 void Analyzer::filter_notes() {
     for (auto const &coord : mValueDirtySet) { // for each value cell whose value was set since last analysis
-//        if (sVerbose) std::cout << "  [FN] considering " << *it << std::endl;
 
         auto &cell = mBoard->at(coord);         // review the notes in
         filter_notes(mBoard->nonet(cell));      // each cell in this cell's nonet, and
         filter_notes(mBoard->column(cell));     //                      ... column, and
         filter_notes(mBoard->row(cell));        //                      ... row
-    }
-}
-
-bool Analyzer::test_naked_single(const Cell &cell) const {
-    return cell.isNote()
-        && cell.notes().count() == 1;
-}
-
-void Analyzer::filter_naked_singles() const {
-    mBoard->mNakedSingles.erase(std::remove_if(mBoard->mNakedSingles.begin(), mBoard->mNakedSingles.end(),
-                [this](const auto &coord) {
-                    auto &cell = mBoard->at(coord);
-                    bool is_naked_single = test_naked_single(cell);
-                    if (!is_naked_single) {
-                        if (sVerbose) std::cout << "  [xNS] " << coord << std::endl;
-                    }
-                    return !is_naked_single;
-                }), mBoard->mNakedSingles.end());
-}
-
-void Analyzer::find_naked_singles() const {
-    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
-    // A naked single arises when there is only one possible candidate for a cell
-    for (auto const &coord : mNotesDirtySet) {
-        auto &cell = mBoard->at(coord);
-
-        // is this a naked single?
-        if (!test_naked_single(cell)) continue;
-
-        // yes! but do we already know about it?
-        if (std::find(mBoard->mNakedSingles.begin(), mBoard->mNakedSingles.end(), cell.coord()) != mBoard->mNakedSingles.end()) continue;
-
-        // no! let's record it
-        mBoard->mNakedSingles.push_back(cell.coord());
-        if (sVerbose) std::cout << "  [fNS] " << cell.coord() << std::endl;
     }
 }
 
@@ -117,8 +81,8 @@ bool Analyzer::test_hidden_single(const Cell &cell, const Value &value, const Se
     return true;
 }
 
-void Analyzer::filter_hidden_singles() const {
-    mBoard->mHiddenSingles.erase(std::remove_if(mBoard->mHiddenSingles.begin(), mBoard->mHiddenSingles.end(),
+void Analyzer::filter_hidden_singles() {
+    mHiddenSingles.erase(std::remove_if(mHiddenSingles.begin(), mHiddenSingles.end(),
                 [this](const auto &entry) {
                     auto &cell = mBoard->at(entry.coord);
                     bool is_hidden_single = false;
@@ -131,11 +95,11 @@ void Analyzer::filter_hidden_singles() const {
                         if (sVerbose) std::cout << "  [xHS] " << cell.coord() << " [NS]" << std::endl;
                     }
                     return !is_hidden_single;
-                }), mBoard->mHiddenSingles.end());
+                }), mHiddenSingles.end());
 }
 
 template<class Set>
-void Analyzer::find_hidden_singles(const Set &set) const {
+void Analyzer::find_hidden_singles(const Set &set) {
     for (auto const &cell: set) {
         // is this a note cell?
         if (!cell.isNote()) continue;
@@ -149,19 +113,19 @@ void Analyzer::find_hidden_singles(const Set &set) const {
              && !test_hidden_single(cell, value, mBoard->row(cell), tag)) continue;
 
             // yes! but do we already know about it?
-            if (std::find_if(mBoard->mHiddenSingles.begin(), mBoard->mHiddenSingles.end(),
-                       [cell](const auto &entry) { return cell.coord() == entry.coord; }) != mBoard->mHiddenSingles.end()) continue;
+            if (std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(),
+                       [cell](const auto &entry) { return cell.coord() == entry.coord; }) != mHiddenSingles.end()) continue;
 
             // no! let's record it
-            Board::HiddenSingle hs(cell.coord(), value, tag);
-            mBoard->mHiddenSingles.push_back(hs);
+            HiddenSingle hs(cell.coord(), value, tag);
+            mHiddenSingles.push_back(hs);
             if (sVerbose) std::cout << "  [fHS] " << hs << std::endl;
             break;  // we're not going to find any other HS among the rest of the candidates for this cell
         }
     }
 }
 
-void Analyzer::find_hidden_singles() const {
+void Analyzer::find_hidden_singles() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
     // A hidden single arises when there is only one possible cell for a candidate
     for (auto const &coord : mValueDirtySet) {
@@ -229,23 +193,23 @@ bool Analyzer::test_naked_pair(const Cell &c1, const Cell &c2) const {
     return true;
 }
 
-void Analyzer::filter_naked_pairs() const {
-    mBoard->mNakedPairs.erase(std::remove_if(mBoard->mNakedPairs.begin(), mBoard->mNakedPairs.end(),
+void Analyzer::filter_naked_pairs() {
+    mNakedPairs.erase(std::remove_if(mNakedPairs.begin(), mNakedPairs.end(),
                 [this](const auto &entry) {
                     bool is_naked_pair = test_naked_pair(mBoard->at(entry.coords.first), mBoard->at(entry.coords.second));
                     if (!is_naked_pair) {
                         if (sVerbose) std::cout << "  [xNP] " << entry << std::endl;
                     }
                     return !is_naked_pair;
-                }), mBoard->mNakedPairs.end());
+                }), mNakedPairs.end());
 }
 
 template<class Set>
-void Analyzer::find_naked_pair(const Cell &cell, const Set &set) const {
+void Analyzer::find_naked_pair(const Cell &cell, const Set &set) {
     // have we already recorded this pair?
-    if (std::find_if(mBoard->mNakedPairs.begin(), mBoard->mNakedPairs.end(),
+    if (std::find_if(mNakedPairs.begin(), mNakedPairs.end(),
                 [cell](auto const &entry) { return cell.coord() == entry.coords.first || cell.coord() == entry.coords.second; })
-            != mBoard->mNakedPairs.end()) return;
+            != mNakedPairs.end()) return;
 
     // no! but...
     for (auto const &pair_cell : set) {
@@ -253,14 +217,14 @@ void Analyzer::find_naked_pair(const Cell &cell, const Set &set) const {
         if (!test_naked_pair(cell, pair_cell)) continue;
 
         // yes! let's record it
-        Board::NakedPair np(std::make_pair(cell.coord(), pair_cell.coord()), std::make_pair(cell.notes().values().at(0), cell.notes().values().at(1)));
-        mBoard->mNakedPairs.push_back(np);
+        NakedPair np(std::make_pair(cell.coord(), pair_cell.coord()), std::make_pair(cell.notes().values().at(0), cell.notes().values().at(1)));
+        mNakedPairs.push_back(np);
         if (sVerbose) std::cout << "  [fNP] " << np << std::endl;
         break;
     }
 }
 
-void Analyzer::find_naked_pairs() const {
+void Analyzer::find_naked_pairs() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#subsets
     // When n candidates are possible in a certain set of n cells all in the same block, row,
     // or column, and no other candidates are possible in those cells, then those n candidates
@@ -306,8 +270,8 @@ bool would_act_on_set(std::vector<Coord> const &coords, Value const &value, std:
 }
 }
 
-void Analyzer::filter_locked_candidates() const {
-    mBoard->mLockedCandidates.erase(std::remove_if(mBoard->mLockedCandidates.begin(), mBoard->mLockedCandidates.end(),
+void Analyzer::filter_locked_candidates() {
+    mLockedCandidates.erase(std::remove_if(mLockedCandidates.begin(), mLockedCandidates.end(),
                 [this](auto &entry) {
                     // are any of the coords in this entry still candidate notes for this value?
                     auto coords(entry.coords); // deep copy, for later printing of pristine entry
@@ -346,16 +310,15 @@ void Analyzer::filter_locked_candidates() const {
                         return true;
                     }
 
-                    // yes! but are they stil by themselves within their recorded set?
-                    // TODO
+                    // yes! we're keeping this entry
                     return false;
-                }), mBoard->mLockedCandidates.end());
+                }), mLockedCandidates.end());
 }
 
 template<class Set1, class Set2>
-void Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore) const {
-    if (std::find_if(mBoard->mLockedCandidates.begin(), mBoard->mLockedCandidates.end(),
-                [cell, value, set_to_ignore](const auto &entry) { return entry.contains(cell.coord(), value, set_to_ignore.tag()); }) != mBoard->mLockedCandidates.end()) {
+void Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore) {
+    if (std::find_if(mLockedCandidates.begin(), mLockedCandidates.end(),
+                [cell, value, set_to_ignore](const auto &entry) { return entry.contains(cell.coord(), value, set_to_ignore.tag()); }) != mLockedCandidates.end()) {
         // we've already record the entry containing this cell, for this set and value
         return;
     }
@@ -400,15 +363,15 @@ void Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 
 
         // no! we found a note cell that is in the rest of the "set_to_ignore"
         // and also is a candidate for this value: we *would* act on it
-        Board::LockedCandidates lc(lc_coords, value, set_to_ignore.tag());
-        mBoard->mLockedCandidates.push_back(lc);
+        LockedCandidates lc(lc_coords, value, set_to_ignore.tag());
+        mLockedCandidates.push_back(lc);
         if (sVerbose) std::cout << "  [fLC] " << lc << std::endl;
         return;
     }
 }
 
 template<class Set>
-void Analyzer::find_locked_candidates(Set const &set) const {
+void Analyzer::find_locked_candidates(Set const &set) {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#blocks
     // Form 1:
     // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same row/column,
@@ -422,9 +385,9 @@ void Analyzer::find_locked_candidates(Set const &set) const {
         if (!cell.isNote()) continue;
 
         // yes! but is it already recorded as a hidden single?
-        if (std::find_if(mBoard->mHiddenSingles.begin(), mBoard->mHiddenSingles.end(),
+        if (std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(),
                     [cell](auto const &entry) { return entry.coord == cell.coord(); })
-                != mBoard->mHiddenSingles.end()) continue;
+                != mHiddenSingles.end()) continue;
 
         // no! then for each candidate value in this note cell
         for (auto const &value : cell.notes().values()) {
@@ -440,7 +403,7 @@ void Analyzer::find_locked_candidates(Set const &set) const {
     }
 }
 
-void Analyzer::find_locked_candidates() const {
+void Analyzer::find_locked_candidates() {
     for (auto const &coord : mNotesDirtySet) {
         auto &cell = mBoard->at(coord);
 
@@ -472,27 +435,27 @@ bool Analyzer::test_hidden_pair(const Cell &c1, const Cell &c2, const Value &v1,
 }
 
 
-void Analyzer::filter_hidden_pairs() const {
-    mBoard->mHiddenPairs.erase(std::remove_if(mBoard->mHiddenPairs.begin(), mBoard->mHiddenPairs.end(),
+void Analyzer::filter_hidden_pairs() {
+    mHiddenPairs.erase(std::remove_if(mHiddenPairs.begin(), mHiddenPairs.end(),
                 [this](auto const &entry) {
                     bool is_hidden_pair = test_hidden_pair(mBoard->at(entry.coords.first), mBoard->at(entry.coords.second), entry.values.first, entry.values.second);
                     if (!is_hidden_pair) {
                         if (sVerbose) std::cout << "  [xHP] " << entry << std::endl;
                     }
                     return !is_hidden_pair;
-                }), mBoard->mHiddenPairs.end());
+                }), mHiddenPairs.end());
 }
 
 template<class Set>
-void Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set) const {
+void Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set) {
     assert(cell.isNote());
     assert(cell.notes().check(v1));
     assert(cell.notes().check(v2));
 
     // have we already recorded this cell into a pair?
-    if (std::find_if(mBoard->mHiddenPairs.begin(), mBoard->mHiddenPairs.end(),
+    if (std::find_if(mHiddenPairs.begin(), mHiddenPairs.end(),
                 [cell](auto const &entry) { return cell.coord() == entry.coords.first || cell.coord() == entry.coords.second; })
-            != mBoard->mHiddenPairs.end()) return;
+            != mHiddenPairs.end()) return;
 
     // no! can we find another note cell with the same pair in the same set,
     // but no other cell with either candidate in the set?
@@ -532,13 +495,13 @@ void Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &
     if (!condition_met) return; // we're done here
 
     // yes! let's record the entry
-    Board::HiddenPair hp(std::make_pair(cell.coord(), ppair_cell->coord()), std::make_pair(v1, v2));
-    mBoard->mHiddenPairs.push_back(hp);
+    HiddenPair hp(std::make_pair(cell.coord(), ppair_cell->coord()), std::make_pair(v1, v2));
+    mHiddenPairs.push_back(hp);
     if (sVerbose) std::cout << "  [fHP] " << hp << std::endl;
 }
 
 template<class Set>
-void Analyzer::find_hidden_pairs(Set const &set) const {
+void Analyzer::find_hidden_pairs(Set const &set) {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#subsets
     // When n candidates are possible in a certain set of n cells all in the same block, row, or column,
     // and those n candidates are not possible elsewhere in that same block, row, or column, then no other
@@ -567,7 +530,7 @@ void Analyzer::find_hidden_pairs(Set const &set) const {
     }
 }
 
-void Analyzer::find_hidden_pairs() const {
+void Analyzer::find_hidden_pairs() {
     for (auto const &coord : mValueDirtySet) {
         auto &cell = mBoard->at(coord);
 
@@ -586,10 +549,7 @@ void Analyzer::find_hidden_pairs() const {
     }
 }
 
-void Analyzer::analyze(Board &board) {
-    assert(!mBoard || mBoard == &board);
-    mBoard = &board;
-
+void Analyzer::analyze() {
     filter_notes();
 
     filter_naked_singles();
@@ -603,4 +563,237 @@ void Analyzer::analyze(Board &board) {
     find_naked_pairs();
     find_locked_candidates();
     find_hidden_pairs();
+}
+
+bool Analyzer::act(const bool singles_only) {
+    bool did_act = false;
+
+    did_act = act_on_naked_single();
+    if (!did_act) did_act = act_on_hidden_single();
+
+    if (!singles_only) {
+        if (!did_act) did_act = act_on_naked_pair();
+        if (!did_act) did_act = act_on_locked_candidate();
+        if (!did_act) did_act = act_on_hidden_pair();
+    }
+
+    return did_act;
+}
+
+bool Analyzer::act_on_hidden_single() {
+    if (mHiddenSingles.empty()) { return false; }
+
+    auto const entry = mHiddenSingles.back();
+    mHiddenSingles.pop_back();
+
+    std::cout << "[HS] " << entry.coord << " =" << entry.value << " [" << entry.tag << "]" << std::endl;
+    mBoard->set_value_at(entry.coord, entry.value);
+
+    return true;
+}
+
+template<class Set>
+bool Analyzer::act_on_naked_pair(const NakedPair &entry, Set &set) {
+    bool acted_on_naked_pair = false;
+
+    auto const &cell1 = mBoard->at(entry.coords.first);
+    auto const &cell2 = mBoard->at(entry.coords.second);
+
+    if (!set.contains(cell2)) return acted_on_naked_pair; // this is not the set to act on
+
+    for (auto &other_cell : set) {
+        if (other_cell.isValue()) continue;
+        if (other_cell == cell1 || other_cell == cell2) continue; // not looking at either of the cell pairs
+
+        bool acted_on_other_cell = false;
+        if (other_cell.check(entry.values.first)) {
+            mBoard->clear_note_at(other_cell.coord(), entry.values.first);
+            std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.first << " [" << set.tag() << "]" << std::endl;
+            acted_on_other_cell = true;
+        }
+        if (other_cell.check(entry.values.second)) {
+            mBoard->clear_note_at(other_cell.coord(), entry.values.second);
+            std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.second << " [" << set.tag() << "]" << std::endl;
+            acted_on_other_cell = true;
+        }
+
+        if (acted_on_other_cell) {
+            acted_on_naked_pair = true;
+        }
+    }
+
+    return acted_on_naked_pair;
+}
+
+bool Analyzer::act_on_naked_pair() {
+    bool acted_on_naked_pair = false;
+
+    if (mNakedPairs.empty()) { return acted_on_naked_pair; }
+
+    auto const entry = mNakedPairs.back();
+    mNakedPairs.pop_back();
+    auto const &cell1 = mBoard->at(entry.coords.first);
+
+    acted_on_naked_pair |= act_on_naked_pair(entry, mBoard->nonet(cell1));
+    acted_on_naked_pair |= act_on_naked_pair(entry, mBoard->column(cell1));
+    acted_on_naked_pair |= act_on_naked_pair(entry, mBoard->row(cell1));
+
+    return acted_on_naked_pair;
+}
+
+template<class Set>
+bool Analyzer::act_on_locked_candidate(const LockedCandidates &entry, Set &set) {
+    bool acted_on_locked_candidates = false;
+
+    for (auto &other_cell : set) {
+        // is this a note cell?
+        if (!other_cell.isNote()) continue;
+
+        // yes! but is it one of the locked candidate?
+        if (std::find(entry.coords.begin(), entry.coords.end(), other_cell.coord())
+                != entry.coords.end()) continue;
+
+        // no! but is it a candidate for the locked value?
+        if (!other_cell.check(entry.value)) continue;
+
+        // yes! we'll act
+        std::cout << "[LC] " << other_cell.coord() << " x" << entry.value << " [" << entry.tag << "]" << std::endl;
+        mBoard->clear_note_at(other_cell.coord(), entry.value);
+        acted_on_locked_candidates = true;
+    }
+
+    //assert(acted_on_locked_candidates);
+    return acted_on_locked_candidates;
+}
+
+bool Analyzer::act_on_locked_candidate() {
+    if (mLockedCandidates.empty()) { return false; }
+
+    auto const entry = mLockedCandidates.back(); // copy
+    mLockedCandidates.pop_back();
+
+    auto &cell = mBoard->at(entry.coords.at(0));
+
+    switch (entry.tag[0]) {
+    case 'n':
+        (void) act_on_locked_candidate(entry, mBoard->nonet(cell));
+        break;
+    case 'c':
+        (void) act_on_locked_candidate(entry, mBoard->column(cell));
+        break;
+    case 'r':
+        (void) act_on_locked_candidate(entry, mBoard->row(cell));
+        break;
+    }
+
+    return true;
+}
+
+bool Analyzer::act_on_hidden_pair(Cell &cell, const HiddenPair &entry) {
+    bool acted_on_hidden_pair = false;
+
+    auto const &v1 = entry.values.first;
+    auto const &v2 = entry.values.second;
+
+    for (auto const &value : cell.notes().values()) {
+        if (value == v1) continue;
+        if (value == v2) continue;
+
+        mBoard->clear_note_at(cell.coord(), value);
+        std::cout << "[HP] " << cell.coord() << " x" << value << " " << entry << std::endl;
+        acted_on_hidden_pair = true;
+    }
+
+    return acted_on_hidden_pair;
+}
+
+bool Analyzer::act_on_hidden_pair() {
+    bool acted_on_hidden_pair = false;
+
+    if (mHiddenPairs.empty()) { return acted_on_hidden_pair; }
+
+    auto const entry = mHiddenPairs.back();
+    mHiddenPairs.pop_back();
+
+    auto &c1 = mBoard->at(entry.coords.first);
+    auto &c2 = mBoard->at(entry.coords.second);
+
+    acted_on_hidden_pair |= act_on_hidden_pair(c1, entry);
+    acted_on_hidden_pair |= act_on_hidden_pair(c2, entry);
+
+    return acted_on_hidden_pair;
+}
+
+std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
+    // naked singles
+    outs << "[NS](" << a.mNakedSingles.size() << ") {";
+    bool is_first = true;
+    for (auto const &coord : a.mNakedSingles) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << coord;
+    }
+    outs << "}" << std::endl
+   // hidden singles
+         << "[HS](" << a.mHiddenSingles.size() << ") {";
+    is_first = true;
+    for (auto const &entry: a.mHiddenSingles) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << entry;
+    }
+    outs << "}" << std::endl
+    // naked pairs
+         << "[NP](" << a.mNakedPairs.size() << ") {";
+    is_first = true;
+    for (auto const &entry: a.mNakedPairs) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << "{" << entry << "}";
+    }
+    outs << "}" << std::endl
+     // locked candidates
+         << "[LC](" << a.mLockedCandidates.size() << ") {";
+    is_first = true;
+    for (auto const &entry: a.mLockedCandidates) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << "{" << entry << "}";
+    }
+    outs << "}" << std::endl
+    // hidden pairs
+         << "[HP](" << a.mHiddenPairs.size() << ") {";
+    is_first = true;
+    for (auto const &entry: a.mHiddenPairs) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << "{" << entry << "}";
+    }
+    outs << "}";
+
+    return outs;
+}
+
+std::ostream& operator<<(std::ostream& outs, const Analyzer::HiddenSingle &hs) {
+    return outs << hs.coord << "#" << hs.value << "[" << hs.tag << "]";
+}
+
+std::ostream& operator<<(std::ostream& outs, const Analyzer::LockedCandidates &lc) {
+    outs << "{";
+    bool is_first = true;
+    for (auto const &coord : lc.coords) {
+        if (!is_first) { std::cout << ","; }
+        is_first = false;
+        outs << coord;
+    }
+    outs << "}#" << lc.value << "[^" << lc.tag << "]";
+    return outs;
+}
+
+std::ostream& operator<<(std::ostream& outs, const Analyzer::NakedPair &np) {
+    return outs << "{" << np.coords.first << "," << np.coords.second << "}#{" << np.values.first << "," << np.values.second << "}";
+}
+
+std::ostream& operator<<(std::ostream& outs, const Analyzer::HiddenPair &hp) {
+    return outs << "{" << hp.coords.first << "," << hp.coords.second << "}#{" << hp.values.first << "," << hp.values.second << "}";
 }

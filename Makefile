@@ -18,6 +18,7 @@ src = coord.cpp \
 	  nonet.cpp \
 	  board.cpp \
 	  analyzer.cpp \
+	  analyzer-nakedsingles.cpp \
 	  solverstate.cpp \
 	  solver.cpp
 

@@ -4,9 +4,9 @@
 #include "solverstate.h"
 
 bool SolverState::act(const bool singles_only) {
-    bool did_act = mBoard.act(singles_only);
+    bool did_act = mAnalyzer.act(singles_only);
     if (did_act) {
-        mAnalyzer.analyze(mBoard);
+        mAnalyzer.analyze();
     }
     return did_act;
 }
@@ -21,7 +21,7 @@ bool SolverState::edit_note(const std::string &entry) {
 
     bool did_clear_note = mBoard.clear_note_at(row, col, val);
     if (did_clear_note) {
-        mAnalyzer.analyze(mBoard);
+        mAnalyzer.analyze();
     }
     return did_clear_note;
 }
@@ -36,7 +36,7 @@ bool SolverState::set_value(const std::string &entry) {
 
     bool did_set_value = mBoard.set_value_at(row, col, val);
     if (did_set_value) {
-        mAnalyzer.analyze(mBoard);
+        mAnalyzer.analyze();
     }
     return did_set_value;
 }

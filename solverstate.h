@@ -14,12 +14,16 @@ public:
         : mBoard(mAnalyzer, board_desc)
         , mGeneration(0) {
 
-        mAnalyzer.analyze(mBoard);
+        mAnalyzer.board(mBoard);
+        mAnalyzer.analyze();
     }
 
     SolverState(const SolverState &other)
-        : mBoard(mAnalyzer, other.mBoard)
-        , mGeneration(other.mGeneration + 1) { }
+        : mAnalyzer(other.mAnalyzer)
+        , mBoard(mAnalyzer, other.mBoard)
+        , mGeneration(other.mGeneration + 1) {
+        mAnalyzer.board(mBoard);
+        }
 
     size_t generation() const { return mGeneration; }
 
