@@ -407,7 +407,8 @@ void Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 
     }
 }
 
-void Analyzer::find_locked_candidates() const {
+template<class Set>
+void Analyzer::find_locked_candidates(Set const &set) const {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#blocks
     // Form 1:
     // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same row/column,
@@ -416,15 +417,13 @@ void Analyzer::find_locked_candidates() const {
     // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same nonet,
     // then it is also not possible anywhere else in the same row/column
 
-    for (auto const &coord : mNotesDirtySet) {
-        auto &cell = mBoard->at(coord);
-
+    for (auto const &cell: set) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
         // yes! but is it already recorded as a hidden single?
         if (std::find_if(mBoard->mHiddenSingles.begin(), mBoard->mHiddenSingles.end(),
-                    [coord](auto const &entry) { return entry.coord == coord; })
+                    [cell](auto const &entry) { return entry.coord == cell.coord(); })
                 != mBoard->mHiddenSingles.end()) continue;
 
         // no! then for each candidate value in this note cell
@@ -438,6 +437,17 @@ void Analyzer::find_locked_candidates() const {
             find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->row(cell));
             find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->column(cell));
         }
+    }
+}
+
+void Analyzer::find_locked_candidates() const {
+    for (auto const &coord : mNotesDirtySet) {
+        auto &cell = mBoard->at(coord);
+
+        // are there now-revealed hidden pairs in any of this cell's blocks
+        find_locked_candidates(mBoard->nonet(cell));
+        find_locked_candidates(mBoard->column(cell));
+        find_locked_candidates(mBoard->row(cell));
     }
 }
 

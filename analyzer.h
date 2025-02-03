@@ -51,6 +51,8 @@ private:
     template<class Set1, class Set2>
     void find_locked_candidate(const Cell &, const Value &, Set1 &set_to_consider, Set2 &set_to_ignore) const;
     void filter_locked_candidates() const;
+    template<class Set>
+    void find_locked_candidates(Set const &) const;
     void find_locked_candidates() const;
 
     // hidden pairs
