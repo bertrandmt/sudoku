@@ -9,6 +9,8 @@
 #include "cell.h"
 #include "verbose.h"
 
+#include <stdexcept>
+
 void Analyzer::value_dirty(const Cell &cell) {
     mValueDirtySet.insert(cell.coord());
 }
@@ -178,7 +180,7 @@ bool would_act(const Set &set, const Cell &c1, const Cell &c2, const Value &v1, 
     bool would_act = false;
     for (auto const &other_cell : set) {
         if (other_cell.isValue()) continue;
-        if (other_cell == c1 || other_cell == c1) continue;
+        if (other_cell == c1 || other_cell == c2) continue;
         if (!other_cell.check(v1) && !other_cell.check(v2)) continue; // no impact on this cell
 
         would_act = true;
@@ -271,6 +273,31 @@ void Analyzer::find_naked_pairs() const {
     }
 }
 
+namespace { // anon
+template<class Set>
+bool would_act_on_set(std::vector<Coord> const &coords, Value const &value, std::string const &tag, Set const &set) {
+    assert(set.tag() == tag);
+
+    bool would_act = false;
+
+    for (auto const &cell : set) {
+        // is it a note cell?
+        if (!cell.isNote()) continue;
+
+        // yes! but is it a candidate?
+        if (!cell.check(value)) continue;
+
+        // yes! but is it one of the locked candidates?
+        if (std::find(coords.begin(), coords.end(), cell.coord()) != coords.end()) continue;
+
+        would_act = true;
+        break;
+    }
+
+    return would_act;
+}
+}
+
 void Analyzer::filter_locked_candidates() const {
     mBoard->mLockedCandidates.erase(std::remove_if(mBoard->mLockedCandidates.begin(), mBoard->mLockedCandidates.end(),
                 [this](auto &entry) {
@@ -292,7 +319,24 @@ void Analyzer::filter_locked_candidates() const {
                     }
 
                     // but would they still have an impact?
-                    // TODO
+                    bool would_act = false;
+                    switch (entry.tag.at(0)) {
+                    case 'n':
+                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->nonet(mBoard->at(coords.at(0))));
+                        break;
+                    case 'c':
+                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->column(mBoard->at(coords.at(0))));
+                        break;
+                    case 'r':
+                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->row(mBoard->at(coords.at(0))));
+                        break;
+                    default:
+                        throw std::runtime_error("unhandled case");
+                    }
+                    if (!would_act) {
+                        if (sVerbose) std::cout << "  [xLC] " << entry << std::endl;
+                        return true;
+                    }
 
                     // yes! but are they stil by themselves within their recorded set?
                     // TODO
@@ -340,14 +384,11 @@ void Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 
         // is it a note cell?
         if (!other_cell.isNote()) continue;
 
-        // yes! but is it the same cell?
-        if (other_cell == cell) continue;
-
-        // no! but is it a candidate?
+        // yes! but is it a candidate?
         if (!other_cell.check(value)) continue;
 
         // yes! but is it one of the locked candidates?
-        if (std::find(set_to_consider.begin(), set_to_consider.end(), other_cell) != set_to_consider.end()) continue;
+        if (std::find(lc_coords.begin(), lc_coords.end(), other_cell.coord()) != lc_coords.end()) continue;
 
         // no! we found a note cell that is in the rest of the "set_to_ignore"
         // and also is a candidate for this value: we *would* act on it
@@ -370,9 +411,16 @@ void Analyzer::find_locked_candidates() const {
     for (auto const &coord : mNotesDirtySet) {
         auto &cell = mBoard->at(coord);
 
-        if (cell.isValue()) continue; // only considering note cells
+        // is this a note cell?
+        if (!cell.isNote()) continue;
 
-        for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
+        // yes! but is it already recorded as a hidden single?
+        if (std::find_if(mBoard->mHiddenSingles.begin(), mBoard->mHiddenSingles.end(),
+                    [coord](auto const &entry) { return entry.coord == coord; })
+                != mBoard->mHiddenSingles.end()) continue;
+
+        // no! then for each candidate value in this note cell
+        for (auto const &value : cell.notes().values()) {
 
             // form 1
             find_locked_candidate(cell, value, mBoard->row(cell), mBoard->nonet(cell));
