@@ -42,5 +42,10 @@ bool SolverState::set_value(const std::string &entry) {
 }
 
 std::ostream &operator<<(std::ostream &outs, const SolverState &state) {
-    return outs << state.mBoard;
+    outs << state.mBoard;
+    if (!state.solved()) {
+        outs << std::endl
+             << state.mAnalyzer;
+    }
+    return outs;
 }

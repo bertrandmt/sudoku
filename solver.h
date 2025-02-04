@@ -28,6 +28,8 @@ public:
         }
     }
 
+    bool solved() const { return mStates.back()->solved(); }
+
     friend std::ostream &operator<<(std::ostream &, const Solver &);
 
 private:

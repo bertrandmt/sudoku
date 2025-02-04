@@ -88,6 +88,7 @@ bool routine(Solver::ptr &solver) {
         case '.':
         case '>': // auto-solve one step
             if (!solver) { help(); break; }
+            if (solver->solved()) break;
             if (solver->solve_one_step(false)) { std::cout << *solver << std::endl; }
             else                               { std::cout << "???" << std::endl; }
             break;

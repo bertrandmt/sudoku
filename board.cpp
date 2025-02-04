@@ -64,7 +64,9 @@ void Board::record_entries_form2(const std::string &entries) {
 }
 
 Board::Board(Analyzer &analyzer, const std::string &board_desc)
-    : mAnalyzer(analyzer) {
+    : mNoteCellsCount(width * height)
+    , mNotesCount(mNoteCellsCount * kNine)
+    , mAnalyzer(analyzer) {
     for (size_t row = 0; row < height; row++) {
         for (size_t col = 0; col < width; col++) {
             mCells.push_back(Cell(row, col));
@@ -88,6 +90,8 @@ Board::Board(Analyzer &analyzer, const std::string &board_desc)
 
 Board::Board(Analyzer &analyzer, const Board &other)
     : mCells(other.mCells)
+    , mNoteCellsCount(other.mNoteCellsCount)
+    , mNotesCount(other.mNotesCount)
     , mAnalyzer(analyzer) {
 
     rebuild_subsets();
@@ -143,6 +147,7 @@ bool Board::clear_note_at(const Coord &coord, const Value &value) {
     if (!cell.check(value)) return false;
 
     cell.set(value, false);
+    mNotesCount--;
 
     mAnalyzer.notes_dirty(cell);
 
@@ -158,6 +163,8 @@ bool Board::set_value_at(const Coord &coord, const Value &value) {
 
     if (!cell.isNote()) return false;
 
+    mNotesCount -= cell.notes().count();
+    mNoteCellsCount--;
     cell.set(value);
 
     mAnalyzer.value_dirty(cell);
@@ -199,7 +206,6 @@ const Nonet &Board::nonet(const Cell &c) const {
 }
 
 std::ostream& operator<<(std::ostream& outs, const Board &b) {
-    // the board itself
     for (size_t i = 0; i < b.height; i++) {
         outs << (i % 3 == 0 ? "+=====+=====+=====++=====+=====+=====++=====+=====+=====+"
                             : "+-----+-----+-----++-----+-----+-----++-----+-----+-----+")
@@ -213,6 +219,11 @@ std::ostream& operator<<(std::ostream& outs, const Board &b) {
         }
     }
     outs << "+=====+=====+=====++=====+=====+=====++=====+=====+=====+";
+    if (b.mNoteCellsCount != 0) {
+        outs << std::endl
+             << "Left to solve:   " << b.mNoteCellsCount << std::endl
+             << "Notes remaining: " << b.mNotesCount;
+    }
 
     return outs;
 }

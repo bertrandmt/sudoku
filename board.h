@@ -60,11 +60,16 @@ public:
     friend class Column;
     friend class Nonet;
 
+    size_t note_cells_count() const { return mNoteCellsCount; }
+
 private:
     std::vector<Cell> mCells;
     std::vector<Row> mRows;
     std::vector<Column> mColumns;
     std::vector<Nonet> mNonets;
+
+    size_t mNoteCellsCount;
+    size_t mNotesCount;
 
     Analyzer &mAnalyzer;
 

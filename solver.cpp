@@ -4,11 +4,17 @@
 #include "solver.h"
 
 bool Solver::solve_one_step(bool singles_only) {
+    if (mStates.back()->solved()) return false;
+
     SolverState::ptr nextState(new SolverState(*mStates.back()));
     std::cout << "Step #" << nextState->generation() << ":" << std::endl;
 
     if (nextState->act(singles_only)) {
         mStates.push_back(nextState);
+
+        if (nextState->solved()) {
+            std::cout << "SOLVED!" << std::endl;
+        }
         return true;
     }
 
@@ -16,17 +22,27 @@ bool Solver::solve_one_step(bool singles_only) {
 }
 
 bool Solver::solve() {
+    if (mStates.back()->solved()) return false;
+
     bool did_act = false;
     while (solve_one_step(false)) did_act = true;
-    std::cout << "???" << std::endl;
+
+    if (!mStates.back()->solved()) {
+        std::cout << "???" << std::endl;
+    }
 
     return did_act;
 }
 
 bool Solver::solve_singles() {
+    if (mStates.back()->solved()) return false;
+
     bool did_act = false;
     while (solve_one_step(true)) did_act = true;
-    std::cout << "???" << std::endl;
+
+    if (!mStates.back()->solved()) {
+        std::cout << "???" << std::endl;
+    }
 
     return did_act;
 }

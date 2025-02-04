@@ -31,6 +31,8 @@ public:
     bool edit_note(const std::string &);
     bool set_value(const std::string &);
 
+    bool solved() const { return mBoard.note_cells_count() == 0; }
+
     void print(std::ostream &outs) const {
         mBoard.print(outs);
     }
