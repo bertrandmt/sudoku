@@ -164,6 +164,14 @@ void Analyzer::find_locked_candidates(Set const &set) {
 }
 
 void Analyzer::find_locked_candidates() {
+    for (auto const &coord : mValueDirtySet) {
+        auto &cell = mBoard->at(coord);
+
+        // are there now-revealed hidden pairs in any of this cell's blocks
+        find_locked_candidates(mBoard->nonet(cell));
+        find_locked_candidates(mBoard->column(cell));
+        find_locked_candidates(mBoard->row(cell));
+    }
     for (auto const &coord : mNotesDirtySet) {
         auto &cell = mBoard->at(coord);
 
