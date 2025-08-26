@@ -17,6 +17,13 @@ public:
         return mRow == other.mRow
             && mColumn == other.mColumn;
     }
+
+    bool operator<(const Coord &other) const {
+        if (mRow != other.mRow) {
+            return mRow < other.mRow;
+        }
+        return mColumn < other.mColumn;
+    }
 private:
     size_t mRow;
     size_t mColumn;
