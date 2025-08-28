@@ -66,14 +66,13 @@ void Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &
         assert(other_cell.check(v1) && other_cell.check(v2));
 
         // yes! but did we already find a pair candidate cell for this hidden pair?
-        if (!ppair_cell) {              // no candidate yet
-            ppair_cell = &other_cell;   // this is "the" other candidate
-            continue;
-        }
-        else {                          // this is disqualifying: we have more than two candidates in the row
-            condition_met = false;
+        if (ppair_cell) {
+            condition_met = false;      // this is disqualifying: we have more than two candidates in the row
             break;
         }
+
+        // this is "the" other candidate
+        ppair_cell = &other_cell;
     }
 
     // did we, in fact, find another candidate?
