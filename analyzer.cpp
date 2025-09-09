@@ -55,11 +55,10 @@ void Analyzer::filter_notes(const Set &set) {
 
 void Analyzer::filter_notes() {
     for (auto const &coord : mValueDirtySet) { // for each value cell whose value was set since last analysis
-
-        auto &cell = mBoard->at(coord);         // review the notes in
-        filter_notes(mBoard->nonet(cell));      // each cell in this cell's nonet, and
-        filter_notes(mBoard->column(cell));     //                      ... column, and
-        filter_notes(mBoard->row(cell));        //                      ... row
+        // review the notes in
+        filter_notes(mBoard->nonet(coord));      // each cell in this cell's nonet, and
+        filter_notes(mBoard->column(coord));     //                      ... column, and
+        filter_notes(mBoard->row(coord));        //                      ... row
     }
 }
 
@@ -71,12 +70,14 @@ void Analyzer::analyze() {
     filter_naked_pairs();
     filter_locked_candidates();
     filter_hidden_pairs();
+    filter_xwings();
 
     find_naked_singles();
     find_hidden_singles();
     find_naked_pairs();
     find_locked_candidates();
     find_hidden_pairs();
+    find_xwings();
 }
 
 bool Analyzer::act(const bool singles_only) {
@@ -89,6 +90,7 @@ bool Analyzer::act(const bool singles_only) {
         if (!did_act) did_act = act_on_naked_pair();
         if (!did_act) did_act = act_on_locked_candidate();
         if (!did_act) did_act = act_on_hidden_pair();
+        if (!did_act) did_act = act_on_xwing();
     }
 
     return did_act;
@@ -135,6 +137,15 @@ std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
          << "[HP](" << a.mHiddenPairs.size() << ") {";
     is_first = true;
     for (auto const &entry: a.mHiddenPairs) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << "{" << entry << "}";
+    }
+    outs << "}" << std::endl
+    // x-wings
+         << "[XW](" << a.mXWings.size() << ") {";
+    is_first = true;
+    for (auto const &entry: a.mXWings) {
         if (!is_first) { outs << ", "; }
         is_first = false;
         outs << "{" << entry << "}";

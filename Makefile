@@ -23,6 +23,7 @@ src = coord.cpp \
 	  analyzer-nakedpairs.cpp \
 	  analyzer-lockedcandidates.cpp \
 	  analyzer-hiddenpairs.cpp \
+	  analyzer-xwing.cpp \
 	  solverstate.cpp \
 	  solver.cpp
 

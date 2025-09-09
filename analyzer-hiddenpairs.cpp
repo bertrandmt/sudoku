@@ -122,20 +122,16 @@ void Analyzer::find_hidden_pairs(Set const &set) {
 
 void Analyzer::find_hidden_pairs() {
     for (auto const &coord : mValueDirtySet) {
-        auto &cell = mBoard->at(coord);
-
         // are there now-revealed hidden pairs in any of this cell's blocks
-        find_hidden_pairs(mBoard->nonet(cell));
-        find_hidden_pairs(mBoard->column(cell));
-        find_hidden_pairs(mBoard->row(cell));
+        find_hidden_pairs(mBoard->nonet(coord));
+        find_hidden_pairs(mBoard->column(coord));
+        find_hidden_pairs(mBoard->row(coord));
     }
     for (auto const &coord : mNotesDirtySet) {
-        auto &cell = mBoard->at(coord);
-
         // are there now-revealed hidden pairs in any of this cell's blocks
-        find_hidden_pairs(mBoard->nonet(cell));
-        find_hidden_pairs(mBoard->column(cell));
-        find_hidden_pairs(mBoard->row(cell));
+        find_hidden_pairs(mBoard->nonet(coord));
+        find_hidden_pairs(mBoard->column(coord));
+        find_hidden_pairs(mBoard->row(coord));
     }
 }
 

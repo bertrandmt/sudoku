@@ -54,13 +54,13 @@ void Analyzer::filter_locked_candidates() {
                     bool would_act = false;
                     switch (entry.tag.at(0)) {
                     case 'n':
-                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->nonet(mBoard->at(coords.at(0))));
+                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->nonet(coords.at(0)));
                         break;
                     case 'c':
-                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->column(mBoard->at(coords.at(0))));
+                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->column(coords.at(0)));
                         break;
                     case 'r':
-                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->row(mBoard->at(coords.at(0))));
+                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->row(coords.at(0)));
                         break;
                     default:
                         throw std::runtime_error("unhandled case");
@@ -165,20 +165,16 @@ void Analyzer::find_locked_candidates(Set const &set) {
 
 void Analyzer::find_locked_candidates() {
     for (auto const &coord : mValueDirtySet) {
-        auto &cell = mBoard->at(coord);
-
         // are there now-revealed hidden pairs in any of this cell's blocks
-        find_locked_candidates(mBoard->nonet(cell));
-        find_locked_candidates(mBoard->column(cell));
-        find_locked_candidates(mBoard->row(cell));
+        find_locked_candidates(mBoard->nonet(coord));
+        find_locked_candidates(mBoard->column(coord));
+        find_locked_candidates(mBoard->row(coord));
     }
     for (auto const &coord : mNotesDirtySet) {
-        auto &cell = mBoard->at(coord);
-
         // are there now-revealed hidden pairs in any of this cell's blocks
-        find_locked_candidates(mBoard->nonet(cell));
-        find_locked_candidates(mBoard->column(cell));
-        find_locked_candidates(mBoard->row(cell));
+        find_locked_candidates(mBoard->nonet(coord));
+        find_locked_candidates(mBoard->column(coord));
+        find_locked_candidates(mBoard->row(coord));
     }
 }
 
@@ -213,17 +209,15 @@ bool Analyzer::act_on_locked_candidate() {
     auto const entry = mLockedCandidates.back(); // copy
     mLockedCandidates.pop_back();
 
-    auto &cell = mBoard->at(entry.coords.at(0));
-
     switch (entry.tag[0]) {
     case 'n':
-        (void) act_on_locked_candidate(entry, mBoard->nonet(cell));
+        (void) act_on_locked_candidate(entry, mBoard->nonet(entry.coords.at(0)));
         break;
     case 'c':
-        (void) act_on_locked_candidate(entry, mBoard->column(cell));
+        (void) act_on_locked_candidate(entry, mBoard->column(entry.coords.at(0)));
         break;
     case 'r':
-        (void) act_on_locked_candidate(entry, mBoard->row(cell));
+        (void) act_on_locked_candidate(entry, mBoard->row(entry.coords.at(0)));
         break;
     }
 

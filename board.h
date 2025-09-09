@@ -43,6 +43,10 @@ public:
     const Column &column(const Cell &) const;
     const Nonet &nonet(const Cell &) const;
 
+    const Row &row(const Coord &) const;
+    const Column &column(const Coord &) const;
+    const Nonet &nonet(const Coord &) const;
+
     std::vector<Cell> &cells() { return mCells; }
     const std::vector<Cell> &cells() const { return mCells; }
 

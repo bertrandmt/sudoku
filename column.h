@@ -8,6 +8,7 @@
 #include <vector>
 #include <iterator>
 #include <cstddef>
+#include <cassert>
 
 class Column {
 public:
@@ -42,11 +43,6 @@ public:
                 && mIndex == other.mIndex;
         }
 
-        bool operator!=(const Iterator &other) const {
-            return pCells != other.pCells
-                || mIndex != other.mIndex;
-        }
-
     private:
         std::vector<Cell> *pCells;
         size_t mIndex;
@@ -56,8 +52,18 @@ public:
     auto begin() { return Iterator(mBoard, mCellStart); }
     auto end() { return Iterator(mBoard, mCellSentinel); }
 
+    auto begin_at(const Cell &cell) {
+        assert(cell.coord().column() == mIndex);
+        return Iterator(mBoard, cell.coord().row() * Board::width + mCellStart);
+    }
+
     auto begin() const { return Iterator(mBoard, mCellStart); }
     auto end() const { return Iterator(mBoard, mCellSentinel); }
+
+    auto begin_at(const Cell &cell) const {
+        assert(cell.coord().column() == mIndex);
+        return Iterator(mBoard, cell.coord().row() * Board::width + mCellStart);
+    }
 
     bool contains(const Cell &other) const {
         return std::find(begin(), end(), other) != end();
@@ -67,6 +73,13 @@ public:
         return &mBoard == &other.mBoard
              && mIndex == other.mIndex;
     }
+
+    bool operator<(const Column &other) const {
+        assert(&mBoard == &other.mBoard);
+        return mIndex < other.mIndex;
+    }
+
+    size_t index() const { return mIndex; }
 
     friend std::ostream& operator<< (std::ostream& outs, const Column&);
 

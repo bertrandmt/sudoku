@@ -191,16 +191,28 @@ const Cell &Board::at(size_t row, size_t col) const {
 }
 
 const Row &Board::row(const Cell &c) const {
-    return mRows.at(c.coord().row());
+    return row(c.coord());
 }
 
 const Column &Board::column(const Cell &c) const {
-    return mColumns.at(c.coord().column());
+    return column(c.coord());
 }
 
 const Nonet &Board::nonet(const Cell &c) const {
-    size_t nonetRow = (c.coord().row() / 3) * 3;
-    size_t nonetCol = (c.coord().column() / 3) * 3;
+    return nonet(c.coord());
+}
+
+const Row &Board::row(const Coord &coord) const {
+    return mRows.at(coord.row());
+}
+
+const Column &Board::column(const Coord &coord) const {
+    return mColumns.at(coord.column());
+}
+
+const Nonet &Board::nonet(const Coord &coord) const {
+    size_t nonetRow = (coord.row() / 3) * 3;
+    size_t nonetCol = (coord.column() / 3) * 3;
 
     return mNonets.at(nonetRow + nonetCol / 3);
 }

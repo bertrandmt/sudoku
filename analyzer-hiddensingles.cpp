@@ -71,20 +71,16 @@ void Analyzer::find_hidden_singles() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
     // A hidden single arises when there is only one possible cell for a candidate
     for (auto const &coord : mValueDirtySet) {
-        auto &cell = mBoard->at(coord);
-
         // are there now-single hidden singles in any of this cell's blocks
-        find_hidden_singles(mBoard->nonet(cell));
-        find_hidden_singles(mBoard->column(cell));
-        find_hidden_singles(mBoard->row(cell));
+        find_hidden_singles(mBoard->nonet(coord));
+        find_hidden_singles(mBoard->column(coord));
+        find_hidden_singles(mBoard->row(coord));
     }
     for (auto const &coord : mNotesDirtySet) {
-        auto &cell = mBoard->at(coord);
-
         // are there now-single hidden singles in any of this cell's blocks
-        find_hidden_singles(mBoard->nonet(cell));
-        find_hidden_singles(mBoard->column(cell));
-        find_hidden_singles(mBoard->row(cell));
+        find_hidden_singles(mBoard->nonet(coord));
+        find_hidden_singles(mBoard->column(coord));
+        find_hidden_singles(mBoard->row(coord));
     }
 }
 
