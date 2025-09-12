@@ -77,7 +77,7 @@ void Analyzer::analyze() {
     filter_locked_candidates();
     filter_hidden_pairs();
     filter_xwings();
-    filter_coloring_graphs();
+    filter_color_chains();
 
     bool did_find = false;
     did_find = find_naked_singles();
@@ -86,7 +86,7 @@ void Analyzer::analyze() {
     if (!did_find) did_find = find_locked_candidates();
     if (!did_find) did_find = find_hidden_pairs();
     if (!did_find) did_find = find_xwings();
-    if (!did_find) did_find = find_coloring_graphs();
+    if (!did_find) did_find = find_color_chains();
 }
 
 bool Analyzer::act(const bool singles_only) {
@@ -100,7 +100,7 @@ bool Analyzer::act(const bool singles_only) {
         if (!did_act) did_act = act_on_locked_candidate();
         if (!did_act) did_act = act_on_hidden_pair();
         if (!did_act) did_act = act_on_xwing();
-        if (!did_act) did_act = act_on_coloring_graph();
+        if (!did_act) did_act = act_on_color_chain();
     }
 
     return did_act;

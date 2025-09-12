@@ -5,12 +5,12 @@
 #include <cassert>
 #include <string>
 #include <vector>
+#include <ranges>
 
 #include "coord.h"
 
 enum Value: int {
-    kUnset = 0,
-    kOne,
+    kOne = 1,
     kTwo,
     kThree,
     kFour,
@@ -19,6 +19,12 @@ enum Value: int {
     kSeven,
     kEight,
     kNine,
+    kUnset
+};
+
+auto value_range = [](Value begin, Value end) {
+    return std::views::iota(static_cast<int>(begin), static_cast<int>(end))
+         | std::views::transform([](int i) { return static_cast<Value>(i); });
 };
 
 class Cell;

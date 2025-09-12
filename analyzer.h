@@ -195,17 +195,15 @@ private:
 
 private:
     //** simple coloring
-    enum ColoringColor { kColorA, kColorB };
-
     struct ColoringGraph {
         Value value;
-        std::unordered_map<Coord, ColoringColor> cells;  // coord -> color mapping
+        std::unordered_map<Coord, bool> cells;  // coord -> color mapping (true=A, false=B)
 
         bool contains(const Coord &coord) const {
             return cells.find(coord) != cells.end();
         }
 
-        ColoringColor get_color(const Coord &coord) const {
+        bool get_color(const Coord &coord) const {
             auto it = cells.find(coord);
             assert(it != cells.end());
             return it->second;
@@ -226,15 +224,15 @@ private:
     std::vector<ColoringGraph> mColoringGraphs;
 
     // filter
-    bool test_coloring_graph(const ColoringGraph &graph) const;
-    void filter_coloring_graphs();
+    void filter_color_chains();
 
     // find
-    bool find_all_coloring_graphs_for_value(const Value &value);
-    bool find_coloring_graphs();
+    bool test_color_chain(const ColoringGraph &graph) const;
+    bool find_color_chains(const Value &value);
+    bool find_color_chains();
 
     // act
-    bool act_on_coloring_graph();
+    bool act_on_color_chain();
 
 private:
     using DirtySet = std::unordered_set<Coord>;

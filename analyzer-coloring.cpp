@@ -20,81 +20,99 @@ namespace {
         return candidates.size() == 2 ? candidates : std::vector<Cell>();
     }
 
-    // Check if two cells form a strong link for a value
-    template<class Board>
-    bool forms_strong_link(Board *board, const Cell &cell1, const Cell &cell2, const Value &value) {
-        // Check if they're in the same row and it has exactly 2 candidates
-        if (board->row(cell1) == board->row(cell2)) {
-            auto candidates = find_strong_link_candidates(board->row(cell1), value);
-            if (candidates.size() == 2) {
-                return (candidates[0] == cell1 && candidates[1] == cell2) ||
-                       (candidates[0] == cell2 && candidates[1] == cell1);
-            }
-        }
-
-        // Check if they're in the same column and it has exactly 2 candidates  
-        if (board->column(cell1) == board->column(cell2)) {
-            auto candidates = find_strong_link_candidates(board->column(cell1), value);
-            if (candidates.size() == 2) {
-                return (candidates[0] == cell1 && candidates[1] == cell2) ||
-                       (candidates[0] == cell2 && candidates[1] == cell1);
-            }
-        }
-
-        // Check if they're in the same nonet and it has exactly 2 candidates
-        if (board->nonet(cell1) == board->nonet(cell2)) {
-            auto candidates = find_strong_link_candidates(board->nonet(cell1), value);
-            if (candidates.size() == 2) {
-                return (candidates[0] == cell1 && candidates[1] == cell2) ||
-                       (candidates[0] == cell2 && candidates[1] == cell1);
-            }
-        }
-
-        return false;
-    }
 }
 
-bool Analyzer::test_coloring_graph(const ColoringGraph &graph) const {
-    // A coloring graph is valid if:
-    // 1. All cells in the graph still have the candidate value
-    // 2. The graph represents a valid coloring (connected via strong links)
 
-    if (graph.size() < 2) return false;
-
-    for (const auto &[coord, color] : graph) {
-        const Cell &cell = mBoard->at(coord);
-        if (!cell.isNote() || !cell.check(graph.value)) {
-            return false;
-        }
-    }
-
-    // Check that the graph is still connected via strong links
-    // Each cell must have at least one strong link to another cell in the graph
-    for (const auto &[coord, color] : graph) {
-        const Cell &current_cell = mBoard->at(coord);
-        bool has_strong_link = false;
-
-        for (const auto &[other_coord, other_color] : graph) {
-            if (coord == other_coord) continue;
-
-            const Cell &other_cell = mBoard->at(other_coord);
-            if (forms_strong_link(mBoard, current_cell, other_cell, graph.value)) {
-                has_strong_link = true;
-                break;
-            }
-        }
-
-        if (!has_strong_link) return false;
-    }
-
-    return true;
-}
-
-void Analyzer::filter_coloring_graphs() {
+void Analyzer::filter_color_chains() {
     mColoringGraphs.clear();
 }
 
-bool Analyzer::find_all_coloring_graphs_for_value(const Value &value) {
+bool Analyzer::test_color_chain(const ColoringGraph &graph) const {
+    // A coloring graph is actionable if it can lead to eliminations via:
+    // Rule 1: Two cells of the same color are in the same unit (conflict)
+    // Rule 2: A cell can see cells of both colors
+    
+    // Group cells by color
+    std::vector<Coord> color_a_cells, color_b_cells;
+    for (const auto &[coord, color] : graph) {
+        if (color) {  // true = color A
+            color_a_cells.push_back(coord);
+        } else {      // false = color B
+            color_b_cells.push_back(coord);
+        }
+    }
+
+    // Check rule 1: cells of same color in the same unit
+    auto check_same_color_same_unit = [this](const std::vector<Coord> &coords) {
+        for (size_t i = 0; i < coords.size(); ++i) {
+            for (size_t j = i + 1; j < coords.size(); ++j) {
+                const Cell &cell1 = mBoard->at(coords[i]);
+                const Cell &cell2 = mBoard->at(coords[j]);
+
+                // Check if they're in the same unit
+                bool same_unit = (mBoard->row(cell1) == mBoard->row(cell2)) ||
+                                (mBoard->column(cell1) == mBoard->column(cell2)) ||
+                                (mBoard->nonet(cell1) == mBoard->nonet(cell2));
+
+                if (same_unit) {
+                    return true; // Found actionable conflict
+                }
+            }
+        }
+        return false;
+    };
+
+    // If either color has cells in the same unit, it's actionable
+    if (check_same_color_same_unit(color_a_cells) || 
+        check_same_color_same_unit(color_b_cells)) {
+        return true;
+    }
+
+    // Check rule 2: cells that can see both colors
+    std::vector<std::pair<Coord, bool>> all_colored_cells;
+    for (const auto &[coord, color] : graph) {
+        all_colored_cells.push_back({coord, color});
+    }
+
+    // Check each cell to see if it can see cells of both colors
+    for (int row = 0; row < 9; ++row) {
+        for (int col = 0; col < 9; ++col) {
+            Coord coord(row, col);
+            const Cell &cell = mBoard->at(coord);
+
+            if (!cell.isNote() || !cell.check(graph.value)) continue;
+
+            // Skip if this cell is part of the coloring graph
+            if (graph.contains(coord)) continue;
+
+            bool sees_color_a = false, sees_color_b = false;
+
+            // Check if this cell can see cells of both colors
+            for (const auto &[colored_coord, color] : all_colored_cells) {
+                const Cell &colored_cell = mBoard->at(colored_coord);
+                if ((mBoard->row(cell) == mBoard->row(colored_cell)) ||
+                    (mBoard->column(cell) == mBoard->column(colored_cell)) ||
+                    (mBoard->nonet(cell) == mBoard->nonet(colored_cell))) {
+
+                    if (color) {  // true = color A
+                        sees_color_a = true;
+                    } else {      // false = color B
+                        sees_color_b = true;
+                    }
+
+                    // If we found both colors, this graph is actionable
+                    if (sees_color_a && sees_color_b) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    return false; // No actionable eliminations found
+}
+
+bool Analyzer::find_color_chains(const Value &value) {
     bool did_find = false;
 
     std::unordered_set<Coord> visited_global;
@@ -110,11 +128,11 @@ bool Analyzer::find_all_coloring_graphs_for_value(const Value &value) {
         ColoringGraph new_graph;
         new_graph.value = value;
 
-        std::queue<std::pair<Coord, ColoringColor>> to_process;
+        std::queue<std::pair<Coord, bool>> to_process;
         std::unordered_set<Coord> visited_local;
 
-        to_process.push({coord, kColorA});
-        new_graph.cells[coord] = kColorA;
+        to_process.push({coord, true});  // true = color A
+        new_graph.cells[coord] = true;
         visited_local.insert(coord);
         visited_global.insert(coord);
 
@@ -154,14 +172,14 @@ bool Analyzer::find_all_coloring_graphs_for_value(const Value &value) {
 
                 if (visited_local.find(linked_coord) == visited_local.end()) {
                     // New cell - add with opposite color and queue for processing
-                    ColoringColor opposite_color = (current_color == kColorA) ? kColorB : kColorA;
+                    bool opposite_color = !current_color;  // flip the boolean
                     new_graph.cells[linked_coord] = opposite_color;
                     to_process.push({linked_coord, opposite_color});
                     visited_local.insert(linked_coord);
                     visited_global.insert(linked_coord);
                 } else {
                     // Cell already in graph - verify color consistency
-                    ColoringColor expected_color = (current_color == kColorA) ? kColorB : kColorA;
+                    bool expected_color = !current_color;  // flip the boolean
                     if (new_graph.get_color(linked_coord) != expected_color) {
                         // Color conflict detected - this means we found a cycle with odd length
                         // which shouldn't happen in a valid coloring graph
@@ -180,8 +198,8 @@ bool Analyzer::find_all_coloring_graphs_for_value(const Value &value) {
             if (new_graph.cells.empty()) break;
         }
 
-        // Only add valid graphs with at least 2 cells
-        if (new_graph.size() >= 2) {
+        // Only add valid graphs with at least 2 cells and that are actionable
+        if (new_graph.size() >= 2 && test_color_chain(new_graph)) {
             assert(mColoringGraphs.empty());
             mColoringGraphs.push_back(new_graph);
             if (sVerbose) std::cout << "  [fCL] " << new_graph << std::endl;
@@ -195,13 +213,12 @@ bool Analyzer::find_all_coloring_graphs_for_value(const Value &value) {
     return did_find;
 }
 
-bool Analyzer::find_coloring_graphs() {
+bool Analyzer::find_color_chains() {
     bool did_find = false;
 
     // For each value, find all connected components
-    for (int value = kOne; value <= kNine; ++value) {
-        Value val = static_cast<Value>(value);
-        did_find = find_all_coloring_graphs_for_value(val);
+    for (Value val : value_range(kOne, kUnset)) {
+        did_find = find_color_chains(val);
         if (!did_find) continue;
         break;
     }
@@ -209,7 +226,7 @@ bool Analyzer::find_coloring_graphs() {
     return did_find;
 }
 
-bool Analyzer::act_on_coloring_graph() {
+bool Analyzer::act_on_color_chain() {
     if (mColoringGraphs.empty()) {
         return false;
     }
@@ -235,7 +252,7 @@ bool Analyzer::act_on_coloring_graph() {
             // Group cells by color within this graph
             std::vector<Coord> color_a_cells, color_b_cells;
             for (const auto &[coord, color] : graph) {
-                if (color == kColorA) {
+                if (color) {
                     color_a_cells.push_back(coord);
                 } else {
                     color_b_cells.push_back(coord);
@@ -285,7 +302,7 @@ bool Analyzer::act_on_coloring_graph() {
 
         // Now check rule 2: cells that can see colors from different graphs
         // Collect all colored cells across all graphs for this value
-        std::vector<std::pair<Coord, ColoringColor>> all_colored_cells;
+        std::vector<std::pair<Coord, bool>> all_colored_cells;
         for (const auto graph_ptr : graphs) {
             for (const auto &[coord, color] : *graph_ptr) {
                 all_colored_cells.push_back({coord, color});
@@ -319,7 +336,7 @@ bool Analyzer::act_on_coloring_graph() {
                         (mBoard->column(cell) == mBoard->column(colored_cell)) ||
                         (mBoard->nonet(cell) == mBoard->nonet(colored_cell))) {
 
-                        if (color == kColorA) {
+                        if (color) {
                             sees_color_a = true;
                             if (sVerbose) std::cout << "    " << coord << " sees color A at " << colored_coord << std::endl;
                         } else {
@@ -352,7 +369,7 @@ std::ostream& operator<<(std::ostream& outs, const Analyzer::ColoringGraph &grap
     for (const auto &[coord, color] : graph) {
         if (!first) outs << ",";
         first = false;
-        outs << coord << ":" << (color == Analyzer::kColorA ? "A" : "B");
+        outs << coord << (color ? "🟩" : "🟥");
     }
     outs << "}#" << graph.value;
     return outs;
