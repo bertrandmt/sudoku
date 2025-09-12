@@ -40,7 +40,7 @@ public:
 
 private:
     template<class Set>
-    void filter_notes_for_set(Cell &, const Set &);
+    void filter_notes(Cell &, const Set &);
     template<class Set>
     void filter_notes(const Set &);
     void filter_notes();
@@ -199,28 +199,28 @@ private:
 private:
     //** simple coloring
     enum ColoringColor { kColorA, kColorB };
-    
+
     struct ColoringGraph {
         Value value;
         std::unordered_map<Coord, ColoringColor> cells;  // coord -> color mapping
-        
+
         bool contains(const Coord &coord) const {
             return cells.find(coord) != cells.end();
         }
-        
+
         ColoringColor get_color(const Coord &coord) const {
             auto it = cells.find(coord);
             assert(it != cells.end());
             return it->second;
         }
-        
+
         size_t size() const {
             return cells.size();
         }
-        
+
         auto begin() const { return cells.begin(); }
         auto end() const { return cells.end(); }
-        
+
         bool operator==(const ColoringGraph &other) const {
             return value == other.value && cells == other.cells;
         }

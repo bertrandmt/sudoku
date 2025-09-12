@@ -20,22 +20,28 @@ void Analyzer::notes_dirty(const Cell &cell) {
 }
 
 template<class Set>
-void Analyzer::filter_notes_for_set(Cell &cell, const Set &set) {
-    if (cell.isNote()) {                                   // note cell; update its own notes from all the value cells in the same set
+void Analyzer::filter_notes(Cell &cell, const Set &set) {
+    // note cell; update its own notes from all the value cells in the same set
+    if (cell.isNote()) {
         for (auto const &other_cell : set) {
-            if (other_cell.isNote()) continue;             // other note cells do not participate in this update
-            if (!cell.check(other_cell.value())) continue; // the value of other_cell is already checked off cell's notes
+            // is the other cell a value note?
+            if (other_cell.isNote()) continue;
+            // yes, but is the value of other_cell already checked off cell's notes
+            if (!cell.check(other_cell.value())) continue;
 
             if (sVerbose) std::cout << "  [FNn] " << cell.coord() << " x" << other_cell.value()
                       << " " << set.tag() << "(" << other_cell.coord() << ")" << std::endl;
             mBoard->clear_note_at(cell.coord(), other_cell.value());
         }
     }
-    else {                                                 // value cell; let's update notes in note cells in the same set
+    // value cell; let's update notes in note cells in the same set
+    else {
         assert(cell.isValue());
         for (auto &other_cell : set) {
-            if (other_cell.isValue()) continue;            // other value cells do not get changed by this process
-            if (!other_cell.check(cell.value())) continue; // the value of cell is already checked off other_cell's notes
+            // is other_cell a note cell?
+            if (other_cell.isValue()) continue;
+            // yes, but is the value of cell already checked off other_cell's notes
+            if (!other_cell.check(cell.value())) continue;
 
             if (sVerbose) std::cout << "  [FNv] " << other_cell.coord() << " x" << cell.value()
                       << " " << set.tag() << "(" << cell.coord() << ")" << std::endl;
@@ -47,18 +53,18 @@ void Analyzer::filter_notes_for_set(Cell &cell, const Set &set) {
 template<class Set>
 void Analyzer::filter_notes(const Set &set) {
     for (auto &cell : set) {
-        filter_notes_for_set(cell, mBoard->nonet(cell));
-        filter_notes_for_set(cell, mBoard->column(cell));
-        filter_notes_for_set(cell, mBoard->row(cell));
+        filter_notes(cell, mBoard->nonet(cell));
+        filter_notes(cell, mBoard->column(cell));
+        filter_notes(cell, mBoard->row(cell));
     }
 }
 
 void Analyzer::filter_notes() {
-    for (auto const &coord : mValueDirtySet) { // for each value cell whose value was set since last analysis
-        // review the notes in
-        filter_notes(mBoard->nonet(coord));      // each cell in this cell's nonet, and
-        filter_notes(mBoard->column(coord));     //                      ... column, and
-        filter_notes(mBoard->row(coord));        //                      ... row
+    // for each value cell whose value was set since last analysis
+    for (auto const &coord : mValueDirtySet) {
+        filter_notes(mBoard->nonet(coord));
+        filter_notes(mBoard->column(coord));
+        filter_notes(mBoard->row(coord));
     }
 }
 
