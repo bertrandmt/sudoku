@@ -47,14 +47,19 @@ private:
 
 private:
     //** naked singles
-    std::vector<Coord> mNakedSingles;
+    struct NakedSingle {
+        Coord coord;
+        Value value;
+    };
+    friend std::ostream& operator<<(std::ostream& outs, const NakedSingle &);
+    std::vector<NakedSingle> mNakedSingles;
 
     // filter
     bool test_naked_single(const Cell &) const;
     void filter_naked_singles();
 
     // find
-    void find_naked_singles();
+    bool find_naked_singles();
 
     // act
     bool act_on_naked_single();
@@ -75,9 +80,7 @@ private:
     void filter_hidden_singles();
 
     // find
-    template<class Set>
-    void find_hidden_singles(const Set &);
-    void find_hidden_singles();
+    bool find_hidden_singles();
 
     // act
     bool act_on_hidden_single();
@@ -97,8 +100,8 @@ private:
 
     // find
     template<class Set>
-    void find_naked_pair(const Cell &, const Set &);
-    void find_naked_pairs();
+    bool find_naked_pair(const Cell &, const Set &);
+    bool find_naked_pairs();
 
     // act
     template<class Set>
@@ -129,10 +132,8 @@ private:
 
     // find
     template<class Set1, class Set2>
-    void find_locked_candidate(const Cell &, const Value &, Set1 &set_to_consider, Set2 &set_to_ignore);
-    template<class Set>
-    void find_locked_candidates(Set const &);
-    void find_locked_candidates();
+    bool find_locked_candidate(const Cell &, const Value &, Set1 &set_to_consider, Set2 &set_to_ignore);
+    bool find_locked_candidates();
 
     // act
     template<class Set>
@@ -154,10 +155,8 @@ private:
 
     // find
     template<class Set>
-    void find_hidden_pair(const Cell &, const Value &v1, const Value &v2, const Set &);
-    template<class Set>
-    void find_hidden_pairs(Set const &);
-    void find_hidden_pairs();
+    bool find_hidden_pair(const Cell &, const Value &v1, const Value &v2, const Set &);
+    bool find_hidden_pairs();
 
     // act
     bool act_on_hidden_pair(Cell &, const HiddenPair &);
@@ -183,12 +182,10 @@ private:
     void filter_xwings();
 
     // find
-    void find_xwing_by_row(const Cell &, const Value &);
-    void find_xwing_by_column(const Cell &, const Value &);
-    void find_xwing(const Cell &, const Value &);
-    template<class Set>
-    void find_xwing(Set const &);
-    void find_xwings();
+    template<class CandidateSet, class EliminationSet>
+    bool find_xwing(const Cell &, const Value &, const CandidateSet &, const EliminationSet &, const std::vector<CandidateSet> &, bool by_row);
+    bool find_xwing(const Cell &, const Value &);
+    bool find_xwings();
 
     // act
     template<class CandidateSet, class EliminationSet>
@@ -233,11 +230,8 @@ private:
     void filter_coloring_graphs();
 
     // find
-    void find_coloring_graph(const Cell &cell, const Value &value);
-    void find_all_coloring_graphs_for_value(const Value &value);
-    template<class Set>
-    void find_coloring_graphs(Set const &set);
-    void find_coloring_graphs();
+    bool find_all_coloring_graphs_for_value(const Value &value);
+    bool find_coloring_graphs();
 
     // act
     bool act_on_coloring_graph();

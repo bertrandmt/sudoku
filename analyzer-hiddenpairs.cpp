@@ -27,28 +27,16 @@ bool Analyzer::test_hidden_pair(const Cell &c1, const Cell &c2, const Value &v1,
 
 
 void Analyzer::filter_hidden_pairs() {
-    mHiddenPairs.erase(std::remove_if(mHiddenPairs.begin(), mHiddenPairs.end(),
-                [this](auto const &entry) {
-                    bool is_hidden_pair = test_hidden_pair(mBoard->at(entry.coords.first), mBoard->at(entry.coords.second), entry.values.first, entry.values.second);
-                    if (!is_hidden_pair) {
-                        if (sVerbose) std::cout << "  [xHP] " << entry << std::endl;
-                    }
-                    return !is_hidden_pair;
-                }), mHiddenPairs.end());
+    mHiddenPairs.clear();
 }
 
 template<class Set>
-void Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set) {
+bool Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set) {
     assert(cell.isNote());
     assert(cell.notes().check(v1));
     assert(cell.notes().check(v2));
 
-    // have we already recorded this cell into a pair?
-    if (std::find_if(mHiddenPairs.begin(), mHiddenPairs.end(),
-                [cell](auto const &entry) { return cell.coord() == entry.coords.first || cell.coord() == entry.coords.second; })
-            != mHiddenPairs.end()) return;
-
-    // no! can we find another note cell with the same pair in the same set,
+    // can we find another note cell with the same pair in the same set,
     // but no other cell with either candidate in the set?
     Cell *ppair_cell = NULL; // "the" other potential candidate
     bool condition_met = true;
@@ -82,23 +70,25 @@ void Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &
     if (cell.notes().count() == 2
      && (ppair_cell && ppair_cell->notes().count() == 2)) condition_met = false;
 
-    if (!condition_met) return; // we're done here
+    if (!condition_met) return false; // we're done here
 
     // yes! let's record the entry
     HiddenPair hp(std::make_pair(cell.coord(), ppair_cell->coord()), std::make_pair(v1, v2));
+    assert(mHiddenPairs.empty());
     mHiddenPairs.push_back(hp);
     if (sVerbose) std::cout << "  [fHP] " << hp << std::endl;
+    return true;
 }
 
-template<class Set>
-void Analyzer::find_hidden_pairs(Set const &set) {
+bool Analyzer::find_hidden_pairs() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#subsets
     // When n candidates are possible in a certain set of n cells all in the same block, row, or column,
     // and those n candidates are not possible elsewhere in that same block, row, or column, then no other
     // candidates are possible in those cells.
     // Applied for n = 2
+    bool did_find = false;
 
-    for (auto const &cell: set) {
+    for (auto const &cell: mBoard->cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
@@ -112,27 +102,22 @@ void Analyzer::find_hidden_pairs(Set const &set) {
                 assert(*pv2 != *pv1);
 
                 // let's see if we can find a hidden pair in the three cell sets
-                find_hidden_pair(cell, *pv1, *pv2, mBoard->nonet(cell));
-                find_hidden_pair(cell, *pv1, *pv2, mBoard->column(cell));
-                find_hidden_pair(cell, *pv1, *pv2, mBoard->row(cell));
+                did_find = find_hidden_pair(cell, *pv1, *pv2, mBoard->row(cell));
+                if (!did_find) did_find = find_hidden_pair(cell, *pv1, *pv2, mBoard->column(cell));
+                if (!did_find) did_find = find_hidden_pair(cell, *pv1, *pv2, mBoard->nonet(cell));
+                if (!did_find) continue;
+                break;
             }
-        }
-    }
-}
 
-void Analyzer::find_hidden_pairs() {
-    for (auto const &coord : mValueDirtySet) {
-        // are there now-revealed hidden pairs in any of this cell's blocks
-        find_hidden_pairs(mBoard->nonet(coord));
-        find_hidden_pairs(mBoard->column(coord));
-        find_hidden_pairs(mBoard->row(coord));
+            if (!did_find) continue;
+            break;
+        }
+
+        if (!did_find) continue;
+        break;
     }
-    for (auto const &coord : mNotesDirtySet) {
-        // are there now-revealed hidden pairs in any of this cell's blocks
-        find_hidden_pairs(mBoard->nonet(coord));
-        find_hidden_pairs(mBoard->column(coord));
-        find_hidden_pairs(mBoard->row(coord));
-    }
+
+    return did_find;
 }
 
 bool Analyzer::act_on_hidden_pair(Cell &cell, const HiddenPair &entry) {

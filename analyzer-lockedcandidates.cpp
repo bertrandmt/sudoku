@@ -31,57 +31,12 @@ bool would_act_on_set(std::vector<Coord> const &coords, Value const &value, std:
 }
 
 void Analyzer::filter_locked_candidates() {
-    mLockedCandidates.erase(std::remove_if(mLockedCandidates.begin(), mLockedCandidates.end(),
-                [this](auto &entry) {
-                    // are any of the coords in this entry still candidate notes for this value?
-                    auto coords(entry.coords); // deep copy, for later printing of pristine entry
-                    coords.erase(std::remove_if(coords.begin(), coords.end(),
-                                [this, entry](auto const &coord) { auto const &cell = mBoard->at(coord); return cell.isValue() || !cell.check(entry.value); }),
-                            coords.end());
-                    if (coords.empty()) {
-                        if (sVerbose) std::cout << "  [xLC] " << entry << std::endl;
-                        return true;
-                    }
-
-                    // yes! but let's note if not all of them
-                    if (coords.size() < entry.coords.size()) {
-                        if(sVerbose) std::cout << "  [~LC] " << entry << " -> ";
-                        entry.coords = coords;
-                        if(sVerbose) std::cout << entry << std::endl;
-                    }
-
-                    // but would they still have an impact?
-                    bool would_act = false;
-                    switch (entry.tag.at(0)) {
-                    case 'n':
-                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->nonet(coords.at(0)));
-                        break;
-                    case 'c':
-                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->column(coords.at(0)));
-                        break;
-                    case 'r':
-                        would_act = would_act_on_set(entry.coords, entry.value, entry.tag, mBoard->row(coords.at(0)));
-                        break;
-                    default:
-                        throw std::runtime_error("unhandled case");
-                    }
-                    if (!would_act) {
-                        if (sVerbose) std::cout << "  [xLC] " << entry << std::endl;
-                        return true;
-                    }
-
-                    // yes! we're keeping this entry
-                    return false;
-                }), mLockedCandidates.end());
+    mLockedCandidates.clear();
 }
 
 template<class Set1, class Set2>
-void Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore) {
-    if (std::find_if(mLockedCandidates.begin(), mLockedCandidates.end(),
-                [cell, value, set_to_ignore](const auto &entry) { return entry.contains(cell.coord(), value, set_to_ignore.tag()); }) != mLockedCandidates.end()) {
-        // we've already record the entry containing this cell, for this set and value
-        return;
-    }
+bool Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore) {
+    bool did_find = false;
 
     std::vector<Coord> lc_coords;
     lc_coords.push_back(cell.coord());
@@ -106,8 +61,8 @@ void Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 
             continue;
         }
 
-        // oh, this was disqualifying: we found another candidate cell is the set to ignore
-        return;
+        // oh, this was disqualifying: we found another candidate cell in the set to ignore
+        return did_find;
     }
 
     // ensure that this set of locked candidates, if acted on, *would* have an effect
@@ -124,14 +79,17 @@ void Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 
         // no! we found a note cell that is in the rest of the "set_to_ignore"
         // and also is a candidate for this value: we *would* act on it
         LockedCandidates lc(lc_coords, value, set_to_ignore.tag());
+        assert(mLockedCandidates.empty());
         mLockedCandidates.push_back(lc);
         if (sVerbose) std::cout << "  [fLC] " << lc << std::endl;
-        return;
+        did_find = true;
+        break;
     }
+
+    return did_find;
 }
 
-template<class Set>
-void Analyzer::find_locked_candidates(Set const &set) {
+bool Analyzer::find_locked_candidates() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#blocks
     // Form 1:
     // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same row/column,
@@ -140,42 +98,33 @@ void Analyzer::find_locked_candidates(Set const &set) {
     // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same nonet,
     // then it is also not possible anywhere else in the same row/column
 
-    for (auto const &cell: set) {
+    bool did_find = false;
+
+    for (auto const &cell: mBoard->cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
-        // yes! but is it already recorded as a hidden single?
-        if (std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(),
-                    [cell](auto const &entry) { return entry.coord == cell.coord(); })
-                != mHiddenSingles.end()) continue;
 
-        // no! then for each candidate value in this note cell
+        // yes! then for each candidate value in this note cell
         for (auto const &value : cell.notes().values()) {
 
             // form 1
-            find_locked_candidate(cell, value, mBoard->row(cell), mBoard->nonet(cell));
-            find_locked_candidate(cell, value, mBoard->column(cell), mBoard->nonet(cell));
+            did_find = find_locked_candidate(cell, value, mBoard->row(cell), mBoard->nonet(cell));
+            if (!did_find) did_find = find_locked_candidate(cell, value, mBoard->column(cell), mBoard->nonet(cell));
 
             // form 2
-            find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->row(cell));
-            find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->column(cell));
-        }
-    }
-}
+            if (!did_find) did_find = find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->row(cell));
+            if (!did_find) did_find = find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->column(cell));
 
-void Analyzer::find_locked_candidates() {
-    for (auto const &coord : mValueDirtySet) {
-        // are there now-revealed hidden pairs in any of this cell's blocks
-        find_locked_candidates(mBoard->nonet(coord));
-        find_locked_candidates(mBoard->column(coord));
-        find_locked_candidates(mBoard->row(coord));
+            if (!did_find) continue;
+            break;
+        }
+
+        if (!did_find) continue;
+        break;
     }
-    for (auto const &coord : mNotesDirtySet) {
-        // are there now-revealed hidden pairs in any of this cell's blocks
-        find_locked_candidates(mBoard->nonet(coord));
-        find_locked_candidates(mBoard->column(coord));
-        find_locked_candidates(mBoard->row(coord));
-    }
+
+    return did_find;
 }
 
 template<class Set>
@@ -210,14 +159,14 @@ bool Analyzer::act_on_locked_candidate() {
     mLockedCandidates.pop_back();
 
     switch (entry.tag[0]) {
-    case 'n':
-        (void) act_on_locked_candidate(entry, mBoard->nonet(entry.coords.at(0)));
+    case 'r':
+        (void) act_on_locked_candidate(entry, mBoard->row(entry.coords.at(0)));
         break;
     case 'c':
         (void) act_on_locked_candidate(entry, mBoard->column(entry.coords.at(0)));
         break;
-    case 'r':
-        (void) act_on_locked_candidate(entry, mBoard->row(entry.coords.at(0)));
+    case 'n':
+        (void) act_on_locked_candidate(entry, mBoard->nonet(entry.coords.at(0)));
         break;
     }
 

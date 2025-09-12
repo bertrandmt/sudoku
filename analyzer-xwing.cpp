@@ -5,17 +5,21 @@
 #include "board.h"
 #include "verbose.h"
 #include <cassert>
+#include <type_traits>
 
 namespace {
     // Helper function for X-Wing pattern detection
     template<class Set>
     std::vector<Cell> candidates(const Set &set, const Value &value) {
         std::vector<Cell> candidates;
+
         for (auto const &cell : set) {
-            if (cell.isNote() && cell.check(value)) {
-                candidates.push_back(cell);
-            }
+            if (!cell.isNote()) continue;
+            if (!cell.check(value)) continue;
+
+            candidates.push_back(cell);
         }
+
         return candidates;
     }
 }
@@ -56,174 +60,109 @@ bool Analyzer::test_xwing(const Value &value, const CandidateSet &cset1,   const
 
 
 void Analyzer::filter_xwings() {
-    mXWings.erase(std::remove_if(mXWings.begin(), mXWings.end(),
-                [this](const auto &entry) {
-                    bool is_xwing;
-                    if (entry.is_row_based) {
-                        is_xwing = test_xwing(entry.value,
-                            mBoard->row(entry.anchor), mBoard->row(entry.diagonal),
-                            mBoard->column(entry.anchor), mBoard->column(entry.diagonal));
-                    } else {
-                        is_xwing = test_xwing(entry.value,
-                            mBoard->column(entry.anchor), mBoard->column(entry.diagonal),
-                            mBoard->row(entry.anchor), mBoard->row(entry.diagonal));
-                    }
-                    if (!is_xwing) {
-                        if (sVerbose) std::cout << "  [xXW] " << entry << std::endl;
-                    }
-                    return !is_xwing;
-                }), mXWings.end());
+    mXWings.clear();
 }
 
 
-void Analyzer::find_xwing_by_row(const Cell &cell, const Value &value) {
-    // Try to find row-based X-Wings: look for another row that has candidates at the same columns
-    // Only check rows with higher indices to avoid duplicates
-    const auto& row = mBoard->row(cell);
+template<class CandidateSet, class EliminationSet>
+bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateSet &cset, const EliminationSet &eset, const std::vector<CandidateSet> &csets, bool by_row) {
+    assert(cell.isNote());
+    assert(cell.check(value));
+    assert(cset.contains(cell));
+    assert(eset.contains(cell));
 
-    // are there exactly two candidates for this value on this row?
-    auto row_candidates = candidates(row, value);
-    if (row_candidates.size() != 2) return;
+    bool did_find = false;
 
-    // yes! identify which cell is which
-    assert(row_candidates[0] == cell || row_candidates[1] == cell);
-    const Cell& other_candidate = (row_candidates[0] == cell) ? row_candidates[1] : row_candidates[0];
+    // are there exactly two candidates for this value on this candidate set?
+    auto cset_candidates = candidates(cset, value);
+    if (cset_candidates.size() != 2) return did_find;
 
-    // is the cell in canonical position?
-    if (mBoard->column(other_candidate) < mBoard->column(cell)) return;
+    // yes! if cell is not the first candidate, we've already considered this cset and found it unsuitable
+    if (cell != cset_candidates[0]) return did_find;
+    const Cell& other_cell = cset_candidates[1];
 
-    // yes! for every subsequent row
-    for (auto other_row_it = mBoard->rows().begin() + row.index() + 1; other_row_it != mBoard->rows().end(); ++other_row_it) {
-        const Row& other_row = *other_row_it;
+    // Get the elimination set for the other cell
+    const EliminationSet &other_eset = [&]() -> const EliminationSet& {
+        if constexpr (std::is_same_v<EliminationSet, Column>) {
+            return mBoard->column(other_cell);
+        } else {
+            return mBoard->row(other_cell);
+        }
+    }();
+    assert(eset < other_eset);
 
-        // are there exactly two candidates for this value on this row?
-        auto other_row_candidates = candidates(other_row, value);
-        if (other_row_candidates.size() != 2) continue;
+    // yes! for every subsequent cset
+    for (auto const &other_cset : csets) {
+        // subsequent csets only
+        if (!(cset < other_cset)) continue;
 
-        // yes! does this other row have candidates in the same columns as our row
-        if (!((mBoard->column(cell).contains(other_row_candidates[0]) && mBoard->column(other_candidate).contains(other_row_candidates[1])) ||
-              (mBoard->column(cell).contains(other_row_candidates[1]) && mBoard->column(other_candidate).contains(other_row_candidates[0])))) continue;
+        // are there exactly two candidates for this value on this other cset?
+        auto other_cset_candidates = candidates(other_cset, value);
+        if (other_cset_candidates.size() != 2) continue;
 
-        // yes! identify the diagonal cell (other candidate in other_row that's in other_candidate's column)
-        const Cell& diagonal = mBoard->column(other_candidate).contains(other_row_candidates[0]) ?
-                               other_row_candidates[0] : other_row_candidates[1];
+        // yes! does this other cset have candidates in the same esets as our cset
+        assert(!(eset.contains(other_cset_candidates[1]) && other_eset.contains(other_cset_candidates[0])));
+        if (!eset.contains(other_cset_candidates[0])) continue;
+        if (!other_eset.contains(other_cset_candidates[1])) continue;
 
-        // is this a valid XWing pattern (i.e. other candidates in the same column would be eliminated)?
-        auto anchor_col_candidates = candidates(mBoard->column(cell), value);
-        auto diagonal_col_candidates = candidates(mBoard->column(diagonal), value);
-        if (anchor_col_candidates.size() <= 2 && diagonal_col_candidates.size() <= 2) continue;
+        // yes! identify the diagonal cell
+        const Cell& diagonal = other_cset_candidates[1];
+        assert(other_eset.contains(diagonal));
 
-        // yes! is the pattern already recorded (somehow)
-        XWing candidate_xwing{value, cell.coord(), diagonal.coord(), true};
-        if (std::find(mXWings.begin(), mXWings.end(), candidate_xwing) != mXWings.end()) continue;
+        // is this a valid XWing pattern (i.e. other candidates in the same esets would be eliminated)?
+        auto anchor_eliminates = candidates(eset, value);
+        auto diagonal_eliminates = candidates(other_eset, value);
+        if (anchor_eliminates.size() <= 2 && diagonal_eliminates.size() <= 2) continue;
 
-        // no! let's record it
+        // yes! record the pattern
+        XWing candidate_xwing{value, cell.coord(), diagonal.coord(), by_row};
+        assert(mXWings.empty());
         mXWings.push_back(candidate_xwing);
         if (sVerbose) std::cout << "  [fXW] " << candidate_xwing << std::endl;
+        did_find = true;
+        break;
     }
+
+    return did_find;
 }
 
-void Analyzer::find_xwing_by_column(const Cell &cell, const Value &value) {
-    // Try to find column-based X-Wings: look for another column that has candidates at the same rows
-    // Only check columns with higher indices to avoid duplicates
-    const auto& column = mBoard->column(cell);
-
-    // are there exactly two candidates for this value in this column?
-    auto col_candidates = candidates(column, value);
-    if (col_candidates.size() != 2) return;
-
-    // yes! identify which cell is which
-    assert(col_candidates[0] == cell || col_candidates[1] == cell);
-    const Cell& other_candidate = (col_candidates[0] == cell) ? col_candidates[1] : col_candidates[0];
-
-    // is the cell in canonical position?
-    if (mBoard->row(other_candidate) < mBoard->row(cell)) return;
-
-    // yes! for every subsequent column
-    for (auto other_col_it = mBoard->columns().begin() + column.index() + 1; other_col_it != mBoard->columns().end(); ++other_col_it) {
-        const Column& other_col = *other_col_it;
-
-        // are there exactly two candidates for this value in this column?
-        auto other_col_candidates = candidates(other_col, value);
-        if (other_col_candidates.size() != 2) continue;
-
-        // yes! does this other column have candidates in the same rows as our column
-        if (!((mBoard->row(cell).contains(other_col_candidates[0]) && mBoard->row(other_candidate).contains(other_col_candidates[1])) ||
-              (mBoard->row(cell).contains(other_col_candidates[1]) && mBoard->row(other_candidate).contains(other_col_candidates[0])))) continue;
-
-        // yes! identify the diagonal cell (other candidate in other_col that's in other_candidate's row)
-        const Cell& diagonal = mBoard->row(other_candidate).contains(other_col_candidates[0]) ?
-                               other_col_candidates[0] : other_col_candidates[1];
-
-        // is this a valid XWing pattern (i.e. other candidates in the same row would be eliminated)?
-        auto anchor_row_candidates = candidates(mBoard->row(cell), value);
-        auto diagonal_row_candidates = candidates(mBoard->row(diagonal), value);
-        if (anchor_row_candidates.size() <= 2 && diagonal_row_candidates.size() <= 2) continue;
-
-        // yes! is the pattern already recorded (somehow)
-        XWing candidate_xwing{value, cell.coord(), diagonal.coord(), false};
-        if (std::find(mXWings.begin(), mXWings.end(), candidate_xwing) != mXWings.end()) continue;
-
-        // no! let's record it
-        mXWings.push_back(candidate_xwing);
-        if (sVerbose) std::cout << "  [fXW] " << candidate_xwing << std::endl;
-    }
-}
-
-void Analyzer::find_xwing(const Cell &cell, const Value &value) {
+bool Analyzer::find_xwing(const Cell &cell, const Value &value) {
     assert(cell.isNote());
     assert(cell.check(value));
 
-    find_xwing_by_row(cell, value);
-    find_xwing_by_column(cell, value);
+    bool did_find = false;
+
+    did_find = find_xwing(cell, value, mBoard->row(cell), mBoard->column(cell), mBoard->rows(), true);
+    if (!did_find) did_find = find_xwing(cell, value, mBoard->column(cell), mBoard->row(cell), mBoard->columns(), false);
+
+    return did_find;
 }
 
-template<class Set>
-void Analyzer::find_xwing(Set const &set) {
+bool Analyzer::find_xwings() {
     // https://www.sudokuwiki.org/x_wing_strategy
     // When there are only two possible cells for a value in each of two different rows,
     // and these candidates lie also in the same columns, then all other candidates for
     // this value in the columns can be eliminated.
+    bool did_find = false;
 
-    for (auto const &cell: set) {
+    for (auto const &cell: mBoard->cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
         // for each value in this cell...
         auto values = cell.notes().values();
         for (auto pv = values.begin(); pv != values.end(); ++pv) {
-            // is this cell already recorded in an X-Wing patter for this value?
-            if (std::find_if(mXWings.begin(), mXWings.end(),
-                        [cell, pv](auto const &entry) {
-                            if (*pv != entry.value) return false;
-                            const Coord& c = cell.coord();
-                            // Check if cell is one of the four corners of the XWing
-                            return c == entry.anchor ||
-                                   c == entry.diagonal ||
-                                   c == Coord(entry.anchor.row(), entry.diagonal.column()) ||
-                                   c == Coord(entry.diagonal.row(), entry.anchor.column()); })
-                    != mXWings.end()) continue;
-
             // let's see if we can anchor an X-Wing pattern in this cell for this value
-            find_xwing(cell, *pv);
+            did_find = find_xwing(cell, *pv);
+            if (!did_find) continue;
+            break;
         }
-    }
-}
 
-void Analyzer::find_xwings() {
-    for (auto const &coord : mValueDirtySet) {
-        // are there now-revealed X-Wing patterns anchored in any of this cell's blocks
-        find_xwing(mBoard->nonet(coord));
-        find_xwing(mBoard->column(coord));
-        find_xwing(mBoard->row(coord));
+        if (!did_find) continue;
+        break;
     }
 
-    for (auto const &coord : mNotesDirtySet) {
-        // are there now-revealed hidden pairs in any of this cell's blocks
-        find_xwing(mBoard->nonet(coord));
-        find_xwing(mBoard->column(coord));
-        find_xwing(mBoard->row(coord));
-    }
+    return did_find;
 }
 
 template<class CandidateSet, class EliminationSet>

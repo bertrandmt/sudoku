@@ -79,13 +79,14 @@ void Analyzer::analyze() {
     filter_xwings();
     filter_coloring_graphs();
 
-    find_naked_singles();
-    find_hidden_singles();
-    find_naked_pairs();
-    find_locked_candidates();
-    find_hidden_pairs();
-    find_xwings();
-    find_coloring_graphs();
+    bool did_find = false;
+    did_find = find_naked_singles();
+    if (!did_find) did_find = find_hidden_singles();
+    if (!did_find) did_find = find_naked_pairs();
+    if (!did_find) did_find = find_locked_candidates();
+    if (!did_find) did_find = find_hidden_pairs();
+    if (!did_find) did_find = find_xwings();
+    if (!did_find) did_find = find_coloring_graphs();
 }
 
 bool Analyzer::act(const bool singles_only) {
