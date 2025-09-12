@@ -51,6 +51,20 @@ nonet.o: nonet.h board.h cell.h coord.h analyzer.h row.h column.h
 board.o: board.h cell.h coord.h analyzer.h row.h column.h nonet.h verbose.h
 analyzer.o: analyzer.h cell.h coord.h board.h row.h column.h nonet.h
 analyzer.o: verbose.h
+analyzer-nakedsingles.o: analyzer.h cell.h coord.h board.h row.h column.h
+analyzer-nakedsingles.o: nonet.h verbose.h
+analyzer-hiddensingles.o: analyzer.h cell.h coord.h board.h row.h column.h
+analyzer-hiddensingles.o: nonet.h verbose.h
+analyzer-nakedpairs.o: analyzer.h cell.h coord.h board.h row.h column.h
+analyzer-nakedpairs.o: nonet.h verbose.h
+analyzer-lockedcandidates.o: analyzer.h cell.h coord.h board.h row.h column.h
+analyzer-lockedcandidates.o: nonet.h verbose.h
+analyzer-hiddenpairs.o: analyzer.h cell.h coord.h board.h row.h column.h
+analyzer-hiddenpairs.o: nonet.h verbose.h
+analyzer-xwing.o: analyzer.h cell.h coord.h board.h row.h column.h nonet.h
+analyzer-xwing.o: verbose.h
+analyzer-coloring.o: analyzer.h cell.h coord.h board.h row.h column.h nonet.h
+analyzer-coloring.o: verbose.h
 solverstate.o: solverstate.h board.h cell.h coord.h analyzer.h row.h column.h
 solverstate.o: nonet.h
 solver.o: solver.h solverstate.h board.h cell.h coord.h analyzer.h row.h
