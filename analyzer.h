@@ -19,7 +19,8 @@ public:
         , mNakedPairs(other.mNakedPairs)
         , mLockedCandidates(other.mLockedCandidates)
         , mHiddenPairs(other.mHiddenPairs)
-        , mXWings(other.mXWings) { }
+        , mXWings(other.mXWings)
+        , mColoringGraphs(other.mColoringGraphs) { }
 
 
     using ptr = std::shared_ptr<Analyzer>;
@@ -194,6 +195,52 @@ private:
     bool act_on_xwing(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2,
                                           const EliminationSet &eset, const std::string &tag);
     bool act_on_xwing();
+
+private:
+    //** simple coloring
+    enum ColoringColor { kColorA, kColorB };
+    
+    struct ColoringGraph {
+        Value value;
+        std::unordered_map<Coord, ColoringColor> cells;  // coord -> color mapping
+        
+        bool contains(const Coord &coord) const {
+            return cells.find(coord) != cells.end();
+        }
+        
+        ColoringColor get_color(const Coord &coord) const {
+            auto it = cells.find(coord);
+            assert(it != cells.end());
+            return it->second;
+        }
+        
+        size_t size() const {
+            return cells.size();
+        }
+        
+        auto begin() const { return cells.begin(); }
+        auto end() const { return cells.end(); }
+        
+        bool operator==(const ColoringGraph &other) const {
+            return value == other.value && cells == other.cells;
+        }
+    };
+    friend std::ostream& operator<<(std::ostream& outs, const ColoringGraph &);
+    std::vector<ColoringGraph> mColoringGraphs;
+
+    // filter
+    bool test_coloring_graph(const ColoringGraph &graph) const;
+    void filter_coloring_graphs();
+
+    // find
+    void find_coloring_graph(const Cell &cell, const Value &value);
+    void find_all_coloring_graphs_for_value(const Value &value);
+    template<class Set>
+    void find_coloring_graphs(Set const &set);
+    void find_coloring_graphs();
+
+    // act
+    bool act_on_coloring_graph();
 
 private:
     using DirtySet = std::unordered_set<Coord>;

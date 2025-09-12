@@ -71,6 +71,7 @@ void Analyzer::analyze() {
     filter_locked_candidates();
     filter_hidden_pairs();
     filter_xwings();
+    filter_coloring_graphs();
 
     find_naked_singles();
     find_hidden_singles();
@@ -78,6 +79,7 @@ void Analyzer::analyze() {
     find_locked_candidates();
     find_hidden_pairs();
     find_xwings();
+    find_coloring_graphs();
 }
 
 bool Analyzer::act(const bool singles_only) {
@@ -91,6 +93,7 @@ bool Analyzer::act(const bool singles_only) {
         if (!did_act) did_act = act_on_locked_candidate();
         if (!did_act) did_act = act_on_hidden_pair();
         if (!did_act) did_act = act_on_xwing();
+        if (!did_act) did_act = act_on_coloring_graph();
     }
 
     return did_act;
@@ -146,6 +149,15 @@ std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
          << "[XW](" << a.mXWings.size() << ") {";
     is_first = true;
     for (auto const &entry: a.mXWings) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << "{" << entry << "}";
+    }
+    outs << "}" << std::endl
+    // coloring graphs
+         << "[CL](" << a.mColoringGraphs.size() << ") {";
+    is_first = true;
+    for (auto const &entry: a.mColoringGraphs) {
         if (!is_first) { outs << ", "; }
         is_first = false;
         outs << "{" << entry << "}";

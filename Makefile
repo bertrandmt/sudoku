@@ -24,6 +24,7 @@ src = coord.cpp \
 	  analyzer-lockedcandidates.cpp \
 	  analyzer-hiddenpairs.cpp \
 	  analyzer-xwing.cpp \
+	  analyzer-coloring.cpp \
 	  solverstate.cpp \
 	  solver.cpp
 
