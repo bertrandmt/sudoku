@@ -24,7 +24,7 @@ src = coord.cpp \
 	  analyzer-lockedcandidates.cpp \
 	  analyzer-hiddenpairs.cpp \
 	  analyzer-xwing.cpp \
-	  analyzer-coloring.cpp \
+	  analyzer-colorchain.cpp \
 	  solverstate.cpp \
 	  solver.cpp
 
@@ -63,8 +63,8 @@ analyzer-hiddenpairs.o: analyzer.h cell.h coord.h board.h row.h column.h
 analyzer-hiddenpairs.o: nonet.h verbose.h
 analyzer-xwing.o: analyzer.h cell.h coord.h board.h row.h column.h nonet.h
 analyzer-xwing.o: verbose.h
-analyzer-coloring.o: analyzer.h cell.h coord.h board.h row.h column.h nonet.h
-analyzer-coloring.o: verbose.h
+analyzer-colorchain.o: analyzer.h cell.h coord.h board.h row.h column.h
+analyzer-colorchain.o: nonet.h verbose.h
 solverstate.o: solverstate.h board.h cell.h coord.h analyzer.h row.h column.h
 solverstate.o: nonet.h
 solver.o: solver.h solverstate.h board.h cell.h coord.h analyzer.h row.h
