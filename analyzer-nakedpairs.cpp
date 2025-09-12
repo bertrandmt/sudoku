@@ -112,12 +112,12 @@ bool Analyzer::find_naked_pairs() {
 
 template<class Set>
 bool Analyzer::act_on_naked_pair(const NakedPair &entry, Set &set) {
-    bool acted_on_naked_pair = false;
+    bool did_act = false;
 
     auto const &cell1 = mBoard->at(entry.coords.first);
     auto const &cell2 = mBoard->at(entry.coords.second);
 
-    if (!set.contains(cell2)) return acted_on_naked_pair; // this is not the set to act on
+    if (!set.contains(cell2)) return did_act; // this is not the set to act on
 
     for (auto &other_cell : set) {
         if (other_cell.isValue()) continue;
@@ -126,32 +126,31 @@ bool Analyzer::act_on_naked_pair(const NakedPair &entry, Set &set) {
         if (other_cell.check(entry.values.first)) {
             mBoard->clear_note_at(other_cell.coord(), entry.values.first);
             std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.first << " [" << set.tag() << "]" << std::endl;
-            acted_on_naked_pair = true;
+            did_act = true;
         }
         if (other_cell.check(entry.values.second)) {
             mBoard->clear_note_at(other_cell.coord(), entry.values.second);
             std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.second << " [" << set.tag() << "]" << std::endl;
-            acted_on_naked_pair = true;
+            did_act = true;
         }
     }
 
-    return acted_on_naked_pair;
+    return did_act;
 }
 
 bool Analyzer::act_on_naked_pair() {
-    bool acted_on_naked_pair = false;
+    bool did_act = false;
 
-    if (mNakedPairs.empty()) { return acted_on_naked_pair; }
+    if (mNakedPairs.empty()) return did_act;
 
-    auto const entry = mNakedPairs.back();
-    mNakedPairs.pop_back();
+    auto const &entry = mNakedPairs.back();
     auto const &cell1 = mBoard->at(entry.coords.first);
 
-    acted_on_naked_pair |= act_on_naked_pair(entry, mBoard->row(cell1));
-    acted_on_naked_pair |= act_on_naked_pair(entry, mBoard->column(cell1));
-    acted_on_naked_pair |= act_on_naked_pair(entry, mBoard->nonet(cell1));
+    did_act |= act_on_naked_pair(entry, mBoard->row(cell1));
+    did_act |= act_on_naked_pair(entry, mBoard->column(cell1));
+    did_act |= act_on_naked_pair(entry, mBoard->nonet(cell1));
 
-    return acted_on_naked_pair;
+    return did_act;
 }
 
 std::ostream& operator<<(std::ostream& outs, const Analyzer::NakedPair &np) {

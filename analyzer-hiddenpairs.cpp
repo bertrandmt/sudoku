@@ -121,7 +121,7 @@ bool Analyzer::find_hidden_pairs() {
 }
 
 bool Analyzer::act_on_hidden_pair(Cell &cell, const HiddenPair &entry) {
-    bool acted_on_hidden_pair = false;
+    bool did_act = false;
 
     auto const &v1 = entry.values.first;
     auto const &v2 = entry.values.second;
@@ -132,27 +132,28 @@ bool Analyzer::act_on_hidden_pair(Cell &cell, const HiddenPair &entry) {
 
         mBoard->clear_note_at(cell.coord(), value);
         std::cout << "[HP] " << cell.coord() << " x" << value << " " << entry << std::endl;
-        acted_on_hidden_pair = true;
+        did_act = true;
     }
 
-    return acted_on_hidden_pair;
+    return did_act;
 }
 
 bool Analyzer::act_on_hidden_pair() {
-    bool acted_on_hidden_pair = false;
+    bool did_act = false;
 
-    if (mHiddenPairs.empty()) { return acted_on_hidden_pair; }
+    if (mHiddenPairs.empty()) return did_act;
+    assert(mHiddenPairs.size() == 1);
 
-    auto const entry = mHiddenPairs.back();
-    mHiddenPairs.pop_back();
+    auto const &entry = mHiddenPairs.back();
 
     auto &c1 = mBoard->at(entry.coords.first);
     auto &c2 = mBoard->at(entry.coords.second);
 
-    acted_on_hidden_pair |= act_on_hidden_pair(c1, entry);
-    acted_on_hidden_pair |= act_on_hidden_pair(c2, entry);
+    did_act |= act_on_hidden_pair(c1, entry);
+    did_act |= act_on_hidden_pair(c2, entry);
 
-    return acted_on_hidden_pair;
+    assert(did_act);
+    return did_act;
 }
 
 std::ostream& operator<<(std::ostream& outs, const Analyzer::HiddenPair &hp) {

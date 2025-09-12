@@ -62,12 +62,15 @@ bool Analyzer::find_hidden_singles() {
 bool Analyzer::act_on_hidden_single() {
     bool did_act = false;
 
+    if (mHiddenSingles.empty()) return did_act;
+
     for (auto const &entry : mHiddenSingles) {
         std::cout << "[HS] " << entry.coord << " =" << entry.value << " [" << entry.tag << "]" << std::endl;
         mBoard->set_value_at(entry.coord, entry.value);
         did_act = true;
     }
 
+    assert(did_act);
     return did_act;
 }
 

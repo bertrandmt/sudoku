@@ -129,7 +129,7 @@ bool Analyzer::find_locked_candidates() {
 
 template<class Set>
 bool Analyzer::act_on_locked_candidate(const LockedCandidates &entry, Set &set) {
-    bool acted_on_locked_candidates = false;
+    bool did_act = false;
 
     for (auto &other_cell : set) {
         // is this a note cell?
@@ -145,32 +145,34 @@ bool Analyzer::act_on_locked_candidate(const LockedCandidates &entry, Set &set) 
         // yes! we'll act
         std::cout << "[LC] " << other_cell.coord() << " x" << entry.value << " [" << entry.tag << "]" << std::endl;
         mBoard->clear_note_at(other_cell.coord(), entry.value);
-        acted_on_locked_candidates = true;
+        did_act = true;
     }
 
-    //assert(acted_on_locked_candidates);
-    return acted_on_locked_candidates;
+    return did_act;
 }
 
 bool Analyzer::act_on_locked_candidate() {
-    if (mLockedCandidates.empty()) { return false; }
+    bool did_act = false;
 
-    auto const entry = mLockedCandidates.back(); // copy
-    mLockedCandidates.pop_back();
+    if (mLockedCandidates.empty()) return did_act;
+    assert(mLockedCandidates.size() == 1);
+
+    auto const &entry = mLockedCandidates.back();
 
     switch (entry.tag[0]) {
     case 'r':
-        (void) act_on_locked_candidate(entry, mBoard->row(entry.coords.at(0)));
+        did_act = act_on_locked_candidate(entry, mBoard->row(entry.coords.at(0)));
         break;
     case 'c':
-        (void) act_on_locked_candidate(entry, mBoard->column(entry.coords.at(0)));
+        did_act = act_on_locked_candidate(entry, mBoard->column(entry.coords.at(0)));
         break;
     case 'n':
-        (void) act_on_locked_candidate(entry, mBoard->nonet(entry.coords.at(0)));
+        did_act =  act_on_locked_candidate(entry, mBoard->nonet(entry.coords.at(0)));
         break;
     }
 
-    return true;
+    assert(did_act);
+    return did_act;
 }
 
 std::ostream& operator<<(std::ostream& outs, const Analyzer::LockedCandidates &lc) {

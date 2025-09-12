@@ -39,6 +39,8 @@ bool Analyzer::find_naked_singles() {
 bool Analyzer::act_on_naked_single() {
     bool did_act = false;
 
+    if (mNakedSingles.empty()) return did_act;
+
     // singles can be acted on all at once
     for (auto const &entry: mNakedSingles) {
         auto &cell = mBoard->at(entry.coord);
@@ -52,6 +54,7 @@ bool Analyzer::act_on_naked_single() {
         did_act = true;
     }
 
+    assert(did_act);
     return did_act;
 }
 

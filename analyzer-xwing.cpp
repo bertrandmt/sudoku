@@ -168,7 +168,7 @@ bool Analyzer::find_xwings() {
 template<class CandidateSet, class EliminationSet>
 bool Analyzer::act_on_xwing(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2,
                                                 const EliminationSet &eset, const std::string &tag) {
-    bool acted = false;
+    bool did_act = false;
 
     for (auto &cell : eset) {
         if (std::find(cset1.begin(), cset1.end(), cell) != cset1.end()) continue;
@@ -179,19 +179,19 @@ bool Analyzer::act_on_xwing(const Value &value, const CandidateSet &cset1, const
 
         std::cout << "[XW] " << cell.coord() << " x" << value << " [" << tag << "]" << std::endl;
         mBoard->clear_note_at(cell.coord(), value);
-        acted = true;
+        did_act = true;
     }
 
-    return acted;
+    return did_act;
 }
 
 bool Analyzer::act_on_xwing() {
-    if (mXWings.empty()) { return false; }
+    bool did_act = false;
+
+    if (mXWings.empty()) return did_act;
+    assert(mXWings.size() == 1);
 
     auto const entry = mXWings.back();
-    mXWings.pop_back();
-
-    bool acted = false;
 
     if (entry.is_row_based) {
         // Row-based X-Wing: eliminate candidates from the two columns
@@ -200,9 +200,9 @@ bool Analyzer::act_on_xwing() {
         auto anchor_column_eliminates = candidates(mBoard->column(entry.anchor), entry.value);
         auto diagonal_column_eliminates = candidates(mBoard->column(entry.diagonal), entry.value);
 
-        acted |= act_on_xwing(entry.value, anchor_row_candidates, diagonal_row_candidates,
+        did_act |= act_on_xwing(entry.value, anchor_row_candidates, diagonal_row_candidates,
                                            anchor_column_eliminates, "c");
-        acted |= act_on_xwing(entry.value, anchor_row_candidates, diagonal_row_candidates,
+        did_act |= act_on_xwing(entry.value, anchor_row_candidates, diagonal_row_candidates,
                                            diagonal_column_eliminates, "c");
     } else {
         // Column-based X-Wing: eliminate candidates from the two rows
@@ -211,13 +211,14 @@ bool Analyzer::act_on_xwing() {
         auto anchor_row_eliminates = candidates(mBoard->row(entry.anchor), entry.value);
         auto diagonal_row_eliminates = candidates(mBoard->row(entry.diagonal), entry.value);
 
-        acted |= act_on_xwing(entry.value, anchor_column_candidates, diagonal_column_candidates,
+        did_act |= act_on_xwing(entry.value, anchor_column_candidates, diagonal_column_candidates,
                                            anchor_row_eliminates, "r");
-        acted |= act_on_xwing(entry.value, anchor_column_candidates, diagonal_column_candidates,
+        did_act |= act_on_xwing(entry.value, anchor_column_candidates, diagonal_column_candidates,
                                            diagonal_row_eliminates, "r");
     }
 
-    return acted;
+    assert(did_act);
+    return did_act;
 }
 
 std::ostream& operator<<(std::ostream& outs, const Analyzer::XWing &xw) {
