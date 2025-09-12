@@ -85,15 +85,15 @@ void Analyzer::find_hidden_singles() {
 }
 
 bool Analyzer::act_on_hidden_single() {
-    if (mHiddenSingles.empty()) { return false; }
+    bool did_act = false;
 
-    auto const entry = mHiddenSingles.back();
-    mHiddenSingles.pop_back();
+    for (auto const &entry : mHiddenSingles) {
+        std::cout << "[HS] " << entry.coord << " =" << entry.value << " [" << entry.tag << "]" << std::endl;
+        mBoard->set_value_at(entry.coord, entry.value);
+        did_act = true;
+    }
 
-    std::cout << "[HS] " << entry.coord << " =" << entry.value << " [" << entry.tag << "]" << std::endl;
-    mBoard->set_value_at(entry.coord, entry.value);
-
-    return true;
+    return did_act;
 }
 
 std::ostream& operator<<(std::ostream& outs, const Analyzer::HiddenSingle &hs) {

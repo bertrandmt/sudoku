@@ -41,19 +41,20 @@ void Analyzer::find_naked_singles() {
 }
 
 bool Analyzer::act_on_naked_single() {
-    if (mNakedSingles.empty()) { return false; }
+    bool did_act = false;
 
-    auto const coord = mNakedSingles.back();
-    mNakedSingles.pop_back();
+    // singles can be acted on all at once
+    for (auto const &coord : mNakedSingles) {
+        auto &cell = mBoard->at(coord);
 
-    auto &cell = mBoard->at(coord);
+        std::vector<Value> values = cell.notes().values();
+        assert(values.size() == 1);
+        Value value = values.at(0);
 
-    std::vector<Value> values = cell.notes().values();
-    assert(values.size() == 1);
-    Value value = values.at(0);
+        std::cout << "[NS] " << cell.coord() << " =" << value << std::endl;
+        mBoard->set_value_at(coord, value);
+        did_act = true;
+    }
 
-    std::cout << "[NS] " << cell.coord() << " =" << value << std::endl;
-    mBoard->set_value_at(coord, value);
-
-    return true;
+    return did_act;
 }
