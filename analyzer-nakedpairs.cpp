@@ -25,14 +25,17 @@ bool would_act(const Set &set, const Cell &c1, const Cell &c2, const Value &v1, 
 }
 }
 
-bool Analyzer::test_naked_pair(const Cell &c1, const Cell &c2) const {
+template<class Set>
+bool Analyzer::test_naked_pair(const Cell &c1, const Cell &c2, const Set &set) const {
     // are these two different cells?
     if (c1 == c2) return false;
 
+    // yes! but is c2 "after" c1?
+    if (c2.coord() < c1.coord()) return false;
+
     // yes! but are both cells in the same set?
-    if (!(mBoard->row(c1) == mBoard->row(c2)
-       || mBoard->column(c1) == mBoard->column(c2)
-       || mBoard->nonet(c1) == mBoard->nonet(c2))) return false;
+    if (!set.contains(c1)) return false;
+    if (!set.contains(c2)) return false;
 
     // yes! but are both cells notes?
     if (!c1.isNote()) return false;
@@ -51,9 +54,7 @@ bool Analyzer::test_naked_pair(const Cell &c1, const Cell &c2) const {
     if (!((v11 == v21 && v12 == v22) || (v11 == v22 && v12 == v21))) return false;
 
     // yes! but would acting on them have an effet?
-    if (!would_act(mBoard->row(c1), c1, c2, v11, v12)
-     && !would_act(mBoard->column(c1), c1, c2, v11, v12)
-     && !would_act(mBoard->nonet(c1), c1, c2, v11, v12)) return false;
+    if (!would_act(set, c1, c2, v11, v12)) return false;
 
     // yes!
     return true;
@@ -63,14 +64,15 @@ template<class Set>
 bool Analyzer::find_naked_pair(const Cell &cell, const Set &set) {
     bool did_find = false;
 
-    // no! but...
     for (auto const &pair_cell : set) {
         // is this candidate pair cell good?
-        if (!test_naked_pair(cell, pair_cell)) continue;
+        if (!test_naked_pair(cell, pair_cell, set)) continue;
+
+        // yes! but is it already recorded?
+        NakedPair np({cell.coord(), pair_cell.coord()}, {cell.notes().values().at(0), cell.notes().values().at(1)});
+        if (std::find(mNakedPairs.begin(), mNakedPairs.end(), np) != mNakedPairs.end()) continue;
 
         // yes! let's record it
-        NakedPair np(std::make_pair(cell.coord(), pair_cell.coord()), std::make_pair(cell.notes().values().at(0), cell.notes().values().at(1)));
-        assert(mNakedPairs.empty());
         mNakedPairs.push_back(np);
         if (sVerbose) std::cout << "  [fNP] " << np << std::endl;
         did_find = true;
@@ -86,7 +88,7 @@ bool Analyzer::find_naked_pairs() {
     // or column, and no other candidates are possible in those cells, then those n candidates
     // are not possible elsewhere in that same block, row, or column.
     // Applied for n = 2
-
+    assert(mNakedPairs.empty());
     bool did_find = false;
 
     for (auto const &cell: mBoard->cells()) {
@@ -96,11 +98,9 @@ bool Analyzer::find_naked_pairs() {
         if (cell.notes().count() != 2) continue;
 
         // yes! let's see if we can find it a pair?
-        did_find = find_naked_pair(cell, mBoard->row(cell));
-        if (!did_find) did_find = find_naked_pair(cell, mBoard->column(cell));
-        if (!did_find) did_find = find_naked_pair(cell, mBoard->nonet(cell));
-        if (!did_find) continue;
-        break; // stop after finding one naked pair, because we're only acting on one at a time
+        did_find |= find_naked_pair(cell, mBoard->row(cell));
+        did_find |= find_naked_pair(cell, mBoard->column(cell));
+        did_find |= find_naked_pair(cell, mBoard->nonet(cell));
     }
 
     return did_find;
@@ -138,15 +138,14 @@ bool Analyzer::act_on_naked_pair() {
     bool did_act = false;
 
     if (mNakedPairs.empty()) return did_act;
-    assert(mNakedPairs.size() == 1);
 
-    auto const &entry = mNakedPairs.back();
-    auto const &cell1 = mBoard->at(entry.coords.first);
+    for (auto const &entry : mNakedPairs) {
+        auto const &cell1 = mBoard->at(entry.coords.first);
 
-    did_act |= act_on_naked_pair(entry, mBoard->row(cell1));
-    did_act |= act_on_naked_pair(entry, mBoard->column(cell1));
-    did_act |= act_on_naked_pair(entry, mBoard->nonet(cell1));
-
+        did_act |= act_on_naked_pair(entry, mBoard->row(cell1));
+        did_act |= act_on_naked_pair(entry, mBoard->column(cell1));
+        did_act |= act_on_naked_pair(entry, mBoard->nonet(cell1));
+    }
     mNakedPairs.clear();
 
     assert(did_act);

@@ -84,12 +84,15 @@ private:
     struct NakedPair {
         std::pair<Coord, Coord> coords;
         std::pair<Value, Value> values;
+
+        bool operator==(const NakedPair &other) const = default;
     };
     friend std::ostream& operator<<(std::ostream& outs, const NakedPair &);
     std::vector<NakedPair> mNakedPairs;
 
     // find
-    bool test_naked_pair(const Cell &, const Cell &) const;
+    template<class Set>
+    bool test_naked_pair(const Cell &, const Cell &, const Set &) const;
     template<class Set>
     bool find_naked_pair(const Cell &, const Set &);
     bool find_naked_pairs();
