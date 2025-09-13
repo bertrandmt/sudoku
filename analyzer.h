@@ -5,6 +5,7 @@
 #include "cell.h"
 
 #include <unordered_set>
+#include <unordered_map>
 #include <memory>
 
 class Board;
