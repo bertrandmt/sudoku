@@ -161,10 +161,10 @@ std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
         outs << "{" << entry << "}";
     }
     outs << "}" << std::endl
-    // coloring graphs
-         << "[CL](" << a.mColoringGraphs.size() << ") {";
+    // color chains (a.k.a. single's chains)
+         << "[SC](" << a.mColorChains.size() << ") {";
     is_first = true;
-    for (auto const &entry: a.mColoringGraphs) {
+    for (auto const &entry: a.mColorChains) {
         if (!is_first) { outs << ", "; }
         is_first = false;
         outs << "{" << entry << "}";

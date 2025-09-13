@@ -20,7 +20,7 @@ public:
         , mLockedCandidates(other.mLockedCandidates)
         , mHiddenPairs(other.mHiddenPairs)
         , mXWings(other.mXWings)
-        , mColoringGraphs(other.mColoringGraphs) { }
+        , mColorChains(other.mColorChains) { }
 
 
     using ptr = std::shared_ptr<Analyzer>;
@@ -195,39 +195,32 @@ private:
 
 private:
     //** simple coloring
-    struct ColoringGraph {
+    struct ColorChain {
         Value value;
-        std::unordered_map<Coord, bool> cells;  // coord -> color mapping (true=A, false=B)
+        std::unordered_map<Coord, bool> cells;  // coord -> color mapping (true=green, false=red)
 
-        bool contains(const Coord &coord) const {
-            return cells.find(coord) != cells.end();
+        std::pair<std::vector<Coord>, std::vector<Coord>> group_cells_by_color() const {
+            std::vector<Coord> green_cells, red_cells;
+            for (const auto &[coord, color] : cells) {
+                if (color) { green_cells.push_back(coord); } // true = green
+                else       { red_cells.push_back(coord); }   // false = red
+            }
+            return {green_cells, red_cells};
         }
 
-        bool get_color(const Coord &coord) const {
-            auto it = cells.find(coord);
-            assert(it != cells.end());
-            return it->second;
-        }
-
-        size_t size() const {
-            return cells.size();
-        }
+        bool cell_sees_both_colors(const Cell &, const Board *) const;
 
         auto begin() const { return cells.begin(); }
         auto end() const { return cells.end(); }
-
-        bool operator==(const ColoringGraph &other) const {
-            return value == other.value && cells == other.cells;
-        }
     };
-    friend std::ostream& operator<<(std::ostream& outs, const ColoringGraph &);
-    std::vector<ColoringGraph> mColoringGraphs;
+    friend std::ostream& operator<<(std::ostream& outs, const ColorChain &);
+    std::vector<ColorChain> mColorChains;
 
     // filter
     void filter_color_chains();
 
     // find
-    bool test_color_chain(const ColoringGraph &graph) const;
+    bool test_color_chain(const ColorChain &chain) const;
     bool find_color_chains(const Value &value);
     bool find_color_chains();
 

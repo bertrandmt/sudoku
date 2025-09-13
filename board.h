@@ -47,17 +47,16 @@ public:
     const Column &column(const Coord &) const;
     const Nonet &nonet(const Coord &) const;
 
-    std::vector<Cell> &cells() { return mCells; }
     const std::vector<Cell> &cells() const { return mCells; }
 
-    std::vector<Row> &rows() { return mRows; }
     const std::vector<Row> &rows() const { return mRows; }
-
-    std::vector<Column> &columns() { return mColumns; }
     const std::vector<Column> &columns() const { return mColumns; }
-
-    std::vector<Nonet> &nonets() { return mNonets; }
     const std::vector<Nonet> &nonets() const { return mNonets; }
+
+    // are these two coords in the same row, column or nonet?
+    bool see_each_other(const Coord &, const Coord &, std::string &out_tag) const;
+    // do any two of the passed coords see each other?
+    bool any_see_each_other(const std::vector<Coord> &, std::string &out_tag) const;
 
     friend std::ostream& operator<< (std::ostream& outs, const Board &);
     friend class Row;
