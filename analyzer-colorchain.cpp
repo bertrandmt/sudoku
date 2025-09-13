@@ -32,11 +32,6 @@ bool Analyzer::ColorChain::cell_sees_both_colors(const Cell &cell, const Board *
     return did_see_green && did_see_red;
 }
 
-
-void Analyzer::filter_color_chains() {
-    mColorChains.clear();
-}
-
 bool Analyzer::test_color_chain(const ColorChain &chain) const {
     // A color chain is actionable if it can lead to eliminations via:
     // Rule 2: Two cells of the same color are in the same unit (conflict)
@@ -237,6 +232,9 @@ bool Analyzer::act_on_color_chain() {
         }
     }
 
+    mColorChains.clear();
+
+    assert(did_act);
     return did_act;
 }
 

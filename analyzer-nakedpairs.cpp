@@ -59,10 +59,6 @@ bool Analyzer::test_naked_pair(const Cell &c1, const Cell &c2) const {
     return true;
 }
 
-void Analyzer::filter_naked_pairs() {
-    mNakedPairs.clear();
-}
-
 template<class Set>
 bool Analyzer::find_naked_pair(const Cell &cell, const Set &set) {
     bool did_find = false;
@@ -142,6 +138,7 @@ bool Analyzer::act_on_naked_pair() {
     bool did_act = false;
 
     if (mNakedPairs.empty()) return did_act;
+    assert(mNakedPairs.size() == 1);
 
     auto const &entry = mNakedPairs.back();
     auto const &cell1 = mBoard->at(entry.coords.first);
@@ -150,6 +147,9 @@ bool Analyzer::act_on_naked_pair() {
     did_act |= act_on_naked_pair(entry, mBoard->column(cell1));
     did_act |= act_on_naked_pair(entry, mBoard->nonet(cell1));
 
+    mNakedPairs.clear();
+
+    assert(did_act);
     return did_act;
 }
 

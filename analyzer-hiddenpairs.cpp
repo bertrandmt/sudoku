@@ -25,11 +25,6 @@ bool Analyzer::test_hidden_pair(const Cell &c1, const Cell &c2, const Value &v1,
     return true;
 }
 
-
-void Analyzer::filter_hidden_pairs() {
-    mHiddenPairs.clear();
-}
-
 template<class Set>
 bool Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set) {
     assert(cell.isNote());
@@ -151,6 +146,8 @@ bool Analyzer::act_on_hidden_pair() {
 
     did_act |= act_on_hidden_pair(c1, entry);
     did_act |= act_on_hidden_pair(c2, entry);
+
+    mHiddenPairs.clear();
 
     assert(did_act);
     return did_act;

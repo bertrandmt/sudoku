@@ -23,10 +23,6 @@ bool Analyzer::test_hidden_single(const Cell &cell, const Value &value, const Se
     return true;
 }
 
-void Analyzer::filter_hidden_singles() {
-    mHiddenSingles.clear();
-}
-
 bool Analyzer::find_hidden_singles() {
     // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
     // A hidden single arises when there is only one possible cell for a candidate
@@ -69,6 +65,7 @@ bool Analyzer::act_on_hidden_single() {
         mBoard->set_value_at(entry.coord, entry.value);
         did_act = true;
     }
+    mHiddenSingles.clear();
 
     assert(did_act);
     return did_act;

@@ -30,10 +30,6 @@ bool would_act_on_set(std::vector<Coord> const &coords, Value const &value, std:
 }
 }
 
-void Analyzer::filter_locked_candidates() {
-    mLockedCandidates.clear();
-}
-
 template<class Set1, class Set2>
 bool Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore) {
     bool did_find = false;
@@ -170,6 +166,7 @@ bool Analyzer::act_on_locked_candidate() {
         did_act =  act_on_locked_candidate(entry, mBoard->nonet(entry.coords.at(0)));
         break;
     }
+    mLockedCandidates.clear();
 
     assert(did_act);
     return did_act;

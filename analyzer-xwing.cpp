@@ -58,12 +58,6 @@ bool Analyzer::test_xwing(const Value &value, const CandidateSet &cset1,   const
     return true;
 }
 
-
-void Analyzer::filter_xwings() {
-    mXWings.clear();
-}
-
-
 template<class CandidateSet, class EliminationSet>
 bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateSet &cset, const EliminationSet &eset, const std::vector<CandidateSet> &csets, bool by_row) {
     assert(cell.isNote());
@@ -192,7 +186,6 @@ bool Analyzer::act_on_xwing() {
     assert(mXWings.size() == 1);
 
     auto const entry = mXWings.back();
-
     if (entry.is_row_based) {
         // Row-based X-Wing: eliminate candidates from the two columns
         auto anchor_row_candidates = candidates(mBoard->row(entry.anchor), entry.value);
@@ -216,6 +209,7 @@ bool Analyzer::act_on_xwing() {
         did_act |= act_on_xwing(entry.value, anchor_column_candidates, diagonal_column_candidates,
                                            diagonal_row_eliminates, "r");
     }
+    mXWings.clear();
 
     assert(did_act);
     return did_act;

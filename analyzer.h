@@ -54,11 +54,8 @@ private:
     friend std::ostream& operator<<(std::ostream& outs, const NakedSingle &);
     std::vector<NakedSingle> mNakedSingles;
 
-    // filter
-    bool test_naked_single(const Cell &) const;
-    void filter_naked_singles();
-
     // find
+    bool test_naked_single(const Cell &) const;
     bool find_naked_singles();
 
     // act
@@ -74,12 +71,9 @@ private:
     friend std::ostream& operator<<(std::ostream& outs, const HiddenSingle &);
     std::vector<HiddenSingle> mHiddenSingles;
 
-    // filter
+    // find
     template<class Set>
     bool test_hidden_single(const Cell &, const Value &, const Set &, std::string &) const;
-    void filter_hidden_singles();
-
-    // find
     bool find_hidden_singles();
 
     // act
@@ -94,11 +88,8 @@ private:
     friend std::ostream& operator<<(std::ostream& outs, const NakedPair &);
     std::vector<NakedPair> mNakedPairs;
 
-    // filter
-    bool test_naked_pair(const Cell &, const Cell &) const;
-    void filter_naked_pairs();
-
     // find
+    bool test_naked_pair(const Cell &, const Cell &) const;
     template<class Set>
     bool find_naked_pair(const Cell &, const Set &);
     bool find_naked_pairs();
@@ -127,9 +118,6 @@ private:
     friend std::ostream& operator<<(std::ostream& outs, const LockedCandidates &);
     std::vector<LockedCandidates> mLockedCandidates;
 
-    // filter
-    void filter_locked_candidates();
-
     // find
     template<class Set1, class Set2>
     bool find_locked_candidate(const Cell &, const Value &, Set1 &set_to_consider, Set2 &set_to_ignore);
@@ -149,11 +137,8 @@ private:
     friend std::ostream& operator<<(std::ostream& outs, const HiddenPair &);
     std::vector<HiddenPair> mHiddenPairs;
 
-    // filter
-    bool test_hidden_pair(const Cell &, const Cell &, const Value &, const Value &) const;
-    void filter_hidden_pairs();
-
     // find
+    bool test_hidden_pair(const Cell &, const Cell &, const Value &, const Value &) const;
     template<class Set>
     bool find_hidden_pair(const Cell &, const Value &v1, const Value &v2, const Set &);
     bool find_hidden_pairs();
@@ -175,13 +160,10 @@ private:
     friend std::ostream& operator<<(std::ostream& outs, const XWing &);
     std::vector<XWing> mXWings;
 
-    // filter
+    // find
     template<class CandidateSet, class EliminationSet>
     bool test_xwing(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2,
                                         const EliminationSet &eset1, const EliminationSet &eset2);
-    void filter_xwings();
-
-    // find
     template<class CandidateSet, class EliminationSet>
     bool find_xwing(const Cell &, const Value &, const CandidateSet &, const EliminationSet &, const std::vector<CandidateSet> &, bool by_row);
     bool find_xwing(const Cell &, const Value &);
@@ -215,9 +197,6 @@ private:
     };
     friend std::ostream& operator<<(std::ostream& outs, const ColorChain &);
     std::vector<ColorChain> mColorChains;
-
-    // filter
-    void filter_color_chains();
 
     // find
     bool test_color_chain(const ColorChain &chain) const;

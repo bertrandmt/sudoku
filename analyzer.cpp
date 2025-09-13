@@ -71,13 +71,13 @@ void Analyzer::filter_notes() {
 void Analyzer::analyze() {
     filter_notes();
 
-    filter_naked_singles();
-    filter_hidden_singles();
-    filter_naked_pairs();
-    filter_locked_candidates();
-    filter_hidden_pairs();
-    filter_xwings();
-    filter_color_chains();
+    assert(mNakedSingles.empty());
+    assert(mHiddenSingles.empty());
+    assert(mNakedPairs.empty());
+    assert(mLockedCandidates.empty());
+    assert(mHiddenPairs.empty());
+    assert(mXWings.empty());
+    assert(mColorChains.empty());
 
     bool did_find = false;
     did_find = find_naked_singles();
