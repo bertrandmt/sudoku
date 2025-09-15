@@ -32,9 +32,6 @@ public:
     }
     void analyze();
 
-    void value_dirty(const Cell &);
-    void notes_dirty(const Cell &);
-
     bool act(const bool singles_only);
 
     friend std::ostream& operator<< (std::ostream& outs, Analyzer const &);
@@ -42,8 +39,6 @@ public:
 private:
     template<class Set>
     void filter_notes(Cell &, const Set &);
-    template<class Set>
-    void filter_notes(const Set &);
     void filter_notes();
 
 private:
@@ -206,9 +201,5 @@ private:
     bool act_on_color_chain();
 
 private:
-    using DirtySet = std::unordered_set<Coord>;
-    DirtySet mValueDirtySet;    // this set of note cells is dirty because their value was set
-    DirtySet mNotesDirtySet;    // this set of cells is dirty, because one of their notes was cleared
-
     Board *mBoard;
 };

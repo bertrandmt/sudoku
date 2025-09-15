@@ -149,8 +149,6 @@ bool Board::clear_note_at(const Coord &coord, const Value &value) {
     cell.set(value, false);
     mNotesCount--;
 
-    mAnalyzer.notes_dirty(cell);
-
     return true;
 }
 
@@ -166,8 +164,6 @@ bool Board::set_value_at(const Coord &coord, const Value &value) {
     mNotesCount -= cell.notes().count();
     mNoteCellsCount--;
     cell.set(value);
-
-    mAnalyzer.value_dirty(cell);
 
     return true;
 }

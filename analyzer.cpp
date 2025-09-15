@@ -11,14 +11,6 @@
 
 #include <stdexcept>
 
-void Analyzer::value_dirty(const Cell &cell) {
-    mValueDirtySet.insert(cell.coord());
-}
-
-void Analyzer::notes_dirty(const Cell &cell) {
-    mNotesDirtySet.insert(cell.coord());
-}
-
 template<class Set>
 void Analyzer::filter_notes(Cell &cell, const Set &set) {
     // note cell; update its own notes from all the value cells in the same set
@@ -50,34 +42,24 @@ void Analyzer::filter_notes(Cell &cell, const Set &set) {
     }
 }
 
-template<class Set>
-void Analyzer::filter_notes(const Set &set) {
-    for (auto &cell : set) {
+void Analyzer::filter_notes() {
+    for (auto &cell: mBoard->cells()) {
         filter_notes(cell, mBoard->nonet(cell));
         filter_notes(cell, mBoard->column(cell));
         filter_notes(cell, mBoard->row(cell));
     }
 }
 
-void Analyzer::filter_notes() {
-    // for each value cell whose value was set since last analysis
-    for (auto const &coord : mValueDirtySet) {
-        filter_notes(mBoard->nonet(coord));
-        filter_notes(mBoard->column(coord));
-        filter_notes(mBoard->row(coord));
-    }
-}
-
 void Analyzer::analyze() {
     filter_notes();
 
-    assert(mNakedSingles.empty());
-    assert(mHiddenSingles.empty());
-    assert(mNakedPairs.empty());
-    assert(mLockedCandidates.empty());
-    assert(mHiddenPairs.empty());
-    assert(mXWings.empty());
-    assert(mColorChains.empty());
+    mNakedSingles.clear();
+    mHiddenSingles.clear();
+    mNakedPairs.clear();
+    mLockedCandidates.clear();
+    mHiddenPairs.clear();
+    mXWings.clear();
+    mColorChains.clear();
 
     bool did_find = false;
     did_find = find_naked_singles();

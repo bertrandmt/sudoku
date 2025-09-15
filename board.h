@@ -48,6 +48,7 @@ public:
     const Nonet &nonet(const Coord &) const;
 
     const std::vector<Cell> &cells() const { return mCells; }
+    std::vector<Cell> &cells() { return mCells; }
 
     const std::vector<Row> &rows() const { return mRows; }
     const std::vector<Column> &columns() const { return mColumns; }
