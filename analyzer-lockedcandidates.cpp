@@ -30,6 +30,18 @@ bool would_act_on_set(std::vector<Coord> const &coords, Value const &value, std:
 }
 }
 
+bool Analyzer::LockedCandidates::operator==(const LockedCandidates &other) const {
+    if (tag != other.tag) return false;
+    if (value != other.value) return false;
+    if (coords.size() != other.coords.size()) return false;
+    for (const Coord &c : coords) {
+        if (std::find(other.coords.begin(), other.coords.end(), c) == other.coords.end()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 template<class Set1, class Set2>
 bool Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore) {
     bool did_find = false;
@@ -62,6 +74,7 @@ bool Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 
     }
 
     // ensure that this set of locked candidates, if acted on, *would* have an effect
+    bool would_act = false;
     for (auto const &other_cell : set_to_ignore) {
         // is it a note cell?
         if (!other_cell.isNote()) continue;
@@ -74,12 +87,19 @@ bool Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 
 
         // no! we found a note cell that is in the rest of the "set_to_ignore"
         // and also is a candidate for this value: we *would* act on it
+        would_act = true;
+        break;
+    }
+
+    if (would_act) {
+        // but is this entry already recorded?
         LockedCandidates lc(lc_coords, value, set_to_ignore.tag());
-        assert(mLockedCandidates.empty());
+        if (std::find(mLockedCandidates.begin(), mLockedCandidates.end(), lc) != mLockedCandidates.end()) return did_find;
+
+        // no! let's record it
         mLockedCandidates.push_back(lc);
         if (sVerbose) std::cout << "  [fLC] " << lc << std::endl;
         did_find = true;
-        break;
     }
 
     return did_find;
@@ -93,7 +113,7 @@ bool Analyzer::find_locked_candidates() {
     // Form 2:
     // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same nonet,
     // then it is also not possible anywhere else in the same row/column
-
+    assert(mLockedCandidates.empty());
     bool did_find = false;
 
     for (auto const &cell: mBoard->cells()) {
@@ -105,19 +125,13 @@ bool Analyzer::find_locked_candidates() {
         for (auto const &value : cell.notes().values()) {
 
             // form 1
-            did_find = find_locked_candidate(cell, value, mBoard->row(cell), mBoard->nonet(cell));
-            if (!did_find) did_find = find_locked_candidate(cell, value, mBoard->column(cell), mBoard->nonet(cell));
+            did_find |= find_locked_candidate(cell, value, mBoard->row(cell), mBoard->nonet(cell));
+            did_find |= find_locked_candidate(cell, value, mBoard->column(cell), mBoard->nonet(cell));
 
             // form 2
-            if (!did_find) did_find = find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->row(cell));
-            if (!did_find) did_find = find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->column(cell));
-
-            if (!did_find) continue;
-            break;
+            did_find |= find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->row(cell));
+            did_find |= find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->column(cell));
         }
-
-        if (!did_find) continue;
-        break;
     }
 
     return did_find;
@@ -151,20 +165,19 @@ bool Analyzer::act_on_locked_candidate() {
     bool did_act = false;
 
     if (mLockedCandidates.empty()) return did_act;
-    assert(mLockedCandidates.size() == 1);
 
-    auto const &entry = mLockedCandidates.back();
-
-    switch (entry.tag[0]) {
-    case 'r':
-        did_act = act_on_locked_candidate(entry, mBoard->row(entry.coords.at(0)));
-        break;
-    case 'c':
-        did_act = act_on_locked_candidate(entry, mBoard->column(entry.coords.at(0)));
-        break;
-    case 'n':
-        did_act =  act_on_locked_candidate(entry, mBoard->nonet(entry.coords.at(0)));
-        break;
+    for (auto const &entry : mLockedCandidates) {
+        switch (entry.tag[0]) {
+        case 'r':
+            did_act |= act_on_locked_candidate(entry, mBoard->row(entry.coords.at(0)));
+            break;
+        case 'c':
+            did_act |= act_on_locked_candidate(entry, mBoard->column(entry.coords.at(0)));
+            break;
+        case 'n':
+            did_act |=  act_on_locked_candidate(entry, mBoard->nonet(entry.coords.at(0)));
+            break;
+        }
     }
     mLockedCandidates.clear();
 

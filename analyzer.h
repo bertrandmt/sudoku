@@ -109,15 +109,8 @@ private:
         std::vector<Coord> coords;
         Value value;
         std::string tag;
-        bool contains(const Coord &c, const Value &v) const {
-            return value == v
-                && std::find(coords.begin(), coords.end(), c) != coords.end();
-        }
-        bool contains(const Coord &c, const Value &v, const std::string &t) const {
-            return value == v
-                && tag == t
-                && std::find(coords.begin(), coords.end(), c) != coords.end();
-        }
+
+        bool operator==(const LockedCandidates &other) const;
     };
     friend std::ostream& operator<<(std::ostream& outs, const LockedCandidates &);
     std::vector<LockedCandidates> mLockedCandidates;

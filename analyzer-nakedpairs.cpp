@@ -72,7 +72,7 @@ bool Analyzer::find_naked_pair(const Cell &cell, const Set &set) {
         NakedPair np({cell.coord(), pair_cell.coord()}, {cell.notes().values().at(0), cell.notes().values().at(1)});
         if (std::find(mNakedPairs.begin(), mNakedPairs.end(), np) != mNakedPairs.end()) continue;
 
-        // yes! let's record it
+        // no! let's record it
         mNakedPairs.push_back(np);
         if (sVerbose) std::cout << "  [fNP] " << np << std::endl;
         did_find = true;
