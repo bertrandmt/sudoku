@@ -130,6 +130,8 @@ private:
     struct HiddenPair {
         std::pair<Coord, Coord> coords;
         std::pair<Value, Value> values;
+
+        bool operator==(const HiddenPair &other) const = default;
     };
     friend std::ostream& operator<<(std::ostream& outs, const HiddenPair &);
     std::vector<HiddenPair> mHiddenPairs;

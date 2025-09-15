@@ -31,6 +31,8 @@ bool Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &
     assert(cell.notes().check(v1));
     assert(cell.notes().check(v2));
 
+    bool did_find = false;
+
     // can we find another note cell with the same pair in the same set,
     // but no other cell with either candidate in the set?
     Cell *ppair_cell = NULL; // "the" other potential candidate
@@ -57,22 +59,29 @@ bool Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &
         // this is "the" other candidate
         ppair_cell = &other_cell;
     }
+    if (!condition_met) return did_find;
 
     // did we, in fact, find another candidate?
-    if (!ppair_cell) condition_met = false;
+    if (!ppair_cell) return did_find;
+
+    // yes! but is this other cell "after" this cell
+    if (ppair_cell->coord() < cell.coord()) return did_find;
 
     // and also, is the candidate pair we found actionable (i.e. is it *not* a naked pair)?
-    if (cell.notes().count() == 2
-     && (ppair_cell && ppair_cell->notes().count() == 2)) condition_met = false;
+    if (cell.notes().count() == 2 && ppair_cell->notes().count() == 2) return did_find;
 
-    if (!condition_met) return false; // we're done here
+    // yes! but is the entry duplicated?
+    assert(cell.coord() < ppair_cell->coord());
+    assert(v2 > v1);
+    HiddenPair hp(std::make_pair(cell.coord(), ppair_cell->coord()), std::make_pair(v1, v2));
+    if (std::find(mHiddenPairs.begin(), mHiddenPairs.end(), hp) != mHiddenPairs.end()) return did_find;
 
     // yes! let's record the entry
-    HiddenPair hp(std::make_pair(cell.coord(), ppair_cell->coord()), std::make_pair(v1, v2));
-    assert(mHiddenPairs.empty());
     mHiddenPairs.push_back(hp);
     if (sVerbose) std::cout << "  [fHP] " << hp << std::endl;
-    return true;
+    did_find = true;
+
+    return did_find;
 }
 
 bool Analyzer::find_hidden_pairs() {
@@ -81,6 +90,7 @@ bool Analyzer::find_hidden_pairs() {
     // and those n candidates are not possible elsewhere in that same block, row, or column, then no other
     // candidates are possible in those cells.
     // Applied for n = 2
+    assert(mHiddenPairs.empty());
     bool did_find = false;
 
     for (auto const &cell: mBoard->cells()) {
@@ -97,19 +107,11 @@ bool Analyzer::find_hidden_pairs() {
                 assert(*pv2 != *pv1);
 
                 // let's see if we can find a hidden pair in the three cell sets
-                did_find = find_hidden_pair(cell, *pv1, *pv2, mBoard->row(cell));
-                if (!did_find) did_find = find_hidden_pair(cell, *pv1, *pv2, mBoard->column(cell));
-                if (!did_find) did_find = find_hidden_pair(cell, *pv1, *pv2, mBoard->nonet(cell));
-                if (!did_find) continue;
-                break;
+                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard->row(cell));
+                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard->column(cell));
+                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard->nonet(cell));
             }
-
-            if (!did_find) continue;
-            break;
         }
-
-        if (!did_find) continue;
-        break;
     }
 
     return did_find;
@@ -137,16 +139,14 @@ bool Analyzer::act_on_hidden_pair() {
     bool did_act = false;
 
     if (mHiddenPairs.empty()) return did_act;
-    assert(mHiddenPairs.size() == 1);
 
-    auto const &entry = mHiddenPairs.back();
+    for (auto const &entry : mHiddenPairs) {
+        auto &c1 = mBoard->at(entry.coords.first);
+        auto &c2 = mBoard->at(entry.coords.second);
 
-    auto &c1 = mBoard->at(entry.coords.first);
-    auto &c2 = mBoard->at(entry.coords.second);
-
-    did_act |= act_on_hidden_pair(c1, entry);
-    did_act |= act_on_hidden_pair(c2, entry);
-
+        did_act |= act_on_hidden_pair(c1, entry);
+        did_act |= act_on_hidden_pair(c2, entry);
+    }
     mHiddenPairs.clear();
 
     assert(did_act);
