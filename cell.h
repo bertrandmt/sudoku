@@ -22,10 +22,10 @@ enum Value: int {
     kUnset
 };
 
-auto value_range = [](Value begin, Value end) {
+inline auto value_range(Value begin, Value end) {
     return std::views::iota(static_cast<int>(begin), static_cast<int>(end))
          | std::views::transform([](int i) { return static_cast<Value>(i); });
-};
+}
 
 class Cell;
 
