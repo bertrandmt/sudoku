@@ -63,10 +63,9 @@ void Board::record_entries_form2(const std::string &entries) {
     }
 }
 
-Board::Board(Analyzer &analyzer, const std::string &board_desc)
+Board::Board(const std::string &board_desc)
     : mNoteCellsCount(width * height)
-    , mNotesCount(mNoteCellsCount * kNine)
-    , mAnalyzer(analyzer) {
+    , mNotesCount(mNoteCellsCount * kNine) {
     for (size_t row = 0; row < height; row++) {
         for (size_t col = 0; col < width; col++) {
             mCells.push_back(Cell(row, col));
@@ -88,11 +87,10 @@ Board::Board(Analyzer &analyzer, const std::string &board_desc)
     }
 }
 
-Board::Board(Analyzer &analyzer, const Board &other)
+Board::Board(const Board &other)
     : mCells(other.mCells)
     , mNoteCellsCount(other.mNoteCellsCount)
-    , mNotesCount(other.mNotesCount)
-    , mAnalyzer(analyzer) {
+    , mNotesCount(other.mNotesCount) {
 
     rebuild_subsets();
 }

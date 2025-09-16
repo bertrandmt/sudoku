@@ -12,7 +12,7 @@ class Board;
 
 class Analyzer {
 public:
-    Analyzer() { }
+    Analyzer(Board &board) : mBoard(&board) { }
 
     Analyzer(Analyzer const &other)
         : mNakedSingles(other.mNakedSingles)
@@ -21,15 +21,9 @@ public:
         , mLockedCandidates(other.mLockedCandidates)
         , mHiddenPairs(other.mHiddenPairs)
         , mXWings(other.mXWings)
-        , mColorChains(other.mColorChains) { }
+        , mColorChains(other.mColorChains)
+        , mBoard(other.mBoard) { }
 
-
-    using ptr = std::shared_ptr<Analyzer>;
-
-    void board(Board &board) {
-        assert(!mBoard || mBoard == &board);
-        mBoard = &board;
-    }
     void analyze();
 
     bool act(const bool singles_only);
@@ -37,6 +31,7 @@ public:
     friend std::ostream& operator<< (std::ostream& outs, Analyzer const &);
 
 private:
+    //** Notes management
     template<class Set>
     void filter_notes(Cell &, const Set &);
     void filter_notes();

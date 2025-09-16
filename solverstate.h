@@ -3,6 +3,7 @@
 #pragma once
 
 #include "board.h"
+#include "analyzer.h"
 
 #include <memory>
 
@@ -11,18 +12,16 @@ public:
     using ptr = std::shared_ptr<SolverState>;
 
     SolverState(const std::string &board_desc)
-        : mBoard(mAnalyzer, board_desc)
+        : mBoard(board_desc)
+        , mAnalyzer(mBoard)
         , mGeneration(0) {
-
-        mAnalyzer.board(mBoard);
         mAnalyzer.analyze();
     }
 
     SolverState(const SolverState &other)
-        : mAnalyzer(other.mAnalyzer)
-        , mBoard(mAnalyzer, other.mBoard)
+        : mBoard(other.mBoard)
+        , mAnalyzer(mBoard)
         , mGeneration(other.mGeneration + 1) {
-        mAnalyzer.board(mBoard);
         }
 
     size_t generation() const { return mGeneration; }
@@ -39,7 +38,7 @@ public:
     friend std::ostream &operator<<(std::ostream &, const SolverState &);
 
 private:
-    Analyzer mAnalyzer;
     Board mBoard;
+    Analyzer mAnalyzer;
     size_t mGeneration;
 };

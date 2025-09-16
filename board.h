@@ -3,7 +3,6 @@
 #pragma once
 
 #include "cell.h"
-#include "analyzer.h"
 
 #include <vector>
 #include <unordered_set>
@@ -19,13 +18,13 @@ class Nonet;
 class Board {
 public:
     friend class Analyzer;
-    Board(Analyzer &analyzer, const std::string &board_desc);
+    Board(const std::string &board_desc);
 private:
     void record_entries_form1(const std::string &);
     void record_entry_form1(const std::string &);
     void record_entries_form2(const std::string &);
 public:
-    Board(Analyzer &analyzer, const Board &other);
+    Board(const Board &other);
 
     using ptr = std::shared_ptr<Board>;
 
@@ -74,8 +73,6 @@ private:
 
     size_t mNoteCellsCount;
     size_t mNotesCount;
-
-    Analyzer &mAnalyzer;
 
     Cell &at(size_t row, size_t col);
     const Cell &at(size_t row, size_t col) const;
