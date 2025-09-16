@@ -241,7 +241,7 @@ bool Analyzer::act_on_color_chain() {
 std::ostream& operator<<(std::ostream& outs, const Analyzer::ColorChain &chain) {
     outs << "{";
     bool first = true;
-    for (const auto &[coord, color] : chain) {
+    for (const auto &[coord, color] : chain.cells) {
         if (!first) outs << ",";
         first = false;
         outs << coord << (color ? "🟩" : "🟥");

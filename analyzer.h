@@ -185,9 +185,6 @@ private:
         }
 
         bool cell_sees_both_colors(const Cell &, const Board *) const;
-
-        auto begin() const { return cells.begin(); }
-        auto end() const { return cells.end(); }
     };
     friend std::ostream& operator<<(std::ostream& outs, const ColorChain &);
     std::vector<ColorChain> mColorChains;
