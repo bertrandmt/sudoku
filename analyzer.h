@@ -3,16 +3,15 @@
 #pragma once
 
 #include "cell.h"
+#include "board.h"
 
 #include <unordered_set>
 #include <unordered_map>
 #include <memory>
 
-class Board;
-
 class Analyzer {
 public:
-    Analyzer(Board &board) : mBoard(&board) { }
+    Analyzer(Board &board) : mBoard(board) { }
 
     Analyzer(Analyzer const &other)
         : mNakedSingles(other.mNakedSingles)
@@ -179,7 +178,7 @@ private:
             return {green_cells, red_cells};
         }
 
-        bool cell_sees_both_colors(const Cell &, const Board *) const;
+        bool cell_sees_both_colors(const Cell &, const Board &) const;
     };
     friend std::ostream& operator<<(std::ostream& outs, const ColorChain &);
     std::vector<ColorChain> mColorChains;
@@ -193,5 +192,5 @@ private:
     bool act_on_color_chain();
 
 private:
-    Board *mBoard;
+    Board &mBoard;
 };

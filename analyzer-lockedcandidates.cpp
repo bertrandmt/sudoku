@@ -116,7 +116,7 @@ bool Analyzer::find_locked_candidates() {
     assert(mLockedCandidates.empty());
     bool did_find = false;
 
-    for (auto const &cell: mBoard->cells()) {
+    for (auto const &cell: mBoard.cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
@@ -125,12 +125,12 @@ bool Analyzer::find_locked_candidates() {
         for (auto const &value : cell.notes().values()) {
 
             // form 1
-            did_find |= find_locked_candidate(cell, value, mBoard->row(cell), mBoard->nonet(cell));
-            did_find |= find_locked_candidate(cell, value, mBoard->column(cell), mBoard->nonet(cell));
+            did_find |= find_locked_candidate(cell, value, mBoard.row(cell), mBoard.nonet(cell));
+            did_find |= find_locked_candidate(cell, value, mBoard.column(cell), mBoard.nonet(cell));
 
             // form 2
-            did_find |= find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->row(cell));
-            did_find |= find_locked_candidate(cell, value, mBoard->nonet(cell), mBoard->column(cell));
+            did_find |= find_locked_candidate(cell, value, mBoard.nonet(cell), mBoard.row(cell));
+            did_find |= find_locked_candidate(cell, value, mBoard.nonet(cell), mBoard.column(cell));
         }
     }
 
@@ -154,7 +154,7 @@ bool Analyzer::act_on_locked_candidate(const LockedCandidates &entry, Set &set) 
 
         // yes! we'll act
         std::cout << "[LC] " << other_cell.coord() << " x" << entry.value << " [" << entry.tag << "]" << std::endl;
-        mBoard->clear_note_at(other_cell.coord(), entry.value);
+        mBoard.clear_note_at(other_cell.coord(), entry.value);
         did_act = true;
     }
 
@@ -169,13 +169,13 @@ bool Analyzer::act_on_locked_candidate() {
     for (auto const &entry : mLockedCandidates) {
         switch (entry.tag[0]) {
         case 'r':
-            did_act |= act_on_locked_candidate(entry, mBoard->row(entry.coords.at(0)));
+            did_act |= act_on_locked_candidate(entry, mBoard.row(entry.coords.at(0)));
             break;
         case 'c':
-            did_act |= act_on_locked_candidate(entry, mBoard->column(entry.coords.at(0)));
+            did_act |= act_on_locked_candidate(entry, mBoard.column(entry.coords.at(0)));
             break;
         case 'n':
-            did_act |=  act_on_locked_candidate(entry, mBoard->nonet(entry.coords.at(0)));
+            did_act |=  act_on_locked_candidate(entry, mBoard.nonet(entry.coords.at(0)));
             break;
         }
     }

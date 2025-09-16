@@ -93,7 +93,7 @@ bool Analyzer::find_hidden_pairs() {
     assert(mHiddenPairs.empty());
     bool did_find = false;
 
-    for (auto const &cell: mBoard->cells()) {
+    for (auto const &cell: mBoard.cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
@@ -107,9 +107,9 @@ bool Analyzer::find_hidden_pairs() {
                 assert(*pv2 != *pv1);
 
                 // let's see if we can find a hidden pair in the three cell sets
-                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard->row(cell));
-                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard->column(cell));
-                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard->nonet(cell));
+                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard.row(cell));
+                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard.column(cell));
+                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard.nonet(cell));
             }
         }
     }
@@ -127,7 +127,7 @@ bool Analyzer::act_on_hidden_pair(Cell &cell, const HiddenPair &entry) {
         if (value == v1) continue;
         if (value == v2) continue;
 
-        mBoard->clear_note_at(cell.coord(), value);
+        mBoard.clear_note_at(cell.coord(), value);
         std::cout << "[HP] " << cell.coord() << " x" << value << " " << entry << std::endl;
         did_act = true;
     }
@@ -141,8 +141,8 @@ bool Analyzer::act_on_hidden_pair() {
     if (mHiddenPairs.empty()) return did_act;
 
     for (auto const &entry : mHiddenPairs) {
-        auto &c1 = mBoard->at(entry.coords.first);
-        auto &c2 = mBoard->at(entry.coords.second);
+        auto &c1 = mBoard.at(entry.coords.first);
+        auto &c2 = mBoard.at(entry.coords.second);
 
         did_act |= act_on_hidden_pair(c1, entry);
         did_act |= act_on_hidden_pair(c2, entry);

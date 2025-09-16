@@ -7,7 +7,7 @@
 #include <cassert>
 #include <queue>
 
-bool Analyzer::ColorChain::cell_sees_both_colors(const Cell &cell, const Board *board) const {
+bool Analyzer::ColorChain::cell_sees_both_colors(const Cell &cell, const Board &board) const {
     // is this cell a note?
     if (!cell.isNote()) return false;
 
@@ -23,7 +23,7 @@ bool Analyzer::ColorChain::cell_sees_both_colors(const Cell &cell, const Board *
 
     for (const auto &[colored_coord, color] : cells) {
         std::string tag;
-        if (board->see_each_other(cell.coord(), colored_coord, tag)) {
+        if (board.see_each_other(cell.coord(), colored_coord, tag)) {
             if (color) { did_see_green = true; }
             else       { did_see_red = true; }
             if (did_see_green && did_see_red) break;
@@ -40,13 +40,13 @@ bool Analyzer::test_color_chain(const ColorChain &chain) const {
     // Check rule 2: cells of same color in the same unit
     auto [green_cells, red_cells] = chain.group_cells_by_color();
     std::string tag;
-    if (mBoard->any_see_each_other(green_cells, tag)
-     || mBoard->any_see_each_other(red_cells, tag)) {
+    if (mBoard.any_see_each_other(green_cells, tag)
+     || mBoard.any_see_each_other(red_cells, tag)) {
         return true;
     }
 
     // Check rule 4: cells that can see both colors
-    for (const auto &cell : mBoard->cells()) {
+    for (const auto &cell : mBoard.cells()) {
         if (chain.cell_sees_both_colors(cell, mBoard)) {
             return true;
         }
@@ -82,7 +82,7 @@ bool Analyzer::find_color_chains(const Value &value) {
 
     std::unordered_set<Coord> visited_global;
 
-    for (auto const &cell : mBoard->cells()) {
+    for (auto const &cell : mBoard.cells()) {
         Coord coord = cell.coord();
 
         // is this a note cell?
@@ -110,18 +110,18 @@ bool Analyzer::find_color_chains(const Value &value) {
             auto [current_coord, current_color] = to_process.front();
             to_process.pop();
 
-            const Cell &current_cell = mBoard->at(current_coord);
+            const Cell &current_cell = mBoard.at(current_coord);
 
             // Find all cells strongly linked to this cell
             std::vector<Cell> linked_cells;
             const Cell *other_cell = nullptr;
-            if (find_strong_link_candidates(current_cell, value, mBoard->row(current_cell), other_cell)) {
+            if (find_strong_link_candidates(current_cell, value, mBoard.row(current_cell), other_cell)) {
                 linked_cells.push_back(*other_cell);
             }
-            if (find_strong_link_candidates(current_cell, value, mBoard->column(current_cell), other_cell)) {
+            if (find_strong_link_candidates(current_cell, value, mBoard.column(current_cell), other_cell)) {
                 linked_cells.push_back(*other_cell);
             }
-            if (find_strong_link_candidates(current_cell, value, mBoard->nonet(current_cell), other_cell)) {
+            if (find_strong_link_candidates(current_cell, value, mBoard.nonet(current_cell), other_cell)) {
                 linked_cells.push_back(*other_cell);
             }
 
@@ -189,16 +189,16 @@ bool Analyzer::find_color_chains() {
 }
 
 namespace {
-bool act_on_color_chain_rule_2(Board *board, const std::vector<Coord> &coords, const Value &value, const std::string &color) {
+bool act_on_color_chain_rule_2(Board &board, const std::vector<Coord> &coords, const Value &value, const std::string &color) {
     assert(!coords.empty());
 
     bool did_act = false;
 
     std::string tag;
-    if (board->any_see_each_other(coords, tag)) {
+    if (board.any_see_each_other(coords, tag)) {
        for (const Coord &coord : coords) {
            std::cout << "[SC] " << coord << " x" << value << " [" << tag << color << "]" << std::endl;
-           board->clear_note_at(coord, value);
+           board.clear_note_at(coord, value);
        }
        did_act = true;
     }
@@ -224,10 +224,10 @@ bool Analyzer::act_on_color_chain() {
     }
 
     // Check rule 4: cells that can see both colors
-    for (const auto &cell : mBoard->cells()) {
+    for (const auto &cell : mBoard.cells()) {
         if (chain.cell_sees_both_colors(cell, mBoard)) {
             std::cout << "[SC] " << cell.coord() << " x" << chain.value << " [👀🟩🟥]" << std::endl;
-            mBoard->clear_note_at(cell.coord(), chain.value);
+            mBoard.clear_note_at(cell.coord(), chain.value);
             did_act = true;
         }
     }

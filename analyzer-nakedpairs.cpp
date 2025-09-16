@@ -91,16 +91,16 @@ bool Analyzer::find_naked_pairs() {
     assert(mNakedPairs.empty());
     bool did_find = false;
 
-    for (auto const &cell: mBoard->cells()) {
+    for (auto const &cell: mBoard.cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
         // yes! but does it have only two notes?
         if (cell.notes().count() != 2) continue;
 
         // yes! let's see if we can find it a pair?
-        did_find |= find_naked_pair(cell, mBoard->row(cell));
-        did_find |= find_naked_pair(cell, mBoard->column(cell));
-        did_find |= find_naked_pair(cell, mBoard->nonet(cell));
+        did_find |= find_naked_pair(cell, mBoard.row(cell));
+        did_find |= find_naked_pair(cell, mBoard.column(cell));
+        did_find |= find_naked_pair(cell, mBoard.nonet(cell));
     }
 
     return did_find;
@@ -110,8 +110,8 @@ template<class Set>
 bool Analyzer::act_on_naked_pair(const NakedPair &entry, Set &set) {
     bool did_act = false;
 
-    auto const &cell1 = mBoard->at(entry.coords.first);
-    auto const &cell2 = mBoard->at(entry.coords.second);
+    auto const &cell1 = mBoard.at(entry.coords.first);
+    auto const &cell2 = mBoard.at(entry.coords.second);
 
     if (!set.contains(cell2)) return did_act; // this is not the set to act on
 
@@ -120,12 +120,12 @@ bool Analyzer::act_on_naked_pair(const NakedPair &entry, Set &set) {
         if (other_cell == cell1 || other_cell == cell2) continue; // not looking at either of the cell pairs
 
         if (other_cell.check(entry.values.first)) {
-            mBoard->clear_note_at(other_cell.coord(), entry.values.first);
+            mBoard.clear_note_at(other_cell.coord(), entry.values.first);
             std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.first << " [" << set.tag() << "]" << std::endl;
             did_act = true;
         }
         if (other_cell.check(entry.values.second)) {
-            mBoard->clear_note_at(other_cell.coord(), entry.values.second);
+            mBoard.clear_note_at(other_cell.coord(), entry.values.second);
             std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.second << " [" << set.tag() << "]" << std::endl;
             did_act = true;
         }
@@ -140,11 +140,11 @@ bool Analyzer::act_on_naked_pair() {
     if (mNakedPairs.empty()) return did_act;
 
     for (auto const &entry : mNakedPairs) {
-        auto const &cell1 = mBoard->at(entry.coords.first);
+        auto const &cell1 = mBoard.at(entry.coords.first);
 
-        did_act |= act_on_naked_pair(entry, mBoard->row(cell1));
-        did_act |= act_on_naked_pair(entry, mBoard->column(cell1));
-        did_act |= act_on_naked_pair(entry, mBoard->nonet(cell1));
+        did_act |= act_on_naked_pair(entry, mBoard.row(cell1));
+        did_act |= act_on_naked_pair(entry, mBoard.column(cell1));
+        did_act |= act_on_naked_pair(entry, mBoard.nonet(cell1));
     }
     mNakedPairs.clear();
 

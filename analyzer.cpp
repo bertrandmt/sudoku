@@ -23,7 +23,7 @@ void Analyzer::filter_notes(Cell &cell, const Set &set) {
 
             if (sVerbose) std::cout << "  [FNn] " << cell.coord() << " x" << other_cell.value()
                       << " " << set.tag() << "(" << other_cell.coord() << ")" << std::endl;
-            mBoard->clear_note_at(cell.coord(), other_cell.value());
+            mBoard.clear_note_at(cell.coord(), other_cell.value());
         }
     }
     // value cell; let's update notes in note cells in the same set
@@ -37,16 +37,16 @@ void Analyzer::filter_notes(Cell &cell, const Set &set) {
 
             if (sVerbose) std::cout << "  [FNv] " << other_cell.coord() << " x" << cell.value()
                       << " " << set.tag() << "(" << cell.coord() << ")" << std::endl;
-            mBoard->clear_note_at(other_cell.coord(), cell.value());
+            mBoard.clear_note_at(other_cell.coord(), cell.value());
         }
     }
 }
 
 void Analyzer::filter_notes() {
-    for (auto &cell: mBoard->cells()) {
-        filter_notes(cell, mBoard->nonet(cell));
-        filter_notes(cell, mBoard->column(cell));
-        filter_notes(cell, mBoard->row(cell));
+    for (auto &cell: mBoard.cells()) {
+        filter_notes(cell, mBoard.nonet(cell));
+        filter_notes(cell, mBoard.column(cell));
+        filter_notes(cell, mBoard.row(cell));
     }
 }
 

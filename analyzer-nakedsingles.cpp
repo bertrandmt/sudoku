@@ -15,7 +15,7 @@ bool Analyzer::find_naked_singles() {
     // A naked single arises when there is only one possible candidate for a cell
     bool did_find = false;
 
-    for (auto const &cell: mBoard->cells()) {
+    for (auto const &cell: mBoard.cells()) {
         // is this a naked single?
         if (!test_naked_single(cell)) continue;
 
@@ -40,7 +40,7 @@ bool Analyzer::act_on_naked_single() {
     // singles can be acted on all at once
     for (auto const &entry: mNakedSingles) {
         std::cout << "[NS] " << entry.coord << " =" << entry.value << std::endl;
-        mBoard->set_value_at(entry.coord, entry.value);
+        mBoard.set_value_at(entry.coord, entry.value);
         did_act = true;
     }
     mNakedSingles.clear();

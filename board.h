@@ -26,8 +26,6 @@ private:
 public:
     Board(const Board &other);
 
-    using ptr = std::shared_ptr<Board>;
-
     static const size_t width = 9;
     static const size_t height = 9;
 

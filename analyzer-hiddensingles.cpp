@@ -28,7 +28,7 @@ bool Analyzer::find_hidden_singles() {
     // A hidden single arises when there is only one possible cell for a candidate
     bool did_find = false;
 
-    for (auto const &cell: mBoard->cells()) {
+    for (auto const &cell: mBoard.cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
@@ -36,9 +36,9 @@ bool Analyzer::find_hidden_singles() {
         for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
             // is this a hidden single?
             std::string tag;
-            if (!test_hidden_single(cell, value, mBoard->row(cell), tag)
-             && !test_hidden_single(cell, value, mBoard->column(cell), tag)
-             && !test_hidden_single(cell, value, mBoard->nonet(cell), tag)) continue;
+            if (!test_hidden_single(cell, value, mBoard.row(cell), tag)
+             && !test_hidden_single(cell, value, mBoard.column(cell), tag)
+             && !test_hidden_single(cell, value, mBoard.nonet(cell), tag)) continue;
 
             // yes! but do we already know about it?
             if (std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(),
@@ -62,7 +62,7 @@ bool Analyzer::act_on_hidden_single() {
 
     for (auto const &entry : mHiddenSingles) {
         std::cout << "[HS] " << entry.coord << " =" << entry.value << " [" << entry.tag << "]" << std::endl;
-        mBoard->set_value_at(entry.coord, entry.value);
+        mBoard.set_value_at(entry.coord, entry.value);
         did_act = true;
     }
     mHiddenSingles.clear();

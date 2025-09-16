@@ -78,9 +78,9 @@ bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateS
     // Get the elimination set for the other cell
     const EliminationSet &other_eset = [&]() -> const EliminationSet& {
         if constexpr (std::is_same_v<EliminationSet, Column>) {
-            return mBoard->column(other_cell);
+            return mBoard.column(other_cell);
         } else {
-            return mBoard->row(other_cell);
+            return mBoard.row(other_cell);
         }
     }();
     assert(eset < other_eset);
@@ -126,8 +126,8 @@ bool Analyzer::find_xwing(const Cell &cell, const Value &value) {
 
     bool did_find = false;
 
-    did_find = find_xwing(cell, value, mBoard->row(cell), mBoard->column(cell), mBoard->rows(), true);
-    if (!did_find) did_find = find_xwing(cell, value, mBoard->column(cell), mBoard->row(cell), mBoard->columns(), false);
+    did_find = find_xwing(cell, value, mBoard.row(cell), mBoard.column(cell), mBoard.rows(), true);
+    if (!did_find) did_find = find_xwing(cell, value, mBoard.column(cell), mBoard.row(cell), mBoard.columns(), false);
 
     return did_find;
 }
@@ -139,7 +139,7 @@ bool Analyzer::find_xwings() {
     // this value in the columns can be eliminated.
     bool did_find = false;
 
-    for (auto const &cell: mBoard->cells()) {
+    for (auto const &cell: mBoard.cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
@@ -172,7 +172,7 @@ bool Analyzer::act_on_xwing(const Value &value, const CandidateSet &cset1, const
         assert(cell.check(value));
 
         std::cout << "[XW] " << cell.coord() << " x" << value << " [" << tag << "]" << std::endl;
-        mBoard->clear_note_at(cell.coord(), value);
+        mBoard.clear_note_at(cell.coord(), value);
         did_act = true;
     }
 
@@ -188,10 +188,10 @@ bool Analyzer::act_on_xwing() {
     auto const entry = mXWings.back();
     if (entry.is_row_based) {
         // Row-based X-Wing: eliminate candidates from the two columns
-        auto anchor_row_candidates = candidates(mBoard->row(entry.anchor), entry.value);
-        auto diagonal_row_candidates = candidates(mBoard->row(entry.diagonal), entry.value);
-        auto anchor_column_eliminates = candidates(mBoard->column(entry.anchor), entry.value);
-        auto diagonal_column_eliminates = candidates(mBoard->column(entry.diagonal), entry.value);
+        auto anchor_row_candidates = candidates(mBoard.row(entry.anchor), entry.value);
+        auto diagonal_row_candidates = candidates(mBoard.row(entry.diagonal), entry.value);
+        auto anchor_column_eliminates = candidates(mBoard.column(entry.anchor), entry.value);
+        auto diagonal_column_eliminates = candidates(mBoard.column(entry.diagonal), entry.value);
 
         did_act |= act_on_xwing(entry.value, anchor_row_candidates, diagonal_row_candidates,
                                            anchor_column_eliminates, "c");
@@ -199,10 +199,10 @@ bool Analyzer::act_on_xwing() {
                                            diagonal_column_eliminates, "c");
     } else {
         // Column-based X-Wing: eliminate candidates from the two rows
-        auto anchor_column_candidates = candidates(mBoard->column(entry.anchor), entry.value);
-        auto diagonal_column_candidates = candidates(mBoard->column(entry.diagonal), entry.value);
-        auto anchor_row_eliminates = candidates(mBoard->row(entry.anchor), entry.value);
-        auto diagonal_row_eliminates = candidates(mBoard->row(entry.diagonal), entry.value);
+        auto anchor_column_candidates = candidates(mBoard.column(entry.anchor), entry.value);
+        auto diagonal_column_candidates = candidates(mBoard.column(entry.diagonal), entry.value);
+        auto anchor_row_eliminates = candidates(mBoard.row(entry.anchor), entry.value);
+        auto diagonal_row_eliminates = candidates(mBoard.row(entry.diagonal), entry.value);
 
         did_act |= act_on_xwing(entry.value, anchor_column_candidates, diagonal_column_candidates,
                                            anchor_row_eliminates, "r");
