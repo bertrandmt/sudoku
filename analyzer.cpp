@@ -61,6 +61,7 @@ void Analyzer::analyze() {
     mXWings.clear();
     mColorChains.clear();
     mYWings.clear();
+    mXYChains.clear();
 
     bool did_find = false;
     did_find = find_naked_singles();
@@ -71,6 +72,7 @@ void Analyzer::analyze() {
     if (!did_find) did_find = find_xwings();
     if (!did_find) did_find = find_color_chains();
     if (!did_find) did_find = find_ywings();
+    if (!did_find) did_find = find_xychains();
 }
 
 bool Analyzer::act(const bool singles_only) {
@@ -86,6 +88,7 @@ bool Analyzer::act(const bool singles_only) {
         if (!did_act) did_act = act_on_xwing();
         if (!did_act) did_act = act_on_color_chain();
         if (!did_act) did_act = act_on_ywing();
+        if (!did_act) did_act = act_on_xychain();
     }
 
     return did_act;
@@ -159,6 +162,15 @@ std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
          << "[YW](" << a.mYWings.size() << ") {";
     is_first = true;
     for (auto const &entry: a.mYWings) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << "{" << entry << "}";
+    }
+    outs << "}" << std::endl
+    // xy-chains
+         << "[XY](" << a.mXYChains.size() << ") {";
+    is_first = true;
+    for (auto const &entry: a.mXYChains) {
         if (!is_first) { outs << ", "; }
         is_first = false;
         outs << "{" << entry << "}";

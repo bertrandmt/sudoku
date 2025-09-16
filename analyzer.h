@@ -6,6 +6,7 @@
 #include "board.h"
 
 #include <unordered_set>
+#include <set>
 #include <unordered_map>
 #include <memory>
 
@@ -22,6 +23,7 @@ public:
         , mXWings(other.mXWings)
         , mColorChains(other.mColorChains)
         , mYWings(other.mYWings)
+        , mXYChains(other.mXYChains)
         , mBoard(board) { }
 
     void analyze();
@@ -213,6 +215,39 @@ private:
     template<class Set>
     bool act_on_ywing(const YWing &entry, const Set &set);
     bool act_on_ywing();
+
+private:
+    //** xy-chain
+    struct XYChain {
+        Value value;                   // candidate to eliminate from cells seeing both chain ends
+        std::vector<Coord> chain;      // sequence of XY-cells forming the chain
+        size_t num_elim;
+
+        bool operator==(const XYChain &other) const {
+            // Two XY-chains are equivalent if they have the same elimination value
+            // and the same endpoints, regardless of the internal path
+            if (value != other.value) return false;
+            return (chain.front() == other.chain.front() && chain.back() == other.chain.back()) ||
+                   (chain.front() == other.chain.back() && chain.back() == other.chain.front());
+        }
+
+        bool operator<(const XYChain &other) const {
+            return (num_elim >  other.num_elim) ||
+                   (num_elim == other.num_elim && chain.size() < other.chain.size());
+        }
+    };
+    friend std::ostream& operator<<(std::ostream& outs, const XYChain &);
+    std::set<XYChain> mXYChains;
+
+    // find
+    size_t test_xychain(const Value &value, const std::vector<Coord> &chain) const;
+    bool find_xychain(const Cell &, const Value &);
+    bool find_xychains();
+
+    // act
+    template<class Set>
+    bool act_on_xychain(const XYChain &entry, const Set &chain_front_set);
+    bool act_on_xychain();
 
 private:
     Board &mBoard;

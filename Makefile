@@ -26,6 +26,7 @@ src = coord.cpp \
 	  analyzer-xwing.cpp \
 	  analyzer-colorchain.cpp \
 	  analyzer-ywing.cpp \
+	  analyzer-xychain.cpp \
 	  solverstate.cpp \
 	  solver.cpp
 
@@ -68,6 +69,8 @@ analyzer-colorchain.o: analyzer.h cell.h coord.h board.h row.h column.h
 analyzer-colorchain.o: nonet.h verbose.h
 analyzer-ywing.o: analyzer.h cell.h coord.h board.h row.h column.h nonet.h
 analyzer-ywing.o: verbose.h
+analyzer-xychain.o: analyzer.h cell.h coord.h board.h row.h column.h nonet.h
+analyzer-xychain.o: verbose.h
 solverstate.o: solverstate.h board.h cell.h coord.h row.h column.h nonet.h
 solverstate.o: analyzer.h
 solver.o: solver.h solverstate.h board.h cell.h coord.h row.h column.h

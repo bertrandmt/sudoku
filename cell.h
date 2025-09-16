@@ -60,6 +60,12 @@ public:
     Value value() const { return mValue; }
     Notes &notes() { assert(isNote()); return mNotes; }
     const Notes &notes() const { assert(isNote()); return mNotes; }
+    Value other_value(const Value &value) const {
+        assert(isNote());
+        assert(notes().count() == 2);
+        assert(check(value));
+        return notes().values()[0] == value ? notes().values()[1] : notes().values()[0];
+    }
 
     bool check(const Value &v) const { return isNote() && mNotes.check(v); }
     bool set(const Value &v, bool set) { return isNote() && mNotes.set(v, set); }
