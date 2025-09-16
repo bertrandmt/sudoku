@@ -53,6 +53,11 @@ public:
 
     // are these two coords in the same row, column or nonet?
     bool see_each_other(const Coord &, const Coord &, std::string &out_tag) const;
+    bool see_each_other(const Cell &c1, const Cell &c2) const {
+        std::string tag;
+        return see_each_other(c1.coord(), c2.coord(), tag);
+    }
+
     // do any two of the passed coords see each other?
     bool any_see_each_other(const std::vector<Coord> &, std::string &out_tag) const;
 

@@ -20,7 +20,7 @@ public:
 
     SolverState(const SolverState &other)
         : mBoard(other.mBoard)
-        , mAnalyzer(mBoard)
+        , mAnalyzer(mBoard, other.mAnalyzer)
         , mGeneration(other.mGeneration + 1) {
         }
 

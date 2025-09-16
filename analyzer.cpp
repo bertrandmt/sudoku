@@ -60,6 +60,7 @@ void Analyzer::analyze() {
     mHiddenPairs.clear();
     mXWings.clear();
     mColorChains.clear();
+    mYWings.clear();
 
     bool did_find = false;
     did_find = find_naked_singles();
@@ -69,6 +70,7 @@ void Analyzer::analyze() {
     if (!did_find) did_find = find_hidden_pairs();
     if (!did_find) did_find = find_xwings();
     if (!did_find) did_find = find_color_chains();
+    if (!did_find) did_find = find_ywings();
 }
 
 bool Analyzer::act(const bool singles_only) {
@@ -83,6 +85,7 @@ bool Analyzer::act(const bool singles_only) {
         if (!did_act) did_act = act_on_hidden_pair();
         if (!did_act) did_act = act_on_xwing();
         if (!did_act) did_act = act_on_color_chain();
+        if (!did_act) did_act = act_on_ywing();
     }
 
     return did_act;
@@ -147,6 +150,15 @@ std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
          << "[SC](" << a.mColorChains.size() << ") {";
     is_first = true;
     for (auto const &entry: a.mColorChains) {
+        if (!is_first) { outs << ", "; }
+        is_first = false;
+        outs << "{" << entry << "}";
+    }
+    outs << "}" << std::endl
+    // y-wings
+         << "[YW](" << a.mYWings.size() << ") {";
+    is_first = true;
+    for (auto const &entry: a.mYWings) {
         if (!is_first) { outs << ", "; }
         is_first = false;
         outs << "{" << entry << "}";

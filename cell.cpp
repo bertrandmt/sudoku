@@ -82,3 +82,7 @@ std::ostream& operator<< (std::ostream& outs, const Cell &c) {
     c.mPass = (c.mPass + 1) % 3;
     return outs;
 }
+
+size_t std::hash<Cell>::operator()(const Cell &cell) const noexcept {
+    return std::hash<Coord>{}(cell.coord());
+}

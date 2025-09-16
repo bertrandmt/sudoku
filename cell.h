@@ -82,3 +82,8 @@ private:
 };
 
 std::ostream& operator<< (std::ostream& outs, const Cell &);
+
+template<>
+struct std::hash<Cell> {
+    std::size_t operator()(const Cell &cell) const noexcept;
+};
