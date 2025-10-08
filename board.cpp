@@ -21,7 +21,7 @@ void Board::record_entry_form1(const std::string &entry) {
     Value val = static_cast<Value>(entry[2] - '0');
     if (val == kUnset) throw std::runtime_error("unset value");
 
-    if (set_value_at(row, col, val)) throw std::runtime_error("did not succeed in setting entry");
+    if (!set_value_at(row, col, val)) throw std::runtime_error("failed to set value at");
 }
 
 void Board::record_entries_form1(const std::string &entries) {
@@ -53,7 +53,9 @@ void Board::record_entries_form2(const std::string &entries) {
         case '7':
         case '8':
         case '9': // it's a value entry
-            set_value_at(c.coord(), static_cast<Value>(entries[index] - '0'));
+            if (!set_value_at(c.coord(), static_cast<Value>(entries[index] - '0'))) {
+                throw std::runtime_error("failed to set value at");
+            }
             break;
 
         default: // don't know what to do with this
