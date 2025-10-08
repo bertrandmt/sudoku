@@ -123,12 +123,12 @@ Four commands impact the state of the board:
 * `r` runs as many actions as possible until full resolution or no remaining heuristic remains
 * `!` resets the state of the board to its initial state (as entered with the `n` command)
 
-For each state, including the initial state from a new game, the full set of possible next non-obvious moves (outside of row, column, nonet filtering of notes) is recorded after printing the board:
+For each state, including the initial state from a new game, the number of remaining cells left to solve, as well as the total number of note candidates remaining are displayed. Additionally, the full set of possible next non-obvious moves (outside of row, column, nonet filtering of notes) is recorded after printing the board:
 
 ```
 λ >
 Step #1:
-[NS] cell[7, 4] =9
+[NS] [7, 4] =9
 +=====+=====+=====++=====+=====+=====++=====+=====+=====+
 [     |     |    *][    *|  * *|  *  ][     |     |  * *]
 [  6  |  7  |     ][  *  |     |     ][  4  |  1  |  *  ]
@@ -166,28 +166,58 @@ Step #1:
 [  *  |  * *|    *][  4  |  7  |  3  ][  * *|    *|  *  ]
 [    *|    *|    *][     |     |     ][  * *|  * *|  * *]
 +=====+=====+=====++=====+=====+=====++=====+=====+=====+
-[NS](2) {[8, 5], [7, 8]}
-[HS](2) {[2, 6]#6[n], [4, 5]#2[n]}
-[LC](5) {{{[1, 6],[2, 6],[3, 6]}#2[^n]}, {{[2, 6],[3, 6]}#1[^n]}, {{[4, 5]}#2[^c]}, {{[8, 5]}#1[^r]}, {{[8, 5]}#1[^c]}}
-[NP](1) {{{[5, 6],[6, 6]}#{7,9}}}
-[HP](0)
+Left to solve:   54
+Notes remaining: 210
+[NS](2) {[7, 8]#4, [8, 5]#1}
+[HS](0) {}
+[NP](0) {}
+[LC](0) {}
+[HP](0) {}
+[XW](0) {}
+[SC](0) {}
+[YW](0) {}
+[XY](0) {}
 ```
 
-There are currently five implemented heuristics: `naked-single`, denoted as `[NS]`, `hidden-single`, denoted as `[HS]`, `locked-candidates`, denoted as `[LC]`, `naked-pairs`, denoted as `[NP]`, and `hidden-pairs`, denoted as `[HP]`.
+There are currently nine implemented heuristics: 
+
+1. `naked-single`, denoted as `[NS]`,
+1. `hidden-single`, denoted as `[HS]`,
+1. `naked-pairs`, denoted as `[NP]`,
+1. `locked-candidates`, denoted as `[LC]`,
+1. `hidden-pairs`, denoted as `[HP]`,
+1. `x-wing`, denoted as `[XW]`,
+1. `simple-coloring`, denoted as `[SC]`,
+1. `y-wing`, denoted as `[YW]`, and
+1. `XY-chain`, denoted as `[XY]`.
 
 For each heuristic, the number of available actions associated with the heuristic appears in parentheses, followed by a summary description of such actions.
 
+## Naked Singles
+
 Naked single indicates a note cell where only one possible value remains. The coordinates of all such cells are recorded. Going back to the example above:
 ```
-[NS](2) {[8, 5], [7, 8]}
+[NS](2) {[7, 8]#4, [8, 5]#1}
 ```
-This is to be interpreted as saying there are two naked singles on the board, at row 8, column 5 and at row 7, column 8.
+This is to be interpreted as saying there are two naked singles on the board, at row 7, column 8 for value 4 and at row 8, column 5 for value 1.
 
-A hidden single is a note cell where one of the possible values is the only possible value in its row, column or nonet. For each possible hidden single, the coordinates of the hidden single cell, the corresponding value and the set (row, column or nonet) where that value is single are all recorded. In the example above:
+## Hidden Singles
+
+A hidden single is a note cell where one of the possible values is the only possible value in its row, column or nonet. For each possible hidden single, the coordinates of the hidden single cell, the corresponding value and the set (row, column or nonet) where that value is single are all recorded. For example:
 ```
-[HS](2) {[2, 6]#6[n], [4, 5]#2[n]}
+[HS](2) {[2, 6]#6[r], [4, 5]#2[r]}
 ```
-This indicates there are two hidden singles in the board. The cell at row 2, column 6 is the only possibiliy for value 6 in its nonet. The cell at row 4, column 5 is the only possible cell for value 2 in its nonet.
+This indicates there are two hidden singles in the board. The cell at row 2, column 6 is the only possibiliy for value 6 in its row. The cell at row 4, column 5 is the only possible cell for value 2 in its row.
+
+## Naked Pairs
+
+Naked pairs are pairs of note cells with the same two (and only two) possible candidate values, in the same set (row, column or nonet). In the example above:
+```
+[NP](1) {{{[5, 6],[6, 6]}#{7,9}}}
+```
+This indicates there is one naked pair in the board, in cells at row 5, column 6 and row 6, column 6. Their common pair of possible values is 7 and 9. The action taken if acting on this entry would be to remove 7 and 9 as candidates in the cells in their common column and common nonet. In practice, this translates in removing candidate 9 in cell 1,6, candidates 7 and 9 in cell 2,6, candidate 9 in cell 3,6, candidate 9 in cells 4,5 and 5,5 and candidate 7 in cell 6,4.
+
+## Locked Candidates
 
 Borrowing from the Sudoku Assistant [explainer page](https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#blocks), the locked candidate rule states that when a given candidate is possible at the intersection of a nonet and a row (or column), and that same candidate is not possible in the rest of the same nonet, then it is not possible in the rest of the same row/column either. The same goes when the candidate is not possible in the rest of the same row/column, in which case it will not be possible in the rest of the same nonet. In the example above:
 ```
@@ -199,61 +229,48 @@ This indicates there are five possible locked candidates in the board. The first
 ```
 This indicates that cells at row 1, column 6, and row 2, column 6 and row 3, column 6 are all candidates for value 2 and that no other cell in their nonet can be a candidate for value 2 (since, though this is not explicitly stated, but can be readily verified in the board above, no other cell in their column is a candidate for value 2). The action for this particular locked candidates finding would therefore be to remove 2 as candidate for cells 1,5 and 2,5 (with celll 3,5 being a value cell, so not impacted, and none of the cells in column 4 for this nonet being candidates for value 2).
 
-Naked pairs are pairs of note cells with the same two (and only two) possible candidate values, in the same set (row, column or nonet). In the example above:
-```
-[NP](1) {{{[5, 6],[6, 6]}#{7,9}}}
-```
-This indicates there is one naked pair in the board, in cells at row 5, column 6 and row 6, column 6. Their common pair of possible values is 7 and 9. The action taken if acting on this entry would be to remove 7 and 9 as candidates in the cells in their common column and common nonet. In practice, this translates in removing candidate 9 in cell 1,6, candidates 7 and 9 in cell 2,6, candidate 9 in cell 3,6, candidate 9 in cells 4,5 and 5,5 and candidate 7 in cell 6,4.
+## Hidden Pairs
 
 Hidden pairs are pairs of note cells with two common candidate values (among others). They are alone in their set (row, column or nonet) sharing these two values. The syntax is the same as that of the naked pair, that is: a pair of coordinates and the two common values.
 
-The solver will process naked singles as long as there are some available, followed by hidden singles, followed by locked candidates, followed by naked pairs, finally followed by hidden pairs.
+For example:
+```
+[HP](2) {{{[3, 1],[9, 1]}#{4,6}}, {{[6, 6],[9, 6]}#{1,7}}}
+```
+
+This indicates there are two hidden pairs at that point in the resolution of a particular board. The first hidden pair is cells at row 3, column 1 and row 9, column 1 (on the same column), for candidate values 4 and 6.
+
+## X-Wing
+
+TODO
+
+## Simple Coloring
+
+TODO
+
+## Y-Wing
+
+TODO
+
+## XY-Chain
+
+TODO
+
+## Order of analysis and resolution
+
+The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring and XY-Chain.
 
 # Editing the table
 
-Sometimes, the solver is not able to solve the whole board. For example:
+It is possible to manually edit the board after initial load. Two commands are available for this purpose:
+
+* `x` removes a candidate in a given note
+* `=` sets a given board entry to a value
+
+The syntax for both is `Crcv` where `C` is the command (`x` or `=`), `r` is the row, `c` is the column for the cell to be changed, `v` is the value for the command.
+
+For example, from the state above:
 ```
-λ n.6..1.825.5.....9848.2.4..1.4....1.3228..9.74.7..4.2.9.926.1..7..58.6..2.......56.
-[...]
-λ r
-Step #1:
-[LC] [9, 4] x7 [r]
-[LC] [9, 5] x7 [r]
-[LC] [9, 6] x7 [r]
-Step #2:
-[LC] [9, 6] x4 [r]
-Step #3:
-[LC] [9, 2] x3 [n]
-[LC] [9, 3] x3 [n]
-Step #4:
-[LC] [9, 2] x1 [n]
-[LC] [9, 3] x1 [n]
-Step #5:
-[LC] [4, 4] x5 [n]
-[LC] [5, 4] x5 [n]
-[LC] [5, 6] x5 [n]
-Step #6:
-[LC] [3, 4] x6 [r]
-[LC] [3, 6] x6 [r]
-Step #7:
-[LC] [3, 2] x9 [r]
-Step #8:
-[NP] [4, 4] x6 [n]
-[NP] [6, 5] x3 [n]
-[NP] [5, 3] x3 [r]
-[NP] [5, 9] x6 [r]
-Step #9:
-[NP] [1, 2] x3 [r]
-[NP] [1, 2] x7 [r]
-[NP] [1, 3] x3 [r]
-[NP] [1, 3] x7 [r]
-Step #10:
-[HP] [3, 4] x3 {[3, 4],[3, 6]}#{5,9}
-[HP] [3, 4] x7 {[3, 4],[3, 6]}#{5,9}
-[HP] [3, 6] x3 {[3, 4],[3, 6]}#{5,9}
-[HP] [3, 6] x7 {[3, 4],[3, 6]}#{5,9}
-Step #11:
-???
 +=====+=====+=====++=====+=====+=====++=====+=====+=====+
 [     |     |     ][     |    *|     ][     |     |    *]
 [  6  |*    |*    ][  1  |     |  8  ][  2  |  5  |     ]
@@ -291,23 +308,7 @@ Step #11:
 [     |*    |*    ][     |     |     ][  5  |  6  |     ]
 [     |*    |*    ][  * *|  *  |    *][     |     |  * *]
 +=====+=====+=====++=====+=====+=====++=====+=====+=====+
-[NS](0) {}
-[HS](0) {}
-[LC](0) {}
-[NP](0) {}
-[HP](0) {}
-λ 
-```
-
-In this case, subtle "[weak chain](https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#weak)" analysis shows that candidate 7 in cell at line 9, column 2 is not possible. The solver has not implemented weak chain analysis, as of yet, and is stuck here. From there, it is possible to edit the board, for example to reflect this "knowledge", in order to help the solver resume. Two commands are available for this purpose:
-
-* `x` removes a candidate in a given note
-* `=` sets a given board entry to a value
-
-The syntax for both is `Crcv` where `C` is the command (`x` or `=`), `r` is the row, `c` is the column for the cell to be changed, `v` is the value for the command.
-
-For example, from the state above:
-```
+[...]
 λ x927
   [fNS] [9, 2]
   [fHS] [9, 3]#7[n]
@@ -351,16 +352,14 @@ Step #11:
 [     |*    |*    ][     |     |     ][  5  |  6  |     ]
 [     |     |*    ][  * *|  *  |    *][     |     |  * *]
 +=====+=====+=====++=====+=====+=====++=====+=====+=====+
-[NS](1) {[9, 2]}
-[HS](1) {[9, 3]#7[n]}
-[LC](2) {{{[2, 2],[3, 2]}#7[^n]}, {{[9, 3]}#7[^c]}}
-[NP](0) {}
-[HP](0) {}
+[...]
 λ 
 ```
 
 The `x` command fails and takes no action if the cell at row `r`, column `c` is a value cell, or if value `v` is not a candidate for it.
 The `=` command succeeds unconditionally.
+
+The solver will take manual changes into consideration when resuming solving.
 
 It must be noted that manual edition of the board has the potential of rendering it impossible to solve. As an example above, setting the value 7 in the cell at row 9, column 2 quickly leads the autosolver to a condition where a note cell has no candidates. The solver is *not* equipped to handle such cases and will likely fail with an assertion when encountering such a case.
  
