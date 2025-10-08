@@ -242,7 +242,74 @@ This indicates there are two hidden pairs at that point in the resolution of a p
 
 ## X-Wing
 
-TODO
+The Sudoku Wiki [explainer page](https://www.sudokuwiki.org/x_wing_strategy) on the X-Wing Strategy states: "When there are only two possible cells for a value in each of two different rows, and these candidates lie also in the same columns, then all other candidates for this value in the columns can be eliminated." The same is true when swapping rows and columns. There is an additional dimension when considering nonets instead of rows/columns, but that dimension does not usually fall under the X-Wing Strategy moniker.
+
+As an example:
+```
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[*   *|  * *|* * *][    *|     |    *][     |     |     ]
+[  *  |  *  |  *  ][  * *|    *|  * *][    *|  9  |  4  ]
+[  *  |     |  *  ][  *  |* *  |* *  ][*    |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][  * *|     |  * *]
+[  7  |  6  |*    ][  9  |  1  |*    ][     |  5  |     ]
+[     |     |  *  ][     |     |  *  ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|     |    *][    *|     |     ][     |     |     ]
+[* *  |  9  |* *  ][* * *|*   *|  2  ][    *|  8  |  1  ]
+[     |     |     ][     |*    |     ][*    |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[    *|     |  * *][  *  |     |     ][  * *|     |  * *]
+[*   *|  7  |*   *][*   *|  5  |*   *][*    |  1  |     ]
+[     |     |    *][  *  |     |  *  ][  * *|     |  * *]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[*   *|  * *|* * *][     |  *  |     ][  * *|  * *|  * *]
+[* * *|  *  |* * *][  7  |*   *|  9  ][* *  |     |     ]
+[     |     |     ][     |  *  |     ][  *  |     |  *  ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |  *  ][  *  |     |     ][  *  |     |     ]
+[* *  |  8  |* *  ][*    |  3  |  1  ][* *  |  6  |  7  ]
+[     |     |    *][     |     |     ][    *|     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |    *][     |     |    *][    *|     |    *]
+[  2  |  4  |  * *][  1  |    *|  * *][     |  7  |    *]
+[     |     |  *  ][     |  *  |  *  ][  * *|     |  * *]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|     |    *][  * *|     |    *][  * *|     |     ]
+[    *|  1  |    *][    *|  9  |    *][     |  4  |  5  ]
+[  *  |     |* *  ][  *  |     |* *  ][  *  |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |    *|    *][  * *|  *  |    *][     |  * *|  * *]
+[  9  |  *  |  * *][* * *|*   *|* * *][  1  |     |    *]
+[     |     |* *  ][  *  |* *  |* *  ][     |     |  *  ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+Left to solve:   50
+Notes remaining: 178
+[NS](0) {}
+[HS](0) {}
+[NP](0) {}
+[LC](0) {}
+[HP](0) {}
+[XW](1) {{{[5, 5],[9, 8]}#2[^r]}}
+[SC](0) {}
+[YW](0) {}
+[XY](0) {}
+```
+This indicates there is one X-Wing structure in the board, with top-left and bottom-right corners as cells at row 5, column 5 and row 9, column 8 respectively, for candidate value 2.
+
+As can be observed, cells at `[5, 5]` and `[9, 5]` are candidates for value 2, and no other cell in column 5 is. Similarly, cells at `[5, 8]` and `[9, 8]` are candidates for value 2 and no other cell in column 8 is. Additionally, cells at `[5, 2]`, `[5, 3]`, `[5, 7]`, `[5, 9]`, `[9, 4]` and `[9, 9]` are all additional candidates for value 2 and, per the heuristic, can be eliminated.
+
+When executing on this heuristic, the solver takes the following set of actions:
+```
+λ >
+Step #3:
+[XW] [5, 2] x2 [r]
+[XW] [5, 3] x2 [r]
+[XW] [5, 7] x2 [r]
+[XW] [5, 9] x2 [r]
+[XW] [9, 4] x2 [r]
+[XW] [9, 9] x2 [r]
+```
 
 ## Simple Coloring
 
