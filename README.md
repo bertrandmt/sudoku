@@ -313,7 +313,135 @@ Step #3:
 
 ## Simple Coloring
 
-TODO
+Per the Sudoku Wiki's [explainer page](https://www.sudokuwiki.org/Simple_Colouring) on Simple Coloring, this is a chaining strategy. For a given candidate value, we are building a graph of candidate cells for this value, linked by 'bi-location' links, and sporting alternate 'green' and 'red' colors.
+
+A 'bi-location' link is a link between a candidate for a given value and another candidate for the same value in the same row, column or nonet, *if* there are no additional candidate for the same value in the same row, column or nonet.
+
+The resulting graph is a "color chain".
+
+Action is by applying two rules:
+* Rule 2 - for a given color chain, if any row, column or nonet has the same color twice, all candidates which share that color in the chain can be eliminated.
+* Rule 4 - for a given color chain, if a candidate for the value that it *not* on the chain can see two colors on the chain, then it can be eliminated.
+
+For example:
+```
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][*    |     |*    ][     |     |     ]
+[  2  |  8  |  9  ][*   *|*   *|*    ][  3  |  7  |  5  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[  3  |  6  |  4  ][  *  |  9  |  *  ][  8  |  1  |  2  ]
+[     |     |     ][*    |     |*    ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[  5  |  1  |  7  ][  2  |  8  |  3  ][  9  |  6  |  4  ]
+[     |     |     ][     |     |     ][     |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][     |     |     ][     |     |     ]
+[  8  |  9  |  3  ][* *  |  2  |* *  ][  6  |* *  |  1  ]
+[     |     |     ][*    |     |*    ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[  1  |  4  |  5  ][  8  |  3  |  6  ][  7  |  2  |  9  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][*    |     |*    ][     |     |     ]
+[  7  |  2  |  6  ][     |* *  |     ][* *  |  8  |  3  ]
+[     |     |     ][    *|     |    *][     |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][     |     |     ][     |     |     ]
+[  4  |  5  |  1  ][  3  |  7  |  8  ][  2  |  9  |  6  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[    *|  7  |  2  ][* * *|  1  |* *  ][* *  |  3  |  8  ]
+[    *|     |     ][    *|     |    *][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[    *|  3  |  8  ][* * *|* * *|  2  ][  1  |* *  |  7  ]
+[    *|     |     ][    *|     |     ][     |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+Left to solve:   20
+Notes remaining: 49
+[NS](0) {}
+[HS](0) {}
+[NP](0) {}
+[LC](0) {}
+[HP](0) {}
+[XW](0) {}
+[SC](1) {{{[4, 8]🟩,[9, 8]🟥,[8, 7]🟩,[6, 5]🟩,[6, 7]🟥}#4}}
+[YW](0) {}
+[XY](0) {}
+```
+This indicates there is a simple color chain for candidate value 4, running via `[4, 8]`, `[9, 8]`, `[8, 7]`, `[6, 7]` and `[6, 5]`.
+
+Per "Rule 4", `[9, 5]` sees both red `[9, 8]` and green `[6, 5]` and therefore cannot be a candidate for value 4:
+```
+[SC] [9, 5] x4 [👀🟩🟥]
+```
+Later, a different chain for candidate value 5 is found, running through `[4, 8]`, `[9, 8]`, `[8, 7]`, `[6, 7]`, `[6, 5]` and `[9, 5]`:
+```
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][*    |     |*    ][     |     |     ]
+[  2  |  8  |  9  ][    *|*   *|*    ][  3  |  7  |  5  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[  3  |  6  |  4  ][  *  |  9  |  *  ][  8  |  1  |  2  ]
+[     |     |     ][*    |     |*    ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[  5  |  1  |  7  ][  2  |  8  |  3  ][  9  |  6  |  4  ]
+[     |     |     ][     |     |     ][     |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][     |     |     ][     |     |     ]
+[  8  |  9  |  3  ][* *  |  2  |* *  ][  6  |* *  |  1  ]
+[     |     |     ][*    |     |*    ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[  1  |  4  |  5  ][  8  |  3  |  6  ][  7  |  2  |  9  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][*    |     |*    ][     |     |     ]
+[  7  |  2  |  6  ][     |* *  |     ][* *  |  8  |  3  ]
+[     |     |     ][    *|     |    *][     |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][     |     |     ][     |     |     ]
+[  4  |  5  |  1  ][  3  |  7  |  8  ][  2  |  9  |  6  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[    *|  7  |  2  ][* * *|  1  |* *  ][* *  |  3  |  8  ]
+[    *|     |     ][    *|     |    *][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[    *|  3  |  8  ][* * *|  * *|  2  ][  1  |* *  |  7  ]
+[    *|     |     ][    *|     |     ][     |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+Left to solve:   20
+Notes remaining: 47
+[NS](0) {}
+[HS](0) {}
+[NP](0) {}
+[LC](0) {}
+[HP](0) {}
+[XW](0) {}
+[SC](1) {{{[4, 8]🟩,[9, 8]🟥,[8, 7]🟩,[6, 5]🟩,[6, 7]🟥,[9, 5]🟥}#5}}
+[YW](0) {}
+[XY](0) {}
+```
+However, `[9, 5]` is colored red, but sees `[9, 8]` also colored red. Per "Rule 2", all reds from the chain can be eliminated:
+```
+[SC] [9, 5] x5 [r🟥]
+[SC] [6, 7] x5 [r🟥]
+[SC] [9, 8] x5 [r🟥]
+```
+Additionally, "Rule 4" also applies, with `[8, 4]` and `[8, 6]` seeing both red at `[9, 5]` (same nonet) and green at `[8, 7]` (same row):
+```
+[SC] [8, 4] x5 [👀🟩🟥]
+[SC] [8, 6] x5 [👀🟩🟥]
+```
 
 ## Y-Wing
 

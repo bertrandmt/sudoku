@@ -171,7 +171,7 @@ bool Analyzer::find_color_chains() {
     //
     // The resulting graph is a "color chain".
     //
-    // Action is by applying tow rules:
+    // Action is by applying two rules:
     // Rule 2 - for a given color chain, if any row, column or nonet has the same color twice,
     //          all candidates which share that color in the chain can be eliminated.
     //
