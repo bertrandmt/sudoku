@@ -18,7 +18,6 @@ Form 1 is denoted by a `.` immediately following the `n` command. In this form, 
 For example:
 ```
 λ n.7.415...3 ......17. .526..... ..62...57 ......... .......32 ..3.4...6 615.3..2. 4.7....9.
-[...]
 +=====+=====+=====++=====+=====+=====++=====+=====+=====+
 [     |     |     ][     |     |  *  ][  *  |     |     ]
 [  7  |    *|  4  ][  1  |  5  |     ][    *|    *|  3  ]
@@ -68,7 +67,6 @@ Form 2 is denoted by a ';' immediately following the `n` command. In this form, 
 For example:
 ```
 λ n;116;127;174;181;235;354;387;396;446;464;485;532;541;573;655;682;738;756;765;817;842;868;883;944;957;963
-[...]
 +=====+=====+=====++=====+=====+=====++=====+=====+=====+
 [     |     |    *][    *|  * *|  *  ][     |     |  * *]
 [  6  |  7  |     ][  *  |     |     ][  4  |  1  |  *  ]
@@ -114,16 +112,19 @@ Just as in form 1, the table, as entered, is loaded, analyzed and displayed.
 
 # Solver
 
-Once a game is loaded, the solver can be made use of. It is stateful and at each state carries a "full" (as full as possible) analysis of the state of the game.
+Once a game is loaded, the solver can be made use of. It is stateful and at each state carries a partial analysis of the state of the game, stopping analysis when a heuristic finds actionable step(s).
 
-Four commands impact the state of the board:
+Five commands impact the state of the board:
 
 * `>` or `.` proceeds through one action in advancing the state of resolution.
 * `<` or `,` goes back one step
 * `r` runs as many actions as possible until full resolution or no remaining heuristic remains
+* `s` runs as many "simple" actions as possible. Simple actions include 'naked' and 'singles' heuristics
 * `!` resets the state of the board to its initial state (as entered with the `n` command)
 
-For each state, including the initial state from a new game, the number of remaining cells left to solve, as well as the total number of note candidates remaining are displayed. Additionally, the full set of possible next non-obvious moves (outside of row, column, nonet filtering of notes) is recorded after printing the board:
+Notes are updated (filtered out) on loading and after each action that sets a value.
+
+For each state, including the initial state from a new game, the full set of possible moves for the first heuristic that has such moves is recorded after printing the board:
 
 ```
 λ >

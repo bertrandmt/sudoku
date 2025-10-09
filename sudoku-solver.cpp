@@ -41,6 +41,7 @@ void help(void) {
               << "  'r'           run auto-solving until blocked (or done)" << std::endl
               << "  's'           run auto-solving using only 'naked' and 'singles' heuristics" << std::endl
               << "  'xrcv'        edit note at row 'r' and column 'c' and unset value 'v'" << std::endl
+              << "  '=rcv'        set cell at row 'r' and column 'c' to value 'v'" << std::endl
               << std::endl
               << "Other commands:" << std::endl
               << "  'p'           print the board in a compact format" << std::endl
