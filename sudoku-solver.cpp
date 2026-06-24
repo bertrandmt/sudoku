@@ -77,7 +77,7 @@ void help(void) {
               << std::endl
               << "Solver commands:" << std::endl
               << "  '>' or '.'    run one step of auto-solving" << std::endl
-              << "  '<' or ','    go back one auto-solveing step" << std::endl
+              << "  '<' or ','    go back one auto-solving step" << std::endl
               << "  '!'           reset the solver to its initial state" << std::endl
               << "  'r'           run auto-solving until blocked (or done)" << std::endl
               << "  's'           run auto-solving using only 'naked' and 'singles' heuristics" << std::endl
