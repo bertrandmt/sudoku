@@ -8,14 +8,28 @@ on:
 
 jobs:
   build:
-    name: Build (-Werror)
-    runs-on: ubuntu-latest
+    # Build with -Werror and run the correctness suite across multiple
+    # toolchains. gcc/libstdc++ on Linux is the baseline; clang adds front-end
+    # diversity; macOS exercises libc++ (the dev environment's standard library)
+    # and confirms '-ledit' still links there. This is the guard against the
+    # libstdc++-vs-libc++ portability fixes that have landed after the fact.
+    name: Build & test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false   # one toolchain failing must not mask the others
+      matrix:
+        include:
+          - { name: linux-gcc,   os: ubuntu-latest, cxx: g++,     install: "sudo apt-get update && sudo apt-get install -y libedit-dev" }
+          - { name: linux-clang, os: ubuntu-latest, cxx: clang++, install: "sudo apt-get update && sudo apt-get install -y libedit-dev" }
+          - { name: macos-clang, os: macos-latest,  cxx: clang++, install: "true" }   # libedit ships with macOS
     steps:
       - uses: actions/checkout@v5
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y libedit-dev
+        run: ${{ matrix.install }}
       - name: Build
-        run: make
+        run: make CXX=${{ matrix.cxx }}
+      - name: Run black-box correctness tests
+        run: ./tests/run.sh
 
   sanitize:
     name: Sanitizer build + input smoke test
