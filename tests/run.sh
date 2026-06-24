@@ -267,12 +267,24 @@ board_after() { # $1 = full output, $2 = marker -> board grid printed just befor
         /^\[.*\|/ { buf = buf $0 "\n" }'
 }
 
-# Determinism: the same puzzle solved twice yields byte-identical output. (The
-# analyzers use unordered_set; this guards against iteration-order leaking out.)
-d1="$(printf 'n.%s\nr\n' "$P_med" | run_solver 2>&1)"
-d2="$(printf 'n.%s\nr\n' "$P_med" | run_solver 2>&1)"
-if [ "$d1" = "$d2" ]; then ok "determinism: identical output across two runs"
-else bad "determinism: output differed between runs"; fi
+# Determinism: the same puzzle solved twice yields byte-identical output. Within
+# one build this rarely trips -- unordered_set/map iteration is a function of
+# hashes and bucket count, not addresses -- so it only catches genuinely
+# incidental nondeterminism (hashing a pointer, an uninitialized read, a stray
+# RNG/clock). The property that really matters, "results don't depend on
+# iteration order", is the cross-*implementation* one, and the CI matrix already
+# proves it for free: libstdc++ and libc++ iterate unordered containers in
+# different orders, so tiers [6]/[7] passing on both the gcc and clang legs IS
+# that test -- no need to reproduce it here. We run two puzzles because P_med
+# uses only basic techniques; P_adv exercises simple coloring, whose
+# unordered_map<Coord,bool> is the one spot where order could plausibly leak.
+for name in med adv; do
+    pvar="P_$name"
+    d1="$(printf 'n.%s\nr\n' "${!pvar}" | run_solver 2>&1)"
+    d2="$(printf 'n.%s\nr\n' "${!pvar}" | run_solver 2>&1)"
+    if [ "$d1" = "$d2" ]; then ok "determinism ($name): identical output across two runs"
+    else bad "determinism ($name): output differed between runs"; fi
+done
 
 # Undo: step forward twice, then back twice; each step back must reproduce the
 # earlier board exactly. A marker after every command isolates one board each.
