@@ -26,6 +26,16 @@ public:
         , mXYChains(other.mXYChains)
         , mBoard(board) { }
 
+    // The only sanctioned way to copy an Analyzer is the rebinding constructor
+    // above, which re-seats mBoard onto the *new* board. The implicit copy ctor
+    // would instead copy the reference, leaving the analyzer pointing at the
+    // source board -- a latent dangling reference once that board dies. Delete
+    // it (which also suppresses the implicit move ctor) so any accidental copy,
+    // e.g. a =default'd SolverState, fails to compile rather than silently
+    // aliasing the wrong board.
+    Analyzer(const Analyzer &) = delete;
+    Analyzer &operator=(const Analyzer &) = delete;
+
     void analyze();
 
     bool act(const bool singles_only);
