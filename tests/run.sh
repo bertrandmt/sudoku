@@ -66,7 +66,7 @@ extract_grids() { tr -d ' ' | grep -E '^[1-9.]{81}$'; }
 P_easy="53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79"
 S_easy="534678912672195348198342567859761423426853791713924856961537284287419635345286179"
 
-P_med="300000000970010000600583000200000900500621003008000005000435002000090056000000001"
+P_med="3........97..1....6..583...2.....9..5..621..3..8.....5...435..2....9..56........1"
 S_med="381976524975214638642583179264358917597621483138749265816435792423197856759862341"
 
 P_clm="1.....569492.561.8.561.924...964.8.1.64.1....218.356.4.4.5...169.5.614.2621.....5"
@@ -86,8 +86,18 @@ S_adv="1973426852658194374837562196312958748591743267426389519185637425264871933
 # before finishing -- but it is a valid soundness oracle for the steps the solver
 # *does* take, which is what lets tier [2] check the Swordfish step never drops a
 # true candidate.
-P_hard="100400006046091200002000000300000040000208000060000005000000900008750120700003004"
+P_hard="1..4....6.46.912....2......3......4....2.8....6......5......9....875.12.7....3..4"
 S_hard="179482536546391278832675419381569742957248361264137895413826957698754123725913684"
+
+# A puzzle that BOTH exercises Swordfish AND runs to a full solution -- the case
+# P_hard cannot cover, since it stalls before finishing. The solver applies a
+# row-based Swordfish on value 8 (5 eliminations) on the way to completing the
+# grid. S_sf (independently brute-forced) is the puzzle's unique completion, so
+# this fixture pulls double duty: tier [1] proves a Swordfish elimination can
+# sit on the critical path of a puzzle that finishes correctly, and the tier [3]
+# check_tech below proves Swordfish actually fires on that path.
+P_sf="5...1...3..6..3..2..32.......23...76....5....19...75.......94..2..8..6..9...4...5"
+S_sf="529418763716593842843276159452381976637954218198627534385169427274835691961742385"
 
 echo "[0] Fixture sanity: puzzles and solutions are well-formed before they gate the solver"
 # A typo in a fixture would make a *correct* solver look broken, or mask a real
@@ -147,7 +157,7 @@ fixture_ok() { # $1 = name, $2 = puzzle, $3 = solution
     why="$(consistent "$2" "$3")";    if [ -n "$why" ]; then bad "$1: solution contradicts a puzzle clue" "$why"; return; fi
     ok "$1: puzzle and solution are well-formed and consistent"
 }
-for name in easy med clm adv; do
+for name in easy med clm adv sf; do
     pvar="P_$name"; svar="S_$name"
     fixture_ok "$name" "${!pvar}" "${!svar}"
 done
@@ -158,7 +168,7 @@ done
 fixture_ok "hard" "$P_hard" "$S_hard"
 
 echo "[1] Full-solve correctness"
-for name in easy med clm adv; do
+for name in easy med clm adv sf; do
     pvar="P_$name"; svar="S_$name"
     out="$(printf 'n.%s\nr\np\n' "${!pvar}" | run_solver 2>&1)"
     got="$(printf '%s' "$out" | extract_grids | tail -1)"
@@ -218,11 +228,11 @@ elim_check() { # $1 = name, $2 = puzzle, $3 = solution
     else                           ok  "$1: every candidate grid still lists the solution's digits"
     fi
 }
-for name in easy med clm adv; do
+for name in easy med clm adv sf; do
     pvar="P_$name"; svar="S_$name"
     elim_check "$name" "${!pvar}" "${!svar}"
 done
-# P_hard is the only fixture that exercises Swordfish; its solve trace stops
+# P_hard exercises Swordfish but its solve trace stops
 # short of a full solution but every step it takes (the Swordfish step included)
 # must still be sound. Checked against the independently-computed S_hard.
 elim_check "hard" "$P_hard" "$S_hard"
@@ -243,6 +253,8 @@ check_tech "$vout_hard" XW "X-Wing"
 check_tech "$vout_hard" NP "Naked Pair"
 check_tech "$vout_hard" LC "Locked Candidates"
 check_tech "$vout_hard" SF "Swordfish"
+vout_sf="$(printf 'v\nn.%s\nr\n' "$P_sf" | run_solver 2>&1)"
+check_tech "$vout_sf" SF "Swordfish (full-solve fixture)"
 vout_adv="$(printf 'v\nn.%s\nr\n' "$P_adv" | run_solver 2>&1)"
 check_tech "$vout_adv" SC "Simple Coloring"
 check_tech "$vout_adv" YW "Y-Wing"
