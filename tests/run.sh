@@ -430,6 +430,67 @@ prec_check "y-wing"            YW "$P_yw1" "[YW] [1, 5] x9
 prec_check "xy-chain"          XY "$P_xy2" "[XY] [5, 5] x2 ({[5, 8]:..:[6, 4]}#2)
 [XY] [6, 7] x2 ({[5, 8]:..:[6, 4]}#2)"
 
+echo "[8] Editing and singles-only commands: =, x and s"
+# Tiers [1]-[7] never exercise the interactive editing commands ('=' set a
+# value, 'x' strike a candidate) or singles-only solving ('s'). Coverage showed
+# those paths -- Solver::set_value / edit_note / solve_singles, and the
+# singles_only=true branch of Analyzer::act -- entirely dark. These drive them
+# through the same black-box REPL a user has.
+
+# --- '=' sets an empty cell, and refuses to overwrite an existing value ---
+# In P_med, cell (1,2) is empty and its solution digit is 8; cell (1,1) is the
+# given clue 3. Setting the empty cell must take; overwriting the clue must not.
+# extract_grids|tail -1 yields the 81-char 'p' grid, so character N (0-based) is
+# cell N: index 0 is (1,1), index 1 is (1,2).
+g_set="$(printf 'n.%s\n=128\np\n' "$P_med" | run_solver 2>&1 | extract_grids | tail -1)"
+if   [ "${g_set:0:1}" != 3 ]; then bad "= : setting a cell disturbed an unrelated clue" "cell (1,1) is '${g_set:0:1}', expected 3"
+elif [ "${g_set:1:1}" = 8 ];  then ok  "= : sets an empty cell to the requested value"
+else bad "= : did not set the requested value" "cell (1,2) is '${g_set:1:1}', expected 8"
+fi
+g_rej="$(printf 'n.%s\n=128\n=119\np\n' "$P_med" | run_solver 2>&1 | extract_grids | tail -1)"
+if [ "$g_rej" = "$g_set" ]; then ok  "= : refuses to overwrite an already-set cell (board unchanged)"
+else bad "= : overwriting an existing value changed the board" "before: $g_set  after: $g_rej"; fi
+
+# --- 'x' strikes exactly one candidate, and undo restores it ---
+# Read the field of a cell from a c-dump. dump is 0-based (0=initial, 1=after
+# the strike, 2=after undo); a ~line is "~ <c1> <c2> ... <c9>", so column c is
+# field $(c+1). Three c-dumps are emitted, 9 rows each, hence NR = dump*9 + row.
+cell_field() { # $1=output $2=dump $3=row $4=col
+    printf '%s' "$1" | grep '^~' | awk -v d="$2" -v r="$3" -v c="$4" 'NR == d*9 + r { print $(c+1) }'
+}
+xout="$(printf 'n.%s\nc\nx124\nc\n<\nc\n' "$P_med" | run_solver 2>&1)"
+xf0="$(cell_field "$xout" 0 1 2)"   # before: candidates of cell (1,2)
+xf1="$(cell_field "$xout" 1 1 2)"   # after striking candidate 4
+xf2="$(cell_field "$xout" 2 1 2)"   # after one undo
+# Derive the expectation from the observed before-state (xf0 with '4' deleted)
+# rather than hard-coding the candidate set, so this checks the one property
+# that matters: 'x' removes exactly the named candidate, no more, and undo is
+# its exact inverse.
+case "$xf0" in
+    *4*) if   [ "$xf1" != "${xf0//4/}" ]; then bad "x : strike did not remove exactly candidate 4" "before {$xf0} after {$xf1}"
+         elif [ "$xf2" != "$xf0" ];       then bad "x : undo did not restore the struck candidate" "before {$xf0} restored {$xf2}"
+         else ok "x : strikes exactly the named candidate and undo restores it"; fi ;;
+    *)   bad "x : test setup -- candidate 4 not present in cell (1,2)" "field was {$xf0}" ;;
+esac
+
+# --- 's' solves with singles only, and is genuinely restricted ---
+# P_easy is solvable by naked/hidden singles alone; P_adv needs the advanced
+# techniques. So 's' must finish P_easy but stall on P_adv, while 'r' finishes
+# P_adv -- that contrast is what proves singles_only actually narrows the search
+# (rather than 's' just being an alias for a full solve).
+if printf 'n.%s\ns\n' "$P_easy" | run_solver 2>&1 | grep -q 'SOLVED!'; then
+    ok "s : singles-only solving completes a singles-only puzzle"
+else
+    bad "s : failed to solve a singles-only puzzle"
+fi
+if printf 'n.%s\ns\n' "$P_adv" | run_solver 2>&1 | grep -q 'SOLVED!'; then
+    bad "s : solved an advanced puzzle with singles only (singles_only not enforced)"
+elif printf 'n.%s\nr\n' "$P_adv" | run_solver 2>&1 | grep -q 'SOLVED!'; then
+    ok "s : stalls where singles are insufficient, yet 'r' solves the same puzzle"
+else
+    bad "s : 'r' unexpectedly failed to solve the advanced puzzle"
+fi
+
 echo
 echo "----------------------------------------"
 printf 'passed: %d   failed: %d\n' "$pass" "$fail"
