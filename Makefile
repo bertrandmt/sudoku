@@ -13,9 +13,6 @@ LDLIBS = -ledit
 
 src = coord.cpp \
 	  cell.cpp \
-	  row.cpp \
-	  column.cpp \
-	  nonet.cpp \
 	  board.cpp \
 	  analyzer.cpp \
 	  analyzer-nakedsingles.cpp \

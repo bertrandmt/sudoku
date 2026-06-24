@@ -77,18 +77,18 @@ public:
         return mCoord == other.mCoord;
     }
 
-    friend std::ostream& operator<< (std::ostream& outs, const Cell &);
+    // Render one of the three display lines (row 0..2) of this cell's 3x3
+    // candidate grid into outs. The caller drives the three lines in sequence;
+    // keeping the line index a parameter (rather than internal state) makes the
+    // cell const-correct and the rendering reentrant.
+    void print_row(std::ostream &outs, size_t row) const;
+
 private:
     const Coord mCoord;
 
     Value mValue;
     Notes mNotes;
-
-    // horrible hack for operator<< and multiline representation
-    mutable size_t mPass = 0;
 };
-
-std::ostream& operator<< (std::ostream& outs, const Cell &);
 
 template<>
 struct std::hash<Cell> {

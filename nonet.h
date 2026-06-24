@@ -42,6 +42,7 @@ public:
             , mIndex(index) { }
 
         reference operator*() const { return pCells->at(mIndex.row() * mWidth + mIndex.column()); }
+        pointer operator->() const { return &**this; }
 
         Iterator& operator++() {
             size_t row = mIndex.row();
@@ -85,8 +86,6 @@ public:
     bool contains(const Cell &other) const {
         return std::find(begin(), end(), other) != end();
     }
-
-    friend std::ostream& operator<< (std::ostream& outs, const Nonet &);
 
 private:
     static_assert(std::forward_iterator<Iterator>);

@@ -314,7 +314,9 @@ std::ostream& operator<<(std::ostream& outs, const Board &b) {
         for (auto l = 0; l < 3; l++) {
             for (size_t j = 0; j < b.width; j++) {
                 const Cell &c = b.at(i, j);
-                outs << (j % 3 == 0 ? "[" : "|") << c << (j % 3 == 2 ? "]" : "");
+                outs << (j % 3 == 0 ? "[" : "|");
+                c.print_row(outs, l);
+                if (j % 3 == 2) outs << "]";
             }
             outs << std::endl;
         }

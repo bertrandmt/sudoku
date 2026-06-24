@@ -42,45 +42,24 @@ std::vector<Value> Notes::values() const {
     return v;
 }
 
-std::ostream& operator<< (std::ostream& outs, const Cell &c) {
-    assert(c.mPass < 3);
-    switch (c.mPass) {
-    case 0:
-        if (c.isNote()) {
-            outs << (c.mNotes.check(kOne)   ? "* " : "  ")
-                 << (c.mNotes.check(kTwo)   ? "* " : "  ")
-                 << (c.mNotes.check(kThree) ? "*"  : " ");
-        }
-        else {
-            outs << "     ";
-        }
-        break;
-    case 1:
-        if (c.isNote()) {
-            outs << (c.mNotes.check(kFour) ? "* " : "  ")
-                 << (c.mNotes.check(kFive) ? "* " : "  ")
-                 << (c.mNotes.check(kSix)  ? "*"  : " ");
-        }
-        else {
-            outs << "  " << c.mValue << "  ";
-        }
-        break;
-    case 2:
-        if (c.isNote()) {
-            outs << (c.mNotes.check(kSeven) ? "* " : "  ")
-                 << (c.mNotes.check(kEight) ? "* " : "  ")
-                 << (c.mNotes.check(kNine)  ? "*"  : " ");
-        }
-        else {
-            outs << "     ";
-        }
-        break;
-    default:
-        assert(!"unreachable");
-        return outs;
+void Cell::print_row(std::ostream &outs, size_t row) const {
+    assert(row < 3);
+    if (isNote()) {
+        // Row 0 -> candidates 1,2,3; row 1 -> 4,5,6; row 2 -> 7,8,9. The first
+        // two positions are "* " or "  "; the last is "*" or " " (no trailing
+        // space), for a 5-character field.
+        const Value v1 = static_cast<Value>(row * 3 + 1);
+        const Value v2 = static_cast<Value>(row * 3 + 2);
+        const Value v3 = static_cast<Value>(row * 3 + 3);
+        outs << (mNotes.check(v1) ? "* " : "  ")
+             << (mNotes.check(v2) ? "* " : "  ")
+             << (mNotes.check(v3) ? "*"  : " ");
     }
-    c.mPass = (c.mPass + 1) % 3;
-    return outs;
+    else {
+        // A solved cell shows its value centered on the middle line only.
+        if (row == 1) outs << "  " << mValue << "  ";
+        else          outs << "     ";
+    }
 }
 
 size_t std::hash<Cell>::operator()(const Cell &cell) const noexcept {

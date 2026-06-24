@@ -82,8 +82,6 @@ public:
 
     size_t index() const { return mIndex; }
 
-    friend std::ostream& operator<< (std::ostream& outs, const Column&);
-
 private:
     static_assert(std::forward_iterator<Iterator>);
     Board &mBoard;
