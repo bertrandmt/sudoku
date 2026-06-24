@@ -94,35 +94,21 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libedit-dev gcovr
-      # '--coverage' (make coverage=1) instruments every translation unit; the
-      # test run below then writes the .gcda execution counts that gcovr reads.
-      - name: Build with coverage instrumentation
-        run: |
-          make clean
-          make coverage=1
-      - name: Run correctness tests (records coverage data)
-        run: ./tests/run.sh
-      # The whitebox unit tests share the same instrumented objects, so running
-      # them accumulates into the same .gcda counts -- without this the
-      # column-based Swordfish path reads as cold in the report.
-      - name: Run whitebox unit tests (records coverage data)
-        run: make coverage=1 unit
-      # This job is a *signal*, not a gate: it reports which lines and branches
-      # the test corpus exercises so cold analyzer paths (detected/untested vs.
-      # dead) are visible, but it does not fail on a coverage threshold. The
-      # per-file table and an HTML drill-down are uploaded as an artifact.
-      - name: Report coverage
-        run: |
-          gcovr --root . --exclude tests --print-summary --txt -o coverage.txt
-          gcovr --root . --exclude tests --html --html-details -o coverage.html
-          echo '===== per-file line / branch coverage ====='
-          cat coverage.txt
+      # 'make coverage' instruments every translation unit (make coverage=1),
+      # exercises both the black-box and whitebox suites to accumulate .gcda
+      # execution counts -- the whitebox run is what keeps the column-based
+      # Swordfish path from reading as cold -- then has gcovr render the report
+      # into build/. This is a *signal*, not a gate: it reports which lines and
+      # branches the corpus exercises so cold analyzer paths (detected/untested
+      # vs. dead) are visible, but it does not fail on a coverage threshold.
+      - name: Build, test and report coverage
+        run: make coverage
       - name: Upload coverage report
         if: always()   # publish the report even if a prior step failed
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: |
-            coverage.txt
-            coverage*.html
-            coverage*.css
+            build/coverage.txt
+            build/coverage*.html
+            build/coverage*.css

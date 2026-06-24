@@ -43,6 +43,7 @@ coverage*.html
 coverage*.css
 
 # project specific files
+build/
 sudoku-solver
 tests/unit/test_analyzer
 *.dSYM/

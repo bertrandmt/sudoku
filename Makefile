@@ -8,7 +8,7 @@ CPPFLAGS = -std=c++2a -Wall -Wsign-compare -Werror -Werror=return-type -MMD -MP
 # '--coverage' to both compile and link, so it takes precedence over debug=1.
 # Both gcc and clang emit gcov-format .gcno/.gcda data from '--coverage', so a
 # single flag covers either toolchain; gcovr reads the result. See the
-# 'coverage' CI job and README for how to produce a report.
+# 'coverage' target/CI job and README for how to produce a report.
 ifeq ($(coverage),1)
 CPPFLAGS += -O0 -g --coverage
 LDFLAGS += --coverage
@@ -20,6 +20,13 @@ endif
 
 CC = $(CXX)
 LDLIBS = -ledit
+
+# All intermediate artifacts (.o, the auto-generated .d dep files, and the
+# .gcno/.gcda coverage data emitted alongside each object) land under build/ so
+# the repo root holds only sources. The binary itself stays at the root: it is
+# the documented entry point ('./sudoku-solver') that tests/run.sh and the docs
+# invoke. build/ is gitignored wholesale.
+BUILD = build
 
 src = coord.cpp \
 	  cell.cpp \
@@ -38,9 +45,20 @@ src = coord.cpp \
 	  solverstate.cpp \
 	  solver.cpp
 
-obj = sudoku-solver.o $(src:%.cpp=%.o)
+obj = $(addprefix $(BUILD)/,sudoku-solver.o $(src:.cpp=.o))
 
 sudoku-solver: $(obj)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
+# Compile each .cpp into build/. The order-only prerequisite on the directory
+# (after the '|') creates build/ without making every object depend on its
+# mtime. -MMD writes build/<name>.d next to the object; because -o names the
+# full build/ path, the dependency rule it emits targets that same path.
+$(BUILD)/%.o: %.cpp | $(BUILD)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD):
+	mkdir -p $(BUILD)
 
 .PHONY: test
 test: sudoku-solver
@@ -50,7 +68,7 @@ test: sudoku-solver
 # REPL's main, sudoku-solver.o) plus the test's own main, and reach the
 # Analyzer's private members through the AnalyzerTest friend. The test source
 # lives under tests/unit, so it needs -I. to find the project headers.
-lib_obj = $(src:%.cpp=%.o)
+lib_obj = $(addprefix $(BUILD)/,$(src:.cpp=.o))
 unit_bin = tests/unit/test_analyzer
 
 .PHONY: unit
@@ -60,11 +78,27 @@ unit: $(unit_bin)
 $(unit_bin): tests/unit/test_analyzer.cpp $(lib_obj)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I. $^ $(LDFLAGS) -o $@
 
+# One-shot coverage report. Rebuilds instrumented from clean, exercises both
+# test suites to accumulate .gcda counts, then has gcovr render the report.
+# gcovr runs gcov in its own scratch directory, so no stray .gcov files land in
+# the repo root; every output (objects, data, and the report) stays in build/.
+# This is the local equivalent of the 'coverage' CI job. Requires gcovr.
+.PHONY: coverage
+coverage:
+	$(MAKE) clean
+	$(MAKE) coverage=1 sudoku-solver
+	./tests/run.sh
+	$(MAKE) coverage=1 unit
+	gcovr --root . --exclude tests --print-summary --txt -o $(BUILD)/coverage.txt
+	gcovr --root . --exclude tests --html --html-details -o $(BUILD)/coverage.html
+	@echo "report: $(BUILD)/coverage.txt and $(BUILD)/coverage.html"
+
 .PHONY: clean
 clean:
-	rm -f $(obj) $(obj:.o=.d) $(obj:.o=.gcno) $(obj:.o=.gcda) sudoku-solver
-	rm -f $(unit_bin) $(lib_obj:.o=.gcno) $(lib_obj:.o=.gcda)
-	rm -rf coverage.txt coverage*.html coverage*.css
+	rm -rf $(BUILD) sudoku-solver
+	rm -f $(unit_bin) $(unit_bin).d
+	rm -f tests/unit/*.gcno tests/unit/*.gcda
+	rm -rf tests/unit/*.dSYM
 
 # Header dependencies are generated automatically by the compiler: -MMD writes a
 # '.d' file of #include prerequisites alongside each '.o', and -MP adds phony

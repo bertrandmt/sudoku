@@ -576,6 +576,11 @@ make test         # build, then run the black-box correctness suite
 make clean        # remove build and coverage artifacts
 ```
 
+Intermediate artifacts (object files, the auto-generated header-dependency
+files, and coverage data) are written under `build/`, so the repo root holds
+only sources. The `./sudoku-solver` binary itself is left at the root, where the
+tests and the examples above expect it.
+
 The correctness suite lives in `tests/run.sh` and drives the compiled binary
 through its REPL. CI additionally builds across gcc, clang and macOS/libc++ and
 runs an ASan/UBSan build against adversarial input.
@@ -584,7 +589,16 @@ runs an ASan/UBSan build against adversarial input.
 
 `make coverage=1` produces an instrumented build; running the suite against it
 records which lines and branches the tests actually exercise. With
-[`gcovr`](https://gcovr.com/) installed:
+[`gcovr`](https://gcovr.com/) installed, `make coverage` does the whole flow,
+rebuilding instrumented, running both test suites, and writing the report into
+`build/`:
+
+```sh
+make coverage                       # -> build/coverage.txt and build/coverage.html
+```
+
+gcovr runs `gcov` in its own scratch directory, so no stray `.gcov` files land
+in the repo root. The underlying steps, if you want to run them by hand:
 
 ```sh
 make clean && make coverage=1
