@@ -176,6 +176,33 @@ void Board::print(std::ostream &out) const {
     out << std::endl;
 }
 
+// Machine-readable candidate dump, one logical row per line. Each line is the
+// sentinel '~' followed by 9 whitespace-separated fields, one per cell in
+// column order. A solved cell's field is its digit; a note cell's field is the
+// concatenation of its remaining candidate digits (1-9, ascending). The
+// sentinel keeps these lines distinct from the ASCII board, the 'p' grid, and
+// the analyzer summary, so test harnesses can grep them unambiguously. A cell
+// with no candidates left (a contradiction) prints an empty field as '-'.
+void Board::print_candidates(std::ostream &out) const {
+    for (size_t row = 0; row < height; row++) {
+        out << '~';
+        for (size_t col = 0; col < width; col++) {
+            const Cell &c = at(row, col);
+            out << ' ';
+            if (c.isValue()) {
+                out << c.value();
+            } else {
+                bool any = false;
+                for (Value v : value_range(kOne, kUnset)) {
+                    if (c.check(v)) { out << static_cast<int>(v); any = true; }
+                }
+                if (!any) out << '-';
+            }
+        }
+        out << std::endl;
+    }
+}
+
 bool Board::clear_note_at(size_t row, size_t col, const Value &value) {
     return clear_note_at(Coord(row, col), value);
 }

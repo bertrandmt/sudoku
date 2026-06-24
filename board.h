@@ -37,6 +37,7 @@ public:
     static const size_t height = 9;
 
     void print(std::ostream &out) const;
+    void print_candidates(std::ostream &out) const;
 
     bool clear_note_at(const Coord &, const Value &);
     bool clear_note_at(size_t row, size_t col, const Value &);

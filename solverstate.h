@@ -35,6 +35,9 @@ public:
     void print(std::ostream &outs) const {
         mBoard.print(outs);
     }
+    void print_candidates(std::ostream &outs) const {
+        mBoard.print_candidates(outs);
+    }
     friend std::ostream &operator<<(std::ostream &, const SolverState &);
 
 private:

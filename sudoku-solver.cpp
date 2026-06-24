@@ -86,6 +86,7 @@ void help(void) {
               << std::endl
               << "Other commands:" << std::endl
               << "  'p'           print the board in a compact format" << std::endl
+              << "  'c'           print per-cell candidates (machine-readable)" << std::endl
               << "  'v'           toggle verbosity for board analysis" << std::endl
               << std::endl;
 }
@@ -173,6 +174,12 @@ bool routine(Solver::ptr &solver) {
         case 'P': // print the board in . notation
             if (!solver) { help(); break; }
             solver->print_current_state(std::cout);
+            break;
+
+        case 'c':
+        case 'C': // print per-cell candidates in a machine-readable form
+            if (!solver) { help(); break; }
+            solver->print_candidates(std::cout);
             break;
 
         case 'v':

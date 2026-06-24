@@ -27,6 +27,11 @@ public:
             mStates.back()->print(outs);
         }
     }
+    void print_candidates(std::ostream &outs) const {
+        if (!mStates.empty()) {
+            mStates.back()->print_candidates(outs);
+        }
+    }
 
     bool solved() const { return mStates.back()->solved(); }
 

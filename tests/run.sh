@@ -182,6 +182,51 @@ else
     bad "reset: '!' did not restore the initial board"
 fi
 
+echo "[6] Elimination soundness: no step ever removes a true candidate"
+# Tier [2] proves placed *values* are never wrong. This proves the dual, and
+# stronger, property: no *elimination* ever strikes a cell's true candidate.
+# An over-elimination usually does not produce a wrong final grid -- it stalls
+# the puzzle into '???' -- so tier [2] would not catch it; here we do, at the
+# step that causes it. Step one technique at a time, dumping the machine-
+# readable candidate grid ('c') after each step, and require every cell to keep
+# listing its solution digit throughout. The single check "solution digit is
+# present in the cell's field" simultaneously catches wrong placements (the
+# placed digit replaces the field, so a wrong placement drops the true digit)
+# and over-eliminations. Runs on every fixture with a known solution, so the
+# advanced analyzers (SC/YW/XY via adv; LC/NP via clm) are all exercised.
+elim_check() { # $1 = name, $2 = puzzle, $3 = solution
+    local input="n.$2"$'\n'
+    local _
+    for _ in $(seq 200); do input+=$'.\nc\n'; done
+    local out; out="$(printf '%s' "$input" | "$SOLVER" 2>&1)"
+    # Each '~' line is one logical row of the candidate grid; the solver emits
+    # rows 0-8 per snapshot, so the row index is just (line number - 1) % 9.
+    # Field $1 is the '~' sentinel; $2..$10 are the nine cells of that row.
+    local violation
+    violation="$(printf '%s' "$out" | grep '^~' | awk -v s="$3" '
+        { r = (NR - 1) % 9
+          for (c = 0; c < 9; c++) {
+              field = $(c + 2)
+              d = substr(s, r * 9 + c + 1, 1)
+              if (index(field, d) == 0) {
+                  printf "cell (%d,%d): solution %s gone, field {%s}", r+1, c+1, d, field
+                  exit
+              }
+          }
+        }')"
+    if [ -z "$(printf '%s' "$out" | grep '^~')" ]; then
+        bad "$1: produced no candidate grids to check"
+    elif [ -n "$violation" ]; then
+        bad "$1: an unsound step removed a true candidate" "$violation"
+    else
+        ok "$1: every candidate grid still lists the solution's digits"
+    fi
+}
+for name in easy med clm adv; do
+    pvar="P_$name"; svar="S_$name"
+    elim_check "$name" "${!pvar}" "${!svar}"
+done
+
 echo
 echo "----------------------------------------"
 printf 'passed: %d   failed: %d\n' "$pass" "$fail"

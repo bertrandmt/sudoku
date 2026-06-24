@@ -563,4 +563,6 @@ It must be noted that manual edition of the board has the potential of rendering
 
 The command `p` prints the current state of the board in `.` notation (see [Form 1](#form-1) above).
 
+The command `c` prints the per-cell candidates in a machine-readable form: one logical row per line, each prefixed with a `~` sentinel and followed by nine whitespace-separated fields (one per cell, left to right). A solved cell's field is its digit; a note cell's field is the concatenation of its remaining candidate digits. This is primarily a hook for the test suite (it checks that no solving step ever eliminates a cell's true candidate), but it is also handy for scripting.
+
 The command `v` toggles verbosity of the analysis of the board state. By default, analysis is *not* verbose.
