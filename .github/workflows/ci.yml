@@ -15,6 +15,11 @@ jobs:
     # libstdc++-vs-libc++ portability fixes that have landed after the fact.
     name: Build & test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
+    # Backstop against a hang (e.g. an analyzer that loops forever): without it a
+    # stuck step burns to GitHub's 6-hour default and fails as an opaque cancel.
+    # run.sh also guards each solver call with `timeout` on Linux; this covers
+    # every step (build included) and the macOS leg where `timeout` is absent.
+    timeout-minutes: 10
     strategy:
       fail-fast: false   # one toolchain failing must not mask the others
       matrix:
@@ -34,6 +39,7 @@ jobs:
   sanitize:
     name: Sanitizer build + input smoke test
     runs-on: ubuntu-latest
+    timeout-minutes: 10   # same hang backstop as the build job
     steps:
       - uses: actions/checkout@v5
       - name: Install dependencies

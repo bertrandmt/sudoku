@@ -26,6 +26,24 @@ if [ ! -x "$SOLVER" ]; then
     exit 2
 fi
 
+# Wall-clock guard for every solver invocation. A bug that loops forever inside
+# a single step (a cycle in chain-building, say) would otherwise hang the whole
+# run -- bounded *input* does not bound time spent in one step. With a timeout
+# the hang turns into a truncated-output assertion failure in seconds instead.
+# 'timeout' is GNU coreutils; macOS ships it as 'gtimeout' if coreutils is
+# installed and otherwise lacks it, so degrade to a no-op there (the CI step's
+# timeout-minutes is the backstop on that leg). Override the budget with
+# SOLVER_TIMEOUT=<seconds>, or SOLVER_TIMEOUT=0 to disable.
+SOLVER_TIMEOUT="${SOLVER_TIMEOUT:-20}"
+if [ "$SOLVER_TIMEOUT" = 0 ]; then            RUN=""
+elif command -v timeout  >/dev/null 2>&1; then RUN="timeout $SOLVER_TIMEOUT"
+elif command -v gtimeout >/dev/null 2>&1; then RUN="gtimeout $SOLVER_TIMEOUT"
+else                                           RUN=""; fi
+# Run the solver under the guard. Used in a pipe (stdin and stdout flow through)
+# everywhere a test drives the binary; the bare "$SOLVER" stays only in the
+# existence check above.
+run_solver() { $RUN "$SOLVER" "$@"; }
+
 pass=0
 fail=0
 ok()  { pass=$((pass + 1)); printf '  ok    %s\n' "$1"; }
@@ -135,7 +153,7 @@ else                        ok  "hard: puzzle is well-formed"; fi
 echo "[1] Full-solve correctness"
 for name in easy med clm adv; do
     pvar="P_$name"; svar="S_$name"
-    out="$(printf 'n.%s\nr\np\n' "${!pvar}" | "$SOLVER" 2>&1)"
+    out="$(printf 'n.%s\nr\np\n' "${!pvar}" | run_solver 2>&1)"
     got="$(printf '%s' "$out" | extract_grids | tail -1)"
     if ! printf '%s' "$out" | grep -q 'SOLVED!'; then
         bad "$name: solver did not reach SOLVED!"
@@ -168,7 +186,7 @@ soundness_violation() { # $1 = puzzle, $2 = solution
     local input="n.$1"$'\n'
     local _
     for _ in $(seq 200); do input+=$'.\nc\n'; done
-    local out; out="$(printf '%s' "$input" | "$SOLVER" 2>&1)"
+    local out; out="$(printf '%s' "$input" | run_solver 2>&1)"
     if [ -z "$(printf '%s' "$out" | grep '^~')" ]; then echo "NO_GRIDS"; return; fi
     # Each '~' line is one logical row of the candidate grid; the solver emits
     # rows 0-8 per snapshot, so the row index is just (line number - 1) % 9.
@@ -209,11 +227,11 @@ check_tech() { # $1 = solver verbose output, $2 = tag, $3 = human name
         bad "$3 ($2): never applied (analyzer may be broken)"
     fi
 }
-vout_hard="$(printf 'v\nn.%s\nr\n' "$P_hard" | "$SOLVER" 2>&1)"
+vout_hard="$(printf 'v\nn.%s\nr\n' "$P_hard" | run_solver 2>&1)"
 check_tech "$vout_hard" XW "X-Wing"
 check_tech "$vout_hard" NP "Naked Pair"
 check_tech "$vout_hard" LC "Locked Candidates"
-vout_adv="$(printf 'v\nn.%s\nr\n' "$P_adv" | "$SOLVER" 2>&1)"
+vout_adv="$(printf 'v\nn.%s\nr\n' "$P_adv" | run_solver 2>&1)"
 check_tech "$vout_adv" SC "Simple Coloring"
 check_tech "$vout_adv" YW "Y-Wing"
 check_tech "$vout_adv" XY "XY-Chain"
@@ -223,7 +241,7 @@ echo "[4] Load-time error messages for bad input"
 # diagnostic text so the self-describing load errors cannot silently regress.
 # $1 = description, $2 = REPL line, $3 = expected substring (fixed string).
 expect_err() {
-    out="$(printf '%s\n' "$2" | "$SOLVER" 2>&1)"
+    out="$(printf '%s\n' "$2" | run_solver 2>&1)"
     if printf '%s' "$out" | grep -qF "$3"; then
         ok "$1"
     else
@@ -251,14 +269,14 @@ board_after() { # $1 = full output, $2 = marker -> board grid printed just befor
 
 # Determinism: the same puzzle solved twice yields byte-identical output. (The
 # analyzers use unordered_set; this guards against iteration-order leaking out.)
-d1="$(printf 'n.%s\nr\n' "$P_med" | "$SOLVER" 2>&1)"
-d2="$(printf 'n.%s\nr\n' "$P_med" | "$SOLVER" 2>&1)"
+d1="$(printf 'n.%s\nr\n' "$P_med" | run_solver 2>&1)"
+d2="$(printf 'n.%s\nr\n' "$P_med" | run_solver 2>&1)"
 if [ "$d1" = "$d2" ]; then ok "determinism: identical output across two runs"
 else bad "determinism: output differed between runs"; fi
 
 # Undo: step forward twice, then back twice; each step back must reproduce the
 # earlier board exactly. A marker after every command isolates one board each.
-u="$(printf 'n.%s\n#S0\n.\n#S1\n.\n#S2\n<\n#B1\n<\n#B0\n' "$P_med" | "$SOLVER" 2>&1)"
+u="$(printf 'n.%s\n#S0\n.\n#S1\n.\n#S2\n<\n#B1\n<\n#B0\n' "$P_med" | run_solver 2>&1)"
 us0="$(board_after "$u" S0)"; us1="$(board_after "$u" S1)"
 ub1="$(board_after "$u" B1)"; ub0="$(board_after "$u" B0)"
 if [ "$us0" = "$us1" ]; then bad "undo: forward steps did not change the board (test is vacuous)"
@@ -268,7 +286,7 @@ else ok "undo: stepping back reproduces prior board states"; fi
 
 # Reset: from a stepped position, '!' restores the initial board. The marker
 # right before '!' isolates the reset board from the intervening step boards.
-r="$(printf 'n.%s\n#R0\n.\n.\n#PRE\n!\n#RST\n' "$P_med" | "$SOLVER" 2>&1)"
+r="$(printf 'n.%s\n#R0\n.\n.\n#PRE\n!\n#RST\n' "$P_med" | run_solver 2>&1)"
 if [ "$(board_after "$r" RST)" = "$(board_after "$r" R0)" ]; then
     ok "reset: '!' restores the initial board"
 else
@@ -318,7 +336,7 @@ else
             printf '  skip  %s: malformed board in notes.txt (%s)\n' "$name" "$why"
             continue
         fi
-        out="$(printf 'n.%s\nr\np\n' "$board" | "$SOLVER" 2>&1)"
+        out="$(printf 'n.%s\nr\np\n' "$board" | run_solver 2>&1)"
         if [ "$solv" = N ]; then
             if printf '%s' "$out" | grep -q 'SOLVED!'; then
                 bad "$name: flagged unsolved in notes but the solver reports SOLVED"
@@ -371,7 +389,7 @@ first_app() { # stdin = verbose solve output; $1 = tag -> sorted elimination blo
 }
 prec_check() { # $1 = name, $2 = tag, $3 = board, $4 = expected sorted block
     local got
-    got="$(printf 'v\nn.%s\nr\n' "$3" | "$SOLVER" 2>&1 | first_app "$2")"
+    got="$(printf 'v\nn.%s\nr\n' "$3" | run_solver 2>&1 | first_app "$2")"
     if   [ -z "$got" ];     then bad "$1 ($2): technique never applied"
     elif [ "$got" = "$4" ]; then ok  "$1 ($2): first application eliminates exactly the expected candidates"
     else bad "$1 ($2): first-application eliminations changed" "$(printf 'expected:\n%s\n--- got:\n%s' "$4" "$got")"
