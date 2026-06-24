@@ -1,0 +1,6 @@
+CompileFlags:
+  # Files here live two levels below the repo root but include the project
+  # headers as "board.h" etc. With no compile_commands.json, clangd resolves
+  # -I relative to the file's directory, so point it back up to the root --
+  # matching the Makefile's `unit` target, which compiles from the root with -I.
+  Add: [-I../..]
