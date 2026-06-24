@@ -110,6 +110,9 @@ Board::Board(const std::string &board_desc)
     }
     rebuild_subsets();
 
+    // Reject an empty description before indexing board_desc[0] below.
+    if (board_desc.empty()) throw std::runtime_error("no board provided");
+
     switch(board_desc[0]) {
     case ';':
         record_entries_form1(board_desc.substr(1));
@@ -120,7 +123,6 @@ Board::Board(const std::string &board_desc)
         break;
 
     default:
-        if (board_desc.empty()) throw std::runtime_error("no board provided");
         throw std::runtime_error("board must start with ';' (row,column,value form) or '.' (81-cell form)");
     }
 

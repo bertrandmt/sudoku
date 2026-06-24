@@ -94,88 +94,35 @@ bool Analyzer::act(const bool singles_only) {
     return did_act;
 }
 
-std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
-    // naked singles
-    outs << "[NS](" << a.mNakedSingles.size() << ") {";
+namespace {
+// Render one "[TAG](count) {e1, e2, ...}" line of the analyzer dump. The
+// singles print their elements bare; every other technique wraps each element
+// in its own braces. Factored out of operator<< so the nine sections share a
+// single definition instead of nine copies of the is_first comma dance.
+template<class Container>
+void print_section(std::ostream &outs, const char *tag, const Container &items, bool brace_each) {
+    outs << "[" << tag << "](" << items.size() << ") {";
     bool is_first = true;
-    for (auto const &coord : a.mNakedSingles) {
+    for (auto const &item : items) {
         if (!is_first) { outs << ", "; }
         is_first = false;
-        outs << coord;
-    }
-    outs << "}" << std::endl
-   // hidden singles
-         << "[HS](" << a.mHiddenSingles.size() << ") {";
-    is_first = true;
-    for (auto const &entry: a.mHiddenSingles) {
-        if (!is_first) { outs << ", "; }
-        is_first = false;
-        outs << entry;
-    }
-    outs << "}" << std::endl
-    // naked pairs
-         << "[NP](" << a.mNakedPairs.size() << ") {";
-    is_first = true;
-    for (auto const &entry: a.mNakedPairs) {
-        if (!is_first) { outs << ", "; }
-        is_first = false;
-        outs << "{" << entry << "}";
-    }
-    outs << "}" << std::endl
-     // locked candidates
-         << "[LC](" << a.mLockedCandidates.size() << ") {";
-    is_first = true;
-    for (auto const &entry: a.mLockedCandidates) {
-        if (!is_first) { outs << ", "; }
-        is_first = false;
-        outs << "{" << entry << "}";
-    }
-    outs << "}" << std::endl
-    // hidden pairs
-         << "[HP](" << a.mHiddenPairs.size() << ") {";
-    is_first = true;
-    for (auto const &entry: a.mHiddenPairs) {
-        if (!is_first) { outs << ", "; }
-        is_first = false;
-        outs << "{" << entry << "}";
-    }
-    outs << "}" << std::endl
-    // x-wings
-         << "[XW](" << a.mXWings.size() << ") {";
-    is_first = true;
-    for (auto const &entry: a.mXWings) {
-        if (!is_first) { outs << ", "; }
-        is_first = false;
-        outs << "{" << entry << "}";
-    }
-    outs << "}" << std::endl
-    // color chains (a.k.a. single's chains)
-         << "[SC](" << a.mColorChains.size() << ") {";
-    is_first = true;
-    for (auto const &entry: a.mColorChains) {
-        if (!is_first) { outs << ", "; }
-        is_first = false;
-        outs << "{" << entry << "}";
-    }
-    outs << "}" << std::endl
-    // y-wings
-         << "[YW](" << a.mYWings.size() << ") {";
-    is_first = true;
-    for (auto const &entry: a.mYWings) {
-        if (!is_first) { outs << ", "; }
-        is_first = false;
-        outs << "{" << entry << "}";
-    }
-    outs << "}" << std::endl
-    // xy-chains
-         << "[XY](" << a.mXYChains.size() << ") {";
-    is_first = true;
-    for (auto const &entry: a.mXYChains) {
-        if (!is_first) { outs << ", "; }
-        is_first = false;
-        outs << "{" << entry << "}";
+        if (brace_each) { outs << "{" << item << "}"; }
+        else            { outs << item; }
     }
     outs << "}";
+}
+} // namespace
+
+std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
+    print_section(outs, "NS", a.mNakedSingles,     false); outs << std::endl;
+    print_section(outs, "HS", a.mHiddenSingles,    false); outs << std::endl;
+    print_section(outs, "NP", a.mNakedPairs,       true);  outs << std::endl;
+    print_section(outs, "LC", a.mLockedCandidates, true);  outs << std::endl;
+    print_section(outs, "HP", a.mHiddenPairs,      true);  outs << std::endl;
+    print_section(outs, "XW", a.mXWings,           true);  outs << std::endl;
+    print_section(outs, "SC", a.mColorChains,      true);  outs << std::endl; // a.k.a. single's chains
+    print_section(outs, "YW", a.mYWings,           true);  outs << std::endl;
+    print_section(outs, "XY", a.mXYChains,         true);
 
     return outs;
 }
