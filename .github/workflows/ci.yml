@@ -11,7 +11,7 @@ jobs:
     name: Build (-Werror)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libedit-dev
       - name: Build
@@ -21,7 +21,7 @@ jobs:
     name: Sanitizer build + input smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libedit-dev
       - name: Build with ASan + UBSan
