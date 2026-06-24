@@ -65,6 +65,73 @@ S_adv="1973426852658194374837562196312958748591743267426389519185637425264871933
 # it is forced to *apply* X-Wing, naked-pair and locked-candidate eliminations.
 P_hard="100400006046091200002000000300000040000208000060000005000000900008750120700003004"
 
+echo "[0] Fixture sanity: puzzles and solutions are well-formed before they gate the solver"
+# A typo in a fixture would make a *correct* solver look broken, or mask a real
+# bug behind a "wrong grid" that is actually the fixture's fault. So validate the
+# fixtures themselves first, independently of the solver: every solution must be
+# a legal completed grid (each row, column and 3x3 box a permutation of 1-9),
+# every puzzle must be well-formed, and every solution must agree with its
+# puzzle's given clues. A failure here is a fixture bug, reported as such.
+
+# Validate a 9x9 grid string. mode "full" requires every cell filled with 1-9
+# (a legal *completed* grid); mode "partial" allows '.'/'0' empties (a *puzzle*).
+# Both modes reject any digit repeated within a row, column or box. Prints the
+# first problem found and is silent on success.
+grid_check() { # $1 = grid, $2 = mode (full|partial)
+    awk -v g="$1" -v mode="$2" 'BEGIN {
+        if (length(g) != 81) { print "length " length(g) " != 81"; exit 1 }
+        for (i = 1; i <= 81; i++) {
+            ch = substr(g, i, 1)
+            if (ch == "." || ch == "0") {
+                if (mode == "full") { print "empty cell at position " i; exit 1 }
+            } else if (ch < "1" || ch > "9") {
+                print "bad char \"" ch "\" at position " i; exit 1
+            }
+        }
+        for (u = 0; u < 9; u++) {            # u indexes the u-th row, column and box
+            split("", rs); split("", cs); split("", bs)
+            for (k = 0; k < 9; k++) {        # k indexes the k-th cell within each
+                rc = substr(g, u*9 + k + 1, 1)
+                cc = substr(g, k*9 + u + 1, 1)
+                bc = substr(g, (int(u/3)*3 + int(k/3))*9 + ((u%3)*3 + (k%3)) + 1, 1)
+                if (rc != "." && rc != "0" && rs[rc]++) { print "row "    (u+1) " repeats " rc; exit 1 }
+                if (cc != "." && cc != "0" && cs[cc]++) { print "column " (u+1) " repeats " cc; exit 1 }
+                if (bc != "." && bc != "0" && bs[bc]++) { print "box "    (u+1) " repeats " bc; exit 1 }
+            }
+        }
+        exit 0
+    }'
+}
+
+# Every given clue in the puzzle must match the solution at that position.
+consistent() { # $1 = puzzle, $2 = solution
+    awk -v p="$1" -v s="$2" 'BEGIN {
+        for (i = 1; i <= 81; i++) {
+            pc = substr(p, i, 1)
+            if (pc == "." || pc == "0") continue
+            sc = substr(s, i, 1)
+            if (pc != sc) { print "position " i ": clue " pc " but solution has " sc; exit 1 }
+        }
+        exit 0
+    }'
+}
+
+fixture_ok() { # $1 = name, $2 = puzzle, $3 = solution
+    local why
+    why="$(grid_check "$2" partial)"; if [ -n "$why" ]; then bad "$1: malformed puzzle fixture" "$why"; return; fi
+    why="$(grid_check "$3" full)";    if [ -n "$why" ]; then bad "$1: solution is not a legal completed grid" "$why"; return; fi
+    why="$(consistent "$2" "$3")";    if [ -n "$why" ]; then bad "$1: solution contradicts a puzzle clue" "$why"; return; fi
+    ok "$1: puzzle and solution are well-formed and consistent"
+}
+for name in easy med clm adv; do
+    pvar="P_$name"; svar="S_$name"
+    fixture_ok "$name" "${!pvar}" "${!svar}"
+done
+# P_hard has no solution fixture; just confirm the puzzle itself is well-formed.
+why_hard="$(grid_check "$P_hard" partial)"
+if [ -n "$why_hard" ]; then bad "hard: malformed puzzle fixture" "$why_hard"
+else                        ok  "hard: puzzle is well-formed"; fi
+
 echo "[1] Full-solve correctness"
 for name in easy med clm adv; do
     pvar="P_$name"; svar="S_$name"
