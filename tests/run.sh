@@ -125,6 +125,27 @@ check_tech "$vout_adv" SC "Simple Coloring"
 check_tech "$vout_adv" YW "Y-Wing"
 check_tech "$vout_adv" XY "XY-Chain"
 
+echo "[4] Load-time error messages for bad input"
+# The smoke test in CI proves bad input does not crash; this pins the actual
+# diagnostic text so the self-describing load errors cannot silently regress.
+# $1 = description, $2 = REPL line, $3 = expected substring (fixed string).
+expect_err() {
+    out="$(printf '%s\n' "$2" | "$SOLVER" 2>&1)"
+    if printf '%s' "$out" | grep -qF "$3"; then
+        ok "$1"
+    else
+        bad "$1" "expected to see: $3"
+    fi
+}
+expect_err "truncated board"     "n.123"                                  "expected 81 cells, got 3"
+expect_err "oversized board"     "n.$(printf '1%.0s' $(seq 90))"          "expected 81 cells, got 90"
+expect_err "invalid character"   "n.$(printf 'z%.0s' $(seq 81))"          "invalid character 'z' at position 1"
+expect_err "contradictory board" "n.11......................................................................8........" "appears more than once in a row"
+expect_err "bad leading char"    "n@nonsense"                             "board must start with"
+expect_err "empty board"         "n"                                      "no board provided"
+expect_err "form-1 bad entry"    "n;99"                                   'cannot parse entry "99"'
+expect_err "cell set twice"      "n;111;112"                              "cell (1,1) set more than once"
+
 echo
 echo "----------------------------------------"
 printf 'passed: %d   failed: %d\n' "$pass" "$fail"
