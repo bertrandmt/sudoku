@@ -51,9 +51,11 @@ bool parse_rcv(const std::string &entry, size_t &row, size_t &col, Value &val) {
 void Board::record_entry_form1(const std::string &entry) {
     size_t row, col;
     Value val;
-    if (!parse_rcv(entry, row, col, val)) throw std::runtime_error("cannot parse entry");
+    if (!parse_rcv(entry, row, col, val))
+        throw std::runtime_error("cannot parse entry \"" + entry + "\": expected 3 digits 1-9 (row, column, value)");
 
-    if (!set_value_at(row, col, val)) throw std::runtime_error("failed to set value at");
+    if (!set_value_at(row, col, val))
+        throw std::runtime_error("cell (" + std::to_string(row + 1) + "," + std::to_string(col + 1) + ") set more than once");
 }
 
 void Board::record_entries_form1(const std::string &entries) {
@@ -67,7 +69,8 @@ void Board::record_entries_form1(const std::string &entries) {
 }
 
 void Board::record_entries_form2(const std::string &entries) {
-    if (entries.size() != width * height) throw std::runtime_error("not the right number of entries");
+    if (entries.size() != width * height)
+        throw std::runtime_error("expected " + std::to_string(width * height) + " cells, got " + std::to_string(entries.size()));
 
     size_t index = 0;
     for (auto &c : mCells) {
@@ -86,12 +89,12 @@ void Board::record_entries_form2(const std::string &entries) {
         case '8':
         case '9': // it's a value entry
             if (!set_value_at(c.coord(), static_cast<Value>(entries[index] - '0'))) {
-                throw std::runtime_error("failed to set value at");
+                throw std::runtime_error("cell (" + std::to_string(c.coord().row() + 1) + "," + std::to_string(c.coord().column() + 1) + ") set more than once");
             }
             break;
 
         default: // don't know what to do with this
-            throw std::runtime_error("bad character in entry");
+            throw std::runtime_error(std::string("invalid character '") + entries[index] + "' at position " + std::to_string(index + 1) + " (use digits 1-9 or '.')");
         }
         index++;
     }
@@ -117,7 +120,8 @@ Board::Board(const std::string &board_desc)
         break;
 
     default:
-        throw std::runtime_error("don't know how to parse this");
+        if (board_desc.empty()) throw std::runtime_error("no board provided");
+        throw std::runtime_error("board must start with ';' (row,column,value form) or '.' (81-cell form)");
     }
 
     reject_duplicate_values(mRows,    "row");
