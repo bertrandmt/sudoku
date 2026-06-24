@@ -158,16 +158,22 @@ echo "[2] Soundness: no step ever places a wrong value or removes a true candida
 # just stalls the puzzle into '???' -- and it is caught here at the exact step
 # that causes it. Runs on every fixture with a known solution, so the advanced
 # analyzers (SC/YW/XY via adv; LC/NP via clm) are all exercised.
-elim_check() { # $1 = name, $2 = puzzle, $3 = solution
-    local input="n.$2"$'\n'
+# soundness_violation is the shared engine behind tier [2] and the corpus tier
+# [6]. It steps one technique at a time, dumping the machine-readable candidate
+# grid ('c') after each step, and checks that every cell still lists its
+# solution digit throughout. Echoes a human-readable description of the first
+# violation found, the sentinel "NO_GRIDS" if the solver emitted no candidate
+# grids at all, or nothing if every step was sound.
+soundness_violation() { # $1 = puzzle, $2 = solution
+    local input="n.$1"$'\n'
     local _
     for _ in $(seq 200); do input+=$'.\nc\n'; done
     local out; out="$(printf '%s' "$input" | "$SOLVER" 2>&1)"
+    if [ -z "$(printf '%s' "$out" | grep '^~')" ]; then echo "NO_GRIDS"; return; fi
     # Each '~' line is one logical row of the candidate grid; the solver emits
     # rows 0-8 per snapshot, so the row index is just (line number - 1) % 9.
     # Field $1 is the '~' sentinel; $2..$10 are the nine cells of that row.
-    local violation
-    violation="$(printf '%s' "$out" | grep '^~' | awk -v s="$3" '
+    printf '%s' "$out" | grep '^~' | awk -v s="$2" '
         { r = (NR - 1) % 9
           for (c = 0; c < 9; c++) {
               field = $(c + 2)
@@ -177,13 +183,14 @@ elim_check() { # $1 = name, $2 = puzzle, $3 = solution
                   exit
               }
           }
-        }')"
-    if [ -z "$(printf '%s' "$out" | grep '^~')" ]; then
-        bad "$1: produced no candidate grids to check"
-    elif [ -n "$violation" ]; then
-        bad "$1: an unsound step dropped a true candidate" "$violation"
-    else
-        ok "$1: every candidate grid still lists the solution's digits"
+        }'
+}
+
+elim_check() { # $1 = name, $2 = puzzle, $3 = solution
+    local v; v="$(soundness_violation "$2" "$3")"
+    if   [ "$v" = NO_GRIDS ]; then bad "$1: produced no candidate grids to check"
+    elif [ -n "$v" ];         then bad "$1: an unsound step dropped a true candidate" "$v"
+    else                           ok  "$1: every candidate grid still lists the solution's digits"
     fi
 }
 for name in easy med clm adv; do
@@ -267,6 +274,131 @@ if [ "$(board_after "$r" RST)" = "$(board_after "$r" R0)" ]; then
 else
     bad "reset: '!' did not restore the initial board"
 fi
+
+echo "[6] Corpus: every puzzle logged in notes.txt solves correctly and soundly"
+# notes.txt is a hand-kept log of real puzzles, one per line as
+# "<label> - <board> - [techniques]". It is reference data, not a faithful
+# trace of *this* solver: spot checks show several puzzles annotated [LC] that
+# the solver reaches by another path, and one transcription typo (1/29/25
+# repeats a value in a column), so the hand annotations are deliberately NOT
+# asserted here. What we *can* assert, independent of any annotation, is the
+# property that actually matters: any puzzle the solver finishes must finish at
+# a legal grid consistent with its clues, and must never drop a true candidate
+# on the way. That turns the ~25 real puzzles in notes.txt into full-solve and
+# per-step soundness fixtures for free, with no hand-written solution strings --
+# the solver's own final grid is validated structurally (a wrong placement would
+# make it fail grid_check) and only then reused as the soundness oracle, so the
+# oracle cannot certify a broken solve. Puzzles flagged "unsolved" must NOT be
+# solved (a guard against an over-eager analyzer); a malformed board is reported
+# and skipped rather than blamed on the solver.
+NOTES="$ROOT/notes.txt"
+if [ ! -f "$NOTES" ]; then
+    bad "corpus: notes.txt not found at $NOTES"
+else
+    # One tab-separated record per puzzle line: index, label, board, solvable.
+    # A line is a puzzle iff its second " - "-delimited field, with spaces and a
+    # trailing " -" stripped, is exactly 81 chars of [1-9.]; section headers,
+    # URLs and blank lines have no such field and fall through.
+    corpus_records="$(awk -F ' - ' '
+        { board = $2
+          gsub(/[ -]+$/, "", board); gsub(/ /, "", board)
+          if (board !~ /^[1-9.]{81}$/) next
+          solvable = (index($0, "unsolved") == 0) ? "Y" : "N"
+          label = $1; gsub(/[ \t]+$/, "", label)
+          printf "%02d\t%s\t%s\t%s\n", ++n, label, board, solvable
+        }' "$NOTES")"
+
+    # A here-string (not a pipe) keeps the loop in this shell so ok/bad update
+    # the pass/fail counters; a piped while-read would tally them in a subshell.
+    while IFS=$'\t' read -r idx label board solv; do
+        [ -n "$board" ] || continue
+        name="$idx $label"
+        why="$(grid_check "$board" partial)"
+        if [ -n "$why" ]; then
+            printf '  skip  %s: malformed board in notes.txt (%s)\n' "$name" "$why"
+            continue
+        fi
+        out="$(printf 'n.%s\nr\np\n' "$board" | "$SOLVER" 2>&1)"
+        if [ "$solv" = N ]; then
+            if printf '%s' "$out" | grep -q 'SOLVED!'; then
+                bad "$name: flagged unsolved in notes but the solver reports SOLVED"
+            else
+                ok "$name: correctly left unsolved (no false solve)"
+            fi
+            continue
+        fi
+        if ! printf '%s' "$out" | grep -q 'SOLVED!'; then
+            bad "$name: solver did not reach SOLVED!"; continue
+        fi
+        grid="$(printf '%s' "$out" | extract_grids | tail -1)"
+        why="$(grid_check "$grid" full)"
+        if [ -n "$why" ]; then bad "$name: solved to an illegal grid" "$why"; continue; fi
+        why="$(consistent "$board" "$grid")"
+        if [ -n "$why" ]; then bad "$name: solution contradicts a clue" "$why"; continue; fi
+        v="$(soundness_violation "$board" "$grid")"
+        if   [ "$v" = NO_GRIDS ]; then bad "$name: produced no candidate grids to check"
+        elif [ -n "$v" ];         then bad "$name: an unsound step dropped a true candidate" "$v"
+        else ok "$name: solves to a legal grid consistent with its clues; every step sound"
+        fi
+    done <<< "$corpus_records"
+fi
+
+echo "[7] Per-technique precision: each advanced analyzer's first application eliminates exactly the expected candidates"
+# Tier [3] only proves a technique fires *at all*; it cannot catch under-firing
+# (pattern detected but half its eliminations missed) or a quietly changed
+# result. This pins the exact set of candidates removed by the *first*
+# application of each advanced technique on a chosen fixture. One solver step
+# applies exactly one technique, so a step is one coherent application.
+#
+# Lines are compared as a sorted *set*: act_on_* applies every found instance
+# (NP/LC/HP/XW/YW) or a single colour-swap-invariant chain (SC), so the set is
+# independent of hash-table iteration order -- which differs between libstdc++
+# and libc++; only the print order does, and LC_ALL=C sort absorbs that. (XY
+# picks the best chain from an ordered set; unique for this fixture.) These
+# goldens are regression locks, not an independent oracle: their *soundness* is
+# guaranteed by tiers [2]/[6], which solve the same fixtures, so a wrong
+# elimination could never be locked in here -- it would fail there first. If a
+# legitimate path change ever alters a block, the diff below shows exactly what
+# moved so the golden can be re-reviewed and updated.
+P_color="289...375364.9.812517283964893.2.6.1145836729726....83451378296.72.1..38.38..21.7"
+P_yw1="..28.4..1..4.6.2.887.32.4.5923618..44.5...6.37..543.29258.37.46649.8.3.71374.6..2"
+P_xy2=".......9476.91..5..9...2.81.7..5..1....7.9....8..31.6724.1...7..1..9..459.....1.."
+first_app() { # stdin = verbose solve output; $1 = tag -> sorted elimination block
+    awk -v tag="$1" '
+        /^Step #/                   { if (printed) exit; next }
+        $0 ~ ("^\\[" tag "\\] \\[") { print; printed = 1 }
+    ' | LC_ALL=C sort
+}
+prec_check() { # $1 = name, $2 = tag, $3 = board, $4 = expected sorted block
+    local got
+    got="$(printf 'v\nn.%s\nr\n' "$3" | "$SOLVER" 2>&1 | first_app "$2")"
+    if   [ -z "$got" ];     then bad "$1 ($2): technique never applied"
+    elif [ "$got" = "$4" ]; then ok  "$1 ($2): first application eliminates exactly the expected candidates"
+    else bad "$1 ($2): first-application eliminations changed" "$(printf 'expected:\n%s\n--- got:\n%s' "$4" "$got")"
+    fi
+}
+prec_check "naked pair"        NP "$P_color" "[NP] [6, 4] x4 [r]
+[NP] [6, 4] x5 [r]
+[NP] [6, 6] x4 [r]
+[NP] [6, 6] x5 [r]"
+prec_check "locked candidates" LC "$P_adv" "[LC] [3, 5] x7 [c]
+[LC] [8, 5] x7 [c]"
+prec_check "hidden pair"       HP "$P_clm" "[HP] [4, 8] x3 {[4, 8],[5, 8]}#{2,5}
+[HP] [4, 8] x7 {[4, 8],[5, 8]}#{2,5}
+[HP] [5, 8] x3 {[4, 8],[5, 8]}#{2,5}
+[HP] [5, 8] x7 {[4, 8],[5, 8]}#{2,5}
+[HP] [5, 8] x9 {[4, 8],[5, 8]}#{2,5}"
+prec_check "x-wing"            XW "$P_clm" "[XW] [1, 4] x7 [c]
+[XW] [5, 4] x7 [c]
+[XW] [8, 4] x7 [c]
+[XW] [8, 8] x7 [c]
+[XW] [9, 4] x7 [c]
+[XW] [9, 8] x7 [c]"
+prec_check "simple coloring"   SC "$P_color" "[SC] [9, 5] x4 [👀🟩🟥]"
+prec_check "y-wing"            YW "$P_yw1" "[YW] [1, 5] x9
+[YW] [2, 8] x9"
+prec_check "xy-chain"          XY "$P_xy2" "[XY] [5, 5] x2 ({[5, 8]:..:[6, 4]}#2)
+[XY] [6, 7] x2 ({[5, 8]:..:[6, 4]}#2)"
 
 echo
 echo "----------------------------------------"
