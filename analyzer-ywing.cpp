@@ -5,6 +5,7 @@
 #include "board.h"
 #include "verbose.h"
 #include <algorithm>
+#include <iterator>
 #include <cassert>
 #include <unordered_set>
 

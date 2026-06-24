@@ -7,6 +7,8 @@
 #include <cassert>
 #include <unordered_set>
 #include <algorithm>
+#include <functional>
+#include <iterator>
 
 size_t Analyzer::test_xychain(const Value &value, const std::vector<Coord> &chain) const {
     // validate that the chain chains properly, and that the end candidate value is also a
