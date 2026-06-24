@@ -52,3 +52,7 @@ jobs:
           run "contradictory board" 'n.11.......................................................................8........\nq\n'
           run "unknown command"     'Z\nq\n'
           run "immediate quit"      'q\n'
+      # Correctness tests, run against the sanitizer build so a real solve that
+      # trips ASan/UBSan also fails here.
+      - name: Run black-box correctness tests
+        run: ./tests/run.sh

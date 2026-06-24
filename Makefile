@@ -32,6 +32,10 @@ src = coord.cpp \
 
 sudoku-solver: $(src:%.cpp=%.o)
 
+.PHONY: test
+test: sudoku-solver
+	./tests/run.sh
+
 .PHONY: depend
 depend:
 	makedepend -- $(CPPFLAGS) -- sudoku-solver.cpp $(src)
