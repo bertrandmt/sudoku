@@ -14,6 +14,13 @@ class Row;
 class Column;
 class Nonet;
 
+// Parse a 3-character "row,column,value" triple, each a digit 1-9, into
+// zero-based row/column indices and a Value. Returns false (leaving the
+// out-parameters unspecified) if the entry is the wrong length or any field
+// is outside 1-9. Centralizes range validation so no caller feeds an
+// out-of-range index/value to the board.
+bool parse_rcv(const std::string &entry, size_t &row, size_t &col, Value &val);
+
 
 class Board {
 public:

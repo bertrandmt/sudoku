@@ -12,14 +12,23 @@
 #include <iostream>
 #include <stdexcept>
 
+bool parse_rcv(const std::string &entry, size_t &row, size_t &col, Value &val) {
+    if (entry.size() != 3) return false;
+
+    if (entry[0] < '1' || entry[0] > '9') return false;
+    if (entry[1] < '1' || entry[1] > '9') return false;
+    if (entry[2] < '1' || entry[2] > '9') return false;
+
+    row = entry[0] - '1';
+    col = entry[1] - '1';
+    val = static_cast<Value>(entry[2] - '0');
+    return true;
+}
+
 void Board::record_entry_form1(const std::string &entry) {
-    if (entry.size() != 3) throw std::runtime_error("cannot parse entry");
-
-
-    size_t row = entry[0] - '1';
-    size_t col = entry[1] - '1';
-    Value val = static_cast<Value>(entry[2] - '0');
-    if (val == kUnset) throw std::runtime_error("unset value");
+    size_t row, col;
+    Value val;
+    if (!parse_rcv(entry, row, col, val)) throw std::runtime_error("cannot parse entry");
 
     if (!set_value_at(row, col, val)) throw std::runtime_error("failed to set value at");
 }
