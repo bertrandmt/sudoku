@@ -7,26 +7,6 @@
 
 #include <algorithm>
 
-bool Analyzer::test_hidden_pair(const Cell &c1, const Cell &c2, const Value &v1, const Value &v2) const {
-    // are they both note cells?
-    if (!c1.isNote()) return false;
-    if (!c2.isNote()) return false;
-
-    // yes! but do they both have at least two entries?
-    if (!(c1.notes().count() >= 2 && c2.notes().count() >= 2)) return false;
-
-    // yes! but does at least one of them have more than two candidates?
-    if (!(c1.notes().count() > 2 || c2.notes().count() > 2)) return false;
-
-    // yes! but are both values still candidates for both notes?
-    if (!(c1.check(v1) && c1.check(v2)))  return false;
-    if (!(c2.check(v1) && c2.check(v2)))  return false;
-
-    // both cells in the entry are still notes with one of them having strictly
-    // more than two candidates and they both have both entry values as candidates
-    return true;
-}
-
 template<class Set>
 bool Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set) {
     assert(cell.isNote());

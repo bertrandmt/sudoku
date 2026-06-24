@@ -139,7 +139,6 @@ private:
     std::vector<HiddenPair> mHiddenPairs;
 
     // find
-    bool test_hidden_pair(const Cell &, const Cell &, const Value &, const Value &) const;
     template<class Set>
     bool find_hidden_pair(const Cell &, const Value &v1, const Value &v2, const Set &);
     bool find_hidden_pairs();

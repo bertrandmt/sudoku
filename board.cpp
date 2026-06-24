@@ -88,8 +88,14 @@ void Board::record_entries_form2(const std::string &entries) {
         case '7':
         case '8':
         case '9': // it's a value entry
-            if (!set_value_at(c.coord(), static_cast<Value>(entries[index] - '0'))) {
-                throw std::runtime_error("cell (" + std::to_string(c.coord().row() + 1) + "," + std::to_string(c.coord().column() + 1) + ") set more than once");
+            // Unlike form-1 (which can list the same cell twice), form-2 visits
+            // every cell exactly once and each starts as a note, so set_value_at
+            // cannot report an already-set cell here. Assert the invariant rather
+            // than carry a throw that can never fire.
+            {
+                bool did_set = set_value_at(c.coord(), static_cast<Value>(entries[index] - '0'));
+                assert(did_set);
+                (void)did_set;
             }
             break;
 
