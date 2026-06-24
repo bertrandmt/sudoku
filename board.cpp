@@ -8,9 +8,32 @@
 #include "cell.h"
 #include "verbose.h"
 
+#include <array>
 #include <cassert>
 #include <iostream>
 #include <stdexcept>
+
+namespace {
+// Reject a board where any digit repeats within a unit (row, column, or
+// nonet). The analyzers assume a logically consistent board; enforcing that
+// at load time keeps a contradictory board from ever reaching them.
+template <typename Subsets>
+void reject_duplicate_values(Subsets &subsets, const char *unit_kind) {
+    for (auto &subset : subsets) {
+        std::array<bool, static_cast<size_t>(kNine)> seen{};
+        for (auto &cell : subset) {
+            if (!cell.isValue()) continue;
+            size_t i = static_cast<size_t>(cell.value()) - 1;   // 1..9 -> 0..8
+            if (seen[i]) {
+                throw std::runtime_error(
+                    std::string("invalid board: value ") + std::to_string(cell.value())
+                    + " appears more than once in a " + unit_kind);
+            }
+            seen[i] = true;
+        }
+    }
+}
+} // namespace
 
 bool parse_rcv(const std::string &entry, size_t &row, size_t &col, Value &val) {
     if (entry.size() != 3) return false;
@@ -96,6 +119,10 @@ Board::Board(const std::string &board_desc)
     default:
         throw std::runtime_error("don't know how to parse this");
     }
+
+    reject_duplicate_values(mRows,    "row");
+    reject_duplicate_values(mColumns, "column");
+    reject_duplicate_values(mNonets,  "nonet");
 }
 
 Board::Board(const Board &other)

@@ -77,7 +77,8 @@ bool routine(Solver::ptr &solver) {
             try {
                 solver.reset(new Solver(nowsline.substr(1)));
             }
-            catch (const std::runtime_error &) {
+            catch (const std::runtime_error &e) {
+                std::cout << e.what() << std::endl;
                 help();
                 break;
             }
