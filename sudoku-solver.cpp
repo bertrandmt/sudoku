@@ -64,7 +64,7 @@ bool routine(Solver::ptr &solver) {
     // no whitespace we care to make use of
     std::string nowsline(line, 0);
     nowsline.erase(
-            std::remove_if(nowsline.begin(), nowsline.end(), [](auto c){ return std::isspace(c); }),
+            std::remove_if(nowsline.begin(), nowsline.end(), [](unsigned char c){ return std::isspace(c); }),
             nowsline.end());
     if (nowsline.size() == 0) { return done; }
 
