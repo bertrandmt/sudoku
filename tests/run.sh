@@ -79,31 +79,50 @@ for name in easy med clm adv; do
     fi
 done
 
-echo "[2] Soundness: no cell is ever set to a value that contradicts the solution"
-# Step one technique at a time, printing after each step, so we see every
-# intermediate board. A correct solver only ever fills a cell with its true
-# value; a single wrong placement here means an unsound deduction.
-input="n.$P_med"$'\n'
-for _ in $(seq 200); do input+=$'.\np\n'; done
-snaps="$(printf '%s' "$input" | "$SOLVER" 2>&1 | extract_grids)"
-offending=""
-while IFS= read -r g; do
-    [ -z "$g" ] && continue
-    if ! awk -v g="$g" -v s="$S_med" '
-        BEGIN { for (i = 1; i <= 81; i++) {
-                    c = substr(g, i, 1)
-                    if (c != "." && c != substr(s, i, 1)) exit 1
-                } exit 0 }'; then
-        offending="$g"; break
+echo "[2] Soundness: no step ever places a wrong value or removes a true candidate"
+# The core correctness property: every cell must always still list its true
+# solution digit. Step one technique at a time, dumping the machine-readable
+# candidate grid ('c') after each step, and require every cell to keep listing
+# its solution digit throughout. The single check "solution digit is present in
+# the cell's field" catches both failure modes at once: a wrong placement (the
+# placed digit replaces the whole field, dropping the true digit) and an
+# over-elimination (a true candidate struck from a still-unsolved cell). The
+# latter is the subtle one -- it usually does not produce a wrong final grid, it
+# just stalls the puzzle into '???' -- and it is caught here at the exact step
+# that causes it. Runs on every fixture with a known solution, so the advanced
+# analyzers (SC/YW/XY via adv; LC/NP via clm) are all exercised.
+elim_check() { # $1 = name, $2 = puzzle, $3 = solution
+    local input="n.$2"$'\n'
+    local _
+    for _ in $(seq 200); do input+=$'.\nc\n'; done
+    local out; out="$(printf '%s' "$input" | "$SOLVER" 2>&1)"
+    # Each '~' line is one logical row of the candidate grid; the solver emits
+    # rows 0-8 per snapshot, so the row index is just (line number - 1) % 9.
+    # Field $1 is the '~' sentinel; $2..$10 are the nine cells of that row.
+    local violation
+    violation="$(printf '%s' "$out" | grep '^~' | awk -v s="$3" '
+        { r = (NR - 1) % 9
+          for (c = 0; c < 9; c++) {
+              field = $(c + 2)
+              d = substr(s, r * 9 + c + 1, 1)
+              if (index(field, d) == 0) {
+                  printf "cell (%d,%d): solution %s gone, field {%s}", r+1, c+1, d, field
+                  exit
+              }
+          }
+        }')"
+    if [ -z "$(printf '%s' "$out" | grep '^~')" ]; then
+        bad "$1: produced no candidate grids to check"
+    elif [ -n "$violation" ]; then
+        bad "$1: an unsound step dropped a true candidate" "$violation"
+    else
+        ok "$1: every candidate grid still lists the solution's digits"
     fi
-done <<< "$snaps"
-if [ -n "$offending" ]; then
-    bad "med: a snapshot placed a wrong value" "$offending"
-elif [ -z "$snaps" ]; then
-    bad "med: produced no board snapshots to check"
-else
-    ok "med: every intermediate placement is consistent with the solution"
-fi
+}
+for name in easy med clm adv; do
+    pvar="P_$name"; svar="S_$name"
+    elim_check "$name" "${!pvar}" "${!svar}"
+done
 
 echo "[3] Per-technique: advanced analyzers actually apply eliminations"
 # Applied steps look like '[XW] [3, 8] x9 [r]' (tag, space, coordinate).
@@ -181,51 +200,6 @@ if [ "$(board_after "$r" RST)" = "$(board_after "$r" R0)" ]; then
 else
     bad "reset: '!' did not restore the initial board"
 fi
-
-echo "[6] Elimination soundness: no step ever removes a true candidate"
-# Tier [2] proves placed *values* are never wrong. This proves the dual, and
-# stronger, property: no *elimination* ever strikes a cell's true candidate.
-# An over-elimination usually does not produce a wrong final grid -- it stalls
-# the puzzle into '???' -- so tier [2] would not catch it; here we do, at the
-# step that causes it. Step one technique at a time, dumping the machine-
-# readable candidate grid ('c') after each step, and require every cell to keep
-# listing its solution digit throughout. The single check "solution digit is
-# present in the cell's field" simultaneously catches wrong placements (the
-# placed digit replaces the field, so a wrong placement drops the true digit)
-# and over-eliminations. Runs on every fixture with a known solution, so the
-# advanced analyzers (SC/YW/XY via adv; LC/NP via clm) are all exercised.
-elim_check() { # $1 = name, $2 = puzzle, $3 = solution
-    local input="n.$2"$'\n'
-    local _
-    for _ in $(seq 200); do input+=$'.\nc\n'; done
-    local out; out="$(printf '%s' "$input" | "$SOLVER" 2>&1)"
-    # Each '~' line is one logical row of the candidate grid; the solver emits
-    # rows 0-8 per snapshot, so the row index is just (line number - 1) % 9.
-    # Field $1 is the '~' sentinel; $2..$10 are the nine cells of that row.
-    local violation
-    violation="$(printf '%s' "$out" | grep '^~' | awk -v s="$3" '
-        { r = (NR - 1) % 9
-          for (c = 0; c < 9; c++) {
-              field = $(c + 2)
-              d = substr(s, r * 9 + c + 1, 1)
-              if (index(field, d) == 0) {
-                  printf "cell (%d,%d): solution %s gone, field {%s}", r+1, c+1, d, field
-                  exit
-              }
-          }
-        }')"
-    if [ -z "$(printf '%s' "$out" | grep '^~')" ]; then
-        bad "$1: produced no candidate grids to check"
-    elif [ -n "$violation" ]; then
-        bad "$1: an unsound step removed a true candidate" "$violation"
-    else
-        ok "$1: every candidate grid still lists the solution's digits"
-    fi
-}
-for name in easy med clm adv; do
-    pvar="P_$name"; svar="S_$name"
-    elim_check "$name" "${!pvar}" "${!svar}"
-done
 
 echo
 echo "----------------------------------------"
