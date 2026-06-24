@@ -76,3 +76,39 @@ jobs:
       # trips ASan/UBSan also fails here.
       - name: Run black-box correctness tests
         run: ./tests/run.sh
+
+  coverage:
+    name: Coverage (gcov/gcovr)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10   # same hang backstop as the other jobs
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libedit-dev gcovr
+      # '--coverage' (make coverage=1) instruments every translation unit; the
+      # test run below then writes the .gcda execution counts that gcovr reads.
+      - name: Build with coverage instrumentation
+        run: |
+          make clean
+          make coverage=1
+      - name: Run correctness tests (records coverage data)
+        run: ./tests/run.sh
+      # This job is a *signal*, not a gate: it reports which lines and branches
+      # the test corpus exercises so cold analyzer paths (detected/untested vs.
+      # dead) are visible, but it does not fail on a coverage threshold. The
+      # per-file table and an HTML drill-down are uploaded as an artifact.
+      - name: Report coverage
+        run: |
+          gcovr --root . --exclude tests --print-summary --txt -o coverage.txt
+          gcovr --root . --exclude tests --html --html-details -o coverage.html
+          echo '===== per-file line / branch coverage ====='
+          cat coverage.txt
+      - name: Upload coverage report
+        if: always()   # publish the report even if a prior step failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.txt
+            coverage*.html
+            coverage*.css

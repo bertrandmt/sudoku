@@ -2,7 +2,17 @@
 # See LICENSE for details of BSD 3-Clause License
 
 CPPFLAGS = -std=c++2a -Wall -Wsign-compare -Werror -Werror=return-type -MMD -MP
-ifeq ($(debug),1)
+# coverage=1 instruments the build so a test run records which lines and
+# branches were exercised. It implies an unoptimized, debuggable build (-O3
+# would fold branches together and make the line mapping unreliable) and adds
+# '--coverage' to both compile and link, so it takes precedence over debug=1.
+# Both gcc and clang emit gcov-format .gcno/.gcda data from '--coverage', so a
+# single flag covers either toolchain; gcovr reads the result. See the
+# 'coverage' CI job and README for how to produce a report.
+ifeq ($(coverage),1)
+CPPFLAGS += -O0 -g --coverage
+LDFLAGS += --coverage
+else ifeq ($(debug),1)
 CPPFLAGS += -O0 -g
 else
 CPPFLAGS += -O3
@@ -37,7 +47,8 @@ test: sudoku-solver
 
 .PHONY: clean
 clean:
-	rm -f $(obj) $(obj:.o=.d) sudoku-solver
+	rm -f $(obj) $(obj:.o=.d) $(obj:.o=.gcno) $(obj:.o=.gcda) sudoku-solver
+	rm -rf coverage.txt coverage*.html coverage*.css
 
 # Header dependencies are generated automatically by the compiler: -MMD writes a
 # '.d' file of #include prerequisites alongside each '.o', and -MP adds phony

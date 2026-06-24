@@ -34,6 +34,14 @@
 # Vi swap files
 *.swp
 
+# Coverage instrumentation and reports (make coverage=1)
+*.gcno
+*.gcda
+*.gcov
+coverage.txt
+coverage*.html
+coverage*.css
+
 # project specific files
 sudoku-solver
 *.bak

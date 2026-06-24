@@ -566,3 +566,33 @@ The command `p` prints the current state of the board in `.` notation (see [Form
 The command `c` prints the per-cell candidates in a machine-readable form: one logical row per line, each prefixed with a `~` sentinel and followed by nine whitespace-separated fields (one per cell, left to right). A solved cell's field is its digit; a note cell's field is the concatenation of its remaining candidate digits. This is primarily a hook for the test suite (it checks that no solving step ever eliminates a cell's true candidate), but it is also handy for scripting.
 
 The command `v` toggles verbosity of the analysis of the board state. By default, analysis is *not* verbose.
+
+# Building and testing
+
+```sh
+make              # optimized build -> ./sudoku-solver
+make debug=1      # unoptimized build with debug symbols
+make test         # build, then run the black-box correctness suite
+make clean        # remove build and coverage artifacts
+```
+
+The correctness suite lives in `tests/run.sh` and drives the compiled binary
+through its REPL. CI additionally builds across gcc, clang and macOS/libc++ and
+runs an ASan/UBSan build against adversarial input.
+
+## Coverage
+
+`make coverage=1` produces an instrumented build; running the suite against it
+records which lines and branches the tests actually exercise. With
+[`gcovr`](https://gcovr.com/) installed:
+
+```sh
+make clean && make coverage=1
+./tests/run.sh
+gcovr --root . --exclude tests --print-summary   # per-file line/branch table
+```
+
+This is a *signal*, not a gate: it surfaces cold analyzer paths (a branch that
+is detected but never exercised, versus one that is dead) rather than enforcing
+a threshold. The `coverage` CI job runs the same flow and uploads an HTML
+drill-down as a build artifact.
