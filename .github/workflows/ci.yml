@@ -34,42 +34,21 @@ jobs:
       # of valid, malformed, truncated, oversized, and garbage inputs. With
       # -fno-sanitize-recover any memory-safety bug or undefined behavior aborts
       # the process with a nonzero exit, failing this step.
+      # Each input is a single line; \n escapes are expanded by printf '%b' so
+      # nothing breaks out of the YAML block scalar.
       - name: Feed adversarial inputs
         run: |
           set -e
-          run() { printf '%s' "$2" | ./sudoku-solver >/dev/null; echo "ok: $1"; }
-          # A solvable board, stepped a few times.
-          run "valid, stepped" 'v
-n.1.....569492.561.8.561.924...964.8.1.64.1....218.356.4.4.5...169.5.614.2621.....5
-.
-.
-.
-q
-'
-          # Row,column,value form.
-          run "form-1 (rcv)" 'n;111;929;353
-q
-'
-          run "empty after n"        'n
-q
-'
-          run "truncated board"      'n.123
-q
-'
-          run "oversized board"      'n.1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-q
-'
-          run "garbage chars"        'n.zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
-q
-'
-          run "bad leading char"     'n@nonsense
-q
-'
-          run "contradictory board"  'n.11.......................................................................8........
-q
-'
-          run "unknown command"      'Z
-q
-'
-          run "immediate quit"       'q
-'
+          run() { printf '%b' "$2" | ./sudoku-solver >/dev/null; echo "ok: $1"; }
+          oversized="n.$(printf '1%.0s' $(seq 90))\nq\n"
+          garbage="n.$(printf 'z%.0s' $(seq 81))\nq\n"
+          run "valid, stepped"      'v\nn.1.....569492.561.8.561.924...964.8.1.64.1....218.356.4.4.5...169.5.614.2621.....5\n.\n.\n.\nq\n'
+          run "form-1 (rcv)"        'n;111;929;353\nq\n'
+          run "empty after n"       'n\nq\n'
+          run "truncated board"     'n.123\nq\n'
+          run "oversized board"     "$oversized"
+          run "garbage chars"       "$garbage"
+          run "bad leading char"    'n@nonsense\nq\n'
+          run "contradictory board" 'n.11.......................................................................8........\nq\n'
+          run "unknown command"     'Z\nq\n'
+          run "immediate quit"      'q\n'
