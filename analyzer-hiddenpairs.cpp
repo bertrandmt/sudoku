@@ -5,6 +5,8 @@
 #include "board.h"
 #include "verbose.h"
 
+#include <algorithm>
+
 bool Analyzer::test_hidden_pair(const Cell &c1, const Cell &c2, const Value &v1, const Value &v2) const {
     // are they both note cells?
     if (!c1.isNote()) return false;

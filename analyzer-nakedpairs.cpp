@@ -5,6 +5,8 @@
 #include "board.h"
 #include "verbose.h"
 
+#include <algorithm>
+
 namespace { // anon
 template<class Set>
 bool would_act(const Set &set, const Cell &c1, const Cell &c2, const Value &v1, const Value &v2) {

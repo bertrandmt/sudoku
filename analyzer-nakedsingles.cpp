@@ -5,6 +5,8 @@
 #include "board.h"
 #include "verbose.h"
 
+#include <algorithm>
+
 bool Analyzer::test_naked_single(const Cell &cell) const {
     return cell.isNote()
         && cell.notes().count() == 1;

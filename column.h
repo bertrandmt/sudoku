@@ -5,6 +5,7 @@
 #include "board.h"
 #include "cell.h"
 
+#include <algorithm>
 #include <vector>
 #include <iterator>
 #include <cstddef>

@@ -5,6 +5,8 @@
 #include "board.h"
 #include "verbose.h"
 
+#include <algorithm>
+
 template<class Set>
 bool Analyzer::test_hidden_single(const Cell &cell, const Value &value, const Set &set, std::string &out_tag) const {
     if (!cell.isNote()) return false;

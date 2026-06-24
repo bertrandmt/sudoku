@@ -4,6 +4,7 @@
 #include "analyzer.h"
 #include "board.h"
 #include "verbose.h"
+#include <algorithm>
 #include <cassert>
 #include <unordered_set>
 

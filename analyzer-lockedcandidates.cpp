@@ -5,6 +5,8 @@
 #include "board.h"
 #include "verbose.h"
 
+#include <algorithm>
+
 namespace { // anon
 template<class Set>
 bool would_act_on_set(std::vector<Coord> const &coords, Value const &value, std::string const &tag, Set const &set) {

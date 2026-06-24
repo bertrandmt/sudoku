@@ -7,6 +7,7 @@
 #include "solver.h"
 #include "verbose.h"
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 
