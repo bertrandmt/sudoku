@@ -35,6 +35,8 @@ jobs:
         run: make CXX=${{ matrix.cxx }}
       - name: Run black-box correctness tests
         run: ./tests/run.sh
+      - name: Run whitebox unit tests
+        run: make CXX=${{ matrix.cxx }} unit
 
   sanitize:
     name: Sanitizer build + input smoke test
@@ -76,6 +78,13 @@ jobs:
       # trips ASan/UBSan also fails here.
       - name: Run black-box correctness tests
         run: ./tests/run.sh
+      # The whitebox tests drive the analyzer on hand-built positions; running
+      # them sanitized puts ASan/UBSan on those paths too. Same flags as the
+      # build step so the test binary links the sanitizer runtime.
+      - name: Run whitebox unit tests
+        run: |
+          make CXXFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1" \
+               LDFLAGS="-fsanitize=address,undefined" unit
 
   coverage:
     name: Coverage (gcov/gcovr)
@@ -93,6 +102,11 @@ jobs:
           make coverage=1
       - name: Run correctness tests (records coverage data)
         run: ./tests/run.sh
+      # The whitebox unit tests share the same instrumented objects, so running
+      # them accumulates into the same .gcda counts -- without this the
+      # column-based Swordfish path reads as cold in the report.
+      - name: Run whitebox unit tests (records coverage data)
+        run: make coverage=1 unit
       # This job is a *signal*, not a gate: it reports which lines and branches
       # the test corpus exercises so cold analyzer paths (detected/untested vs.
       # dead) are visible, but it does not fail on a coverage threshold. The

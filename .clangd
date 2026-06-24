@@ -1,2 +1,4 @@
 CompileFlags:
-  Add: [-std=c++2a]
+  # -I. so sources outside the repo root (e.g. tests/unit) resolve the project
+  # headers the same way the Makefile's `unit` target does.
+  Add: [-std=c++2a, -I.]

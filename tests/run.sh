@@ -80,8 +80,14 @@ P_adv="19.342..52.581943.483...219..12.5..4..91.4.2.7426...51918....42.2.4..1933
 S_adv="197342685265819437483756219631295874859174326742638951918563742526487193374921568"
 
 # A harder puzzle the pure-logic solver does NOT fully crack, but along the way
-# it is forced to *apply* X-Wing, naked-pair and locked-candidate eliminations.
+# it is forced to *apply* X-Wing, naked-pair, locked-candidate and Swordfish
+# eliminations. S_hard (computed by an independent brute-force solver) is the
+# puzzle's unique completion; it is not a full-solve fixture -- the solver stalls
+# before finishing -- but it is a valid soundness oracle for the steps the solver
+# *does* take, which is what lets tier [2] check the Swordfish step never drops a
+# true candidate.
 P_hard="100400006046091200002000000300000040000208000060000005000000900008750120700003004"
+S_hard="179482536546391278832675419381569742957248361264137895413826957698754123725913684"
 
 echo "[0] Fixture sanity: puzzles and solutions are well-formed before they gate the solver"
 # A typo in a fixture would make a *correct* solver look broken, or mask a real
@@ -145,10 +151,11 @@ for name in easy med clm adv; do
     pvar="P_$name"; svar="S_$name"
     fixture_ok "$name" "${!pvar}" "${!svar}"
 done
-# P_hard has no solution fixture; just confirm the puzzle itself is well-formed.
-why_hard="$(grid_check "$P_hard" partial)"
-if [ -n "$why_hard" ]; then bad "hard: malformed puzzle fixture" "$why_hard"
-else                        ok  "hard: puzzle is well-formed"; fi
+# P_hard does not fully solve, but S_hard is still its unique completion, so it
+# is validated like any other fixture (well-formed puzzle, legal completed grid,
+# clues consistent) -- a typo here would silently weaken the tier [2] soundness
+# check that relies on it.
+fixture_ok "hard" "$P_hard" "$S_hard"
 
 echo "[1] Full-solve correctness"
 for name in easy med clm adv; do
@@ -215,6 +222,10 @@ for name in easy med clm adv; do
     pvar="P_$name"; svar="S_$name"
     elim_check "$name" "${!pvar}" "${!svar}"
 done
+# P_hard is the only fixture that exercises Swordfish; its solve trace stops
+# short of a full solution but every step it takes (the Swordfish step included)
+# must still be sound. Checked against the independently-computed S_hard.
+elim_check "hard" "$P_hard" "$S_hard"
 
 echo "[3] Per-technique: advanced analyzers actually apply eliminations"
 # Applied steps look like '[XW] [3, 8] x9 [r]' (tag, space, coordinate).
@@ -231,6 +242,7 @@ vout_hard="$(printf 'v\nn.%s\nr\n' "$P_hard" | run_solver 2>&1)"
 check_tech "$vout_hard" XW "X-Wing"
 check_tech "$vout_hard" NP "Naked Pair"
 check_tech "$vout_hard" LC "Locked Candidates"
+check_tech "$vout_hard" SF "Swordfish"
 vout_adv="$(printf 'v\nn.%s\nr\n' "$P_adv" | run_solver 2>&1)"
 check_tech "$vout_adv" SC "Simple Coloring"
 check_tech "$vout_adv" YW "Y-Wing"
@@ -424,6 +436,14 @@ prec_check "x-wing"            XW "$P_clm" "[XW] [1, 4] x7 [c]
 [XW] [8, 8] x7 [c]
 [XW] [9, 4] x7 [c]
 [XW] [9, 8] x7 [c]"
+# Swordfish on value 8: base rows {1,6,9}, candidates confined to columns
+# {5,7,8}; 8 is eliminated from those columns outside the base rows. Verified by
+# hand against the candidate grid at the firing step.
+prec_check "swordfish"         SF "$P_hard" "[SF] [2, 8] x8 [c]
+[SF] [3, 5] x8 [c]
+[SF] [3, 8] x8 [c]
+[SF] [7, 5] x8 [c]
+[SF] [7, 8] x8 [c]"
 prec_check "simple coloring"   SC "$P_color" "[SC] [9, 5] x4 [👀🟩🟥]"
 prec_check "y-wing"            YW "$P_yw1" "[YW] [1, 5] x9
 [YW] [2, 8] x9"

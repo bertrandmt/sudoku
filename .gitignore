@@ -44,5 +44,7 @@ coverage*.css
 
 # project specific files
 sudoku-solver
+tests/unit/test_analyzer
+*.dSYM/
 *.bak
 out.txt
