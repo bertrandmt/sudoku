@@ -63,8 +63,12 @@ A sanitizer trace is especially helpful. You can reproduce many memory-safety
 issues by building with:
 
 ```
-make CXXFLAGS="-fsanitize=address,undefined -g -O1"
+make CXXFLAGS="-fsanitize=address,undefined -g -O1" \
+     LDFLAGS="-fsanitize=address,undefined"
 ```
+
+(The flag must be passed at both compile and link time; this project's
+`Makefile` links via the implicit rule, so `LDFLAGS` is required as well.)
 
 ## What to Expect
 
