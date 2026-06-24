@@ -146,6 +146,42 @@ expect_err "empty board"         "n"                                      "no bo
 expect_err "form-1 bad entry"    "n;99"                                   'cannot parse entry "99"'
 expect_err "cell set twice"      "n;111;112"                              "cell (1,1) set more than once"
 
+echo "[5] State management: determinism, undo and reset"
+# Board-grid lines start with '[' and contain '|'. Action-annotation lines such
+# as '[NS] [2, 4] =2' also start with '[' but contain no '|', so they are
+# excluded: we compare board *state*, not the step that produced it.
+board_after() { # $1 = full output, $2 = marker -> board grid printed just before #<marker>
+    printf '%s' "$1" | awk -v m="#$2" '
+        /^#/      { if ($0 == m) { printf "%s", buf; exit } buf = ""; next }
+        /^\[.*\|/ { buf = buf $0 "\n" }'
+}
+
+# Determinism: the same puzzle solved twice yields byte-identical output. (The
+# analyzers use unordered_set; this guards against iteration-order leaking out.)
+d1="$(printf 'n.%s\nr\n' "$P_med" | "$SOLVER" 2>&1)"
+d2="$(printf 'n.%s\nr\n' "$P_med" | "$SOLVER" 2>&1)"
+if [ "$d1" = "$d2" ]; then ok "determinism: identical output across two runs"
+else bad "determinism: output differed between runs"; fi
+
+# Undo: step forward twice, then back twice; each step back must reproduce the
+# earlier board exactly. A marker after every command isolates one board each.
+u="$(printf 'n.%s\n#S0\n.\n#S1\n.\n#S2\n<\n#B1\n<\n#B0\n' "$P_med" | "$SOLVER" 2>&1)"
+us0="$(board_after "$u" S0)"; us1="$(board_after "$u" S1)"
+ub1="$(board_after "$u" B1)"; ub0="$(board_after "$u" B0)"
+if [ "$us0" = "$us1" ]; then bad "undo: forward steps did not change the board (test is vacuous)"
+elif [ "$ub1" != "$us1" ]; then bad "undo: one step back does not match the prior state"
+elif [ "$ub0" != "$us0" ]; then bad "undo: two steps back does not match the initial state"
+else ok "undo: stepping back reproduces prior board states"; fi
+
+# Reset: from a stepped position, '!' restores the initial board. The marker
+# right before '!' isolates the reset board from the intervening step boards.
+r="$(printf 'n.%s\n#R0\n.\n.\n#PRE\n!\n#RST\n' "$P_med" | "$SOLVER" 2>&1)"
+if [ "$(board_after "$r" RST)" = "$(board_after "$r" R0)" ]; then
+    ok "reset: '!' restores the initial board"
+else
+    bad "reset: '!' did not restore the initial board"
+fi
+
 echo
 echo "----------------------------------------"
 printf 'passed: %d   failed: %d\n' "$pass" "$fail"
