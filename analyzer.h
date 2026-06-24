@@ -21,6 +21,7 @@ public:
         , mLockedCandidates(other.mLockedCandidates)
         , mHiddenPairs(other.mHiddenPairs)
         , mXWings(other.mXWings)
+        , mSwordfish(other.mSwordfish)
         , mColorChains(other.mColorChains)
         , mYWings(other.mYWings)
         , mXYChains(other.mXYChains)
@@ -41,6 +42,12 @@ public:
     bool act(const bool singles_only);
 
     friend std::ostream& operator<< (std::ostream& outs, Analyzer const &);
+
+    // Whitebox unit tests reach the private find_*/act_* members and the result
+    // vectors through this friend, so individual techniques can be exercised on
+    // hand-built positions that a full REPL solve cannot easily reproduce.
+    // Defined in tests/unit/test_analyzer.cpp; no production code depends on it.
+    friend struct AnalyzerTest;
 
 private:
     //** Notes management
@@ -174,6 +181,30 @@ private:
     bool act_on_xwing(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2,
                                           const EliminationSet &eset, const std::string &tag);
     bool act_on_xwing();
+
+private:
+    //** swordfish
+    struct Swordfish {
+        Value value;
+        std::vector<Coord> anchors;  // three corners defining the Swordfish pattern
+        bool is_row_based;           // true if rows contain the pattern, false if columns contain the pattern
+
+        bool operator==(const Swordfish &other) const = default;
+    };
+    friend std::ostream& operator<<(std::ostream& outs, const Swordfish &);
+    std::vector<Swordfish> mSwordfish;
+
+    // find
+    template<class CandidateSet, class EliminationSet>
+    bool find_swordfish(const Cell &, const Value &, const CandidateSet &, const EliminationSet &, const std::vector<CandidateSet> &, bool by_row);
+    bool find_swordfish(const Cell &, const Value &);
+    bool find_swordfish();
+
+    // act
+    template<class CandidateSet, class EliminationSet>
+    bool act_on_swordfish(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2, const CandidateSet &cset3,
+                                              const EliminationSet &eset, const std::string &tag);
+    bool act_on_swordfish();
 
 private:
     //** simple coloring

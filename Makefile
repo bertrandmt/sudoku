@@ -31,6 +31,7 @@ src = coord.cpp \
 	  analyzer-lockedcandidates.cpp \
 	  analyzer-hiddenpairs.cpp \
 	  analyzer-xwing.cpp \
+	  analyzer-swordfish.cpp \
 	  analyzer-colorchain.cpp \
 	  analyzer-ywing.cpp \
 	  analyzer-xychain.cpp \
@@ -45,9 +46,24 @@ sudoku-solver: $(obj)
 test: sudoku-solver
 	./tests/run.sh
 
+# Whitebox unit tests. They link every library object (everything except the
+# REPL's main, sudoku-solver.o) plus the test's own main, and reach the
+# Analyzer's private members through the AnalyzerTest friend. The test source
+# lives under tests/unit, so it needs -I. to find the project headers.
+lib_obj = $(src:%.cpp=%.o)
+unit_bin = tests/unit/test_analyzer
+
+.PHONY: unit
+unit: $(unit_bin)
+	$(unit_bin)
+
+$(unit_bin): tests/unit/test_analyzer.cpp $(lib_obj)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I. $^ $(LDFLAGS) -o $@
+
 .PHONY: clean
 clean:
 	rm -f $(obj) $(obj:.o=.d) $(obj:.o=.gcno) $(obj:.o=.gcda) sudoku-solver
+	rm -f $(unit_bin) $(lib_obj:.o=.gcno) $(lib_obj:.o=.gcda)
 	rm -rf coverage.txt coverage*.html coverage*.css
 
 # Header dependencies are generated automatically by the compiler: -MMD writes a
