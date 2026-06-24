@@ -54,13 +54,19 @@ S_med="3819765249752146386425831792643589175976214831387492658164357924231978567
 P_clm="1.....569492.561.8.561.924...964.8.1.64.1....218.356.4.4.5...169.5.614.2621.....5"
 S_clm="187423569492756138356189247539647821764218953218935674843592716975361482621874395"
 
+# A hard puzzle (the "5*b" board from notes.txt) that fully solves but only by
+# applying the advanced analyzers: simple coloring, Y-Wing and XY-chain all
+# fire real eliminations. Doubles as a full-solve fixture and the SC/YW/XY
+# per-technique source.
+P_adv="19.342..52.581943.483...219..12.5..4..91.4.2.7426...51918....42.2.4..1933.4921.68"
+S_adv="197342685265819437483756219631295874859174326742638951918563742526487193374921568"
+
 # A harder puzzle the pure-logic solver does NOT fully crack, but along the way
-# it is forced to *apply* advanced eliminations (X-Wing, naked pair, locked
-# candidates). Used for the per-technique checks.
+# it is forced to *apply* X-Wing, naked-pair and locked-candidate eliminations.
 P_hard="100400006046091200002000000300000040000208000060000005000000900008750120700003004"
 
 echo "[1] Full-solve correctness"
-for name in easy med clm; do
+for name in easy med clm adv; do
     pvar="P_$name"; svar="S_$name"
     out="$(printf 'n.%s\nr\np\n' "${!pvar}" | "$SOLVER" 2>&1)"
     got="$(printf '%s' "$out" | extract_grids | tail -1)"
@@ -103,17 +109,21 @@ echo "[3] Per-technique: advanced analyzers actually apply eliminations"
 # Applied steps look like '[XW] [3, 8] x9 [r]' (tag, space, coordinate).
 # Detection-only summary lines look like '[XW](0) {}' (tag immediately followed
 # by '('), and must NOT count -- they print every step regardless.
-vout="$(printf 'v\nn.%s\nr\n' "$P_hard" | "$SOLVER" 2>&1)"
-check_tech() { # $1 = tag, $2 = human name
-    if printf '%s' "$vout" | grep -qE "^\[$1\] \[[0-9]"; then
-        ok "$2 ($1): applied at least one elimination"
+check_tech() { # $1 = solver verbose output, $2 = tag, $3 = human name
+    if printf '%s' "$1" | grep -qE "^\[$2\] \[[0-9]"; then
+        ok "$3 ($2): applied at least one elimination"
     else
-        bad "$2 ($1): never applied (analyzer may be broken)"
+        bad "$3 ($2): never applied (analyzer may be broken)"
     fi
 }
-check_tech XW "X-Wing"
-check_tech NP "Naked Pair"
-check_tech LC "Locked Candidates"
+vout_hard="$(printf 'v\nn.%s\nr\n' "$P_hard" | "$SOLVER" 2>&1)"
+check_tech "$vout_hard" XW "X-Wing"
+check_tech "$vout_hard" NP "Naked Pair"
+check_tech "$vout_hard" LC "Locked Candidates"
+vout_adv="$(printf 'v\nn.%s\nr\n' "$P_adv" | "$SOLVER" 2>&1)"
+check_tech "$vout_adv" SC "Simple Coloring"
+check_tech "$vout_adv" YW "Y-Wing"
+check_tech "$vout_adv" XY "XY-Chain"
 
 echo
 echo "----------------------------------------"
