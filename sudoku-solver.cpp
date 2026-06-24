@@ -10,13 +10,53 @@
 #include <iostream>
 #include <string>
 
+#include <clocale>
+#include <cstdlib>
 #include <unistd.h>
+
+#include <editline/readline.h>
 
 bool sVerbose = false;
 
 namespace {
 
 bool sInteractive = true;
+
+// Path to the persistent command-history file, computed once at startup.
+std::string history_path() {
+    const char *home = std::getenv("HOME");
+    if (!home) return std::string();
+    return std::string(home) + "/.sudoku-solver_history";
+}
+
+// Read one line of input. On an interactive terminal this uses libedit's
+// readline() for in-line editing and up/down history recall; piped input
+// falls back to std::getline. Returns false on end-of-input (the EOF
+// newline is emitted only on the interactive path, where it tidies the
+// prompt; scripted runs need no trailing blank line).
+bool read_line(std::string &line) {
+    if (!sInteractive) {
+        std::getline(std::cin, line);
+        return static_cast<bool>(std::cin);
+    }
+
+    char *raw = readline("λ ");
+    if (!raw) {            // EOF (Ctrl-D)
+        std::cout << std::endl;
+        return false;
+    }
+    line.assign(raw);
+
+    // Record non-empty lines in history, skipping consecutive duplicates.
+    static std::string last;
+    if (!line.empty() && line != last) {
+        add_history(raw);
+        last = line;
+    }
+
+    std::free(raw);
+    return true;
+}
 
 void help(void) {
     std::cout << "New game commands:" << std::endl
@@ -53,10 +93,7 @@ bool routine(Solver::ptr &solver) {
     bool done = false;
 
     std::string line;
-    if (sInteractive) std::cout << "λ " << std::flush;
-    std::getline(std::cin, line);
-    if (!std::cin) {
-        std::cout << std::endl;
+    if (!read_line(line)) {
         done = true;
         return done;
     }
@@ -158,12 +195,27 @@ int main(void) {
 
     bool done = false;
 
+    // Honor the environment's locale so libedit measures the multibyte
+    // prompt ("λ ") at its true display width and keeps the cursor aligned.
+    std::setlocale(LC_CTYPE, "");
+
     // interactive?
     sInteractive = isatty(fileno(stdin));
+
+    // Load persistent command history (interactive sessions only).
+    std::string histfile;
+    if (sInteractive) {
+        using_history();
+        stifle_history(1000);
+        histfile = history_path();
+        if (!histfile.empty()) read_history(histfile.c_str());
+    }
 
     do {
         done = routine(solver);
     } while (!done);
+
+    if (!histfile.empty()) write_history(histfile.c_str());
 
     return 0;
 }

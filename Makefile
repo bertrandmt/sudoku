@@ -9,7 +9,7 @@ CPPFLAGS += -O3
 endif
 
 CC = $(CXX)
-LDLIBS =
+LDLIBS = -ledit
 
 src = coord.cpp \
 	  cell.cpp \
