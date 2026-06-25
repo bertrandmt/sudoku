@@ -557,6 +557,16 @@ The `=` command succeeds unconditionally.
 
 The solver will take manual changes into consideration when resuming solving.
 
+## Tab completion
+
+In an interactive session, the arguments of the `x` and `=` commands can be completed from the live board state by pressing `Tab`. This turns completion into a "show me the legal moves" affordance for the `rcv` triple:
+
+* with the cursor right after `x` or `=`, completion offers the rows that still contain at least one unset cell;
+* after a row digit (`=1`), it offers the columns whose cell in that row is still unset;
+* after a row and column (`=13`), it offers the candidate values still legal in that cell.
+
+A unique match is inserted directly; otherwise pressing `Tab` again lists the possibilities. As elsewhere, the digits form a single concatenated token (`=137`), so no trailing space is added after a completion. (Command-name completion is not offered: the verbs are single characters with no shared prefixes, so it would add nothing.) Completion is an interactive-only convenience; piped/scripted input is unaffected.
+
 It must be noted that manual edition of the board has the potential of rendering it impossible to solve. As an example above, setting the value 7 in the cell at row 9, column 2 quickly leads the autosolver to a condition where a note cell has no candidates. The solver is *not* equipped to handle such cases and will likely fail with an assertion when encountering such a case.
  
 # Other commands

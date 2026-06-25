@@ -35,6 +35,15 @@ public:
 
     bool solved() const { return mStates.back()->solved(); }
 
+    // --- accessors for interactive tab completion (see completion.h) ---
+    // Is the cell at (row,col) currently unset (still a note cell)? Returns
+    // false if there is no board yet or the coordinates are out of range.
+    bool is_unset(size_t row, size_t col) const;
+    // The candidate values still legal at (row,col), ascending. Empty if the
+    // cell is already set, there is no board, or the coordinates are out of
+    // range.
+    std::vector<Value> candidates_at(size_t row, size_t col) const;
+
     friend std::ostream &operator<<(std::ostream &, const Solver &);
 
 private:
