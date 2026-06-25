@@ -32,6 +32,11 @@ public:
 
     bool solved() const { return mBoard.note_cells_count() == 0; }
 
+    // Read-only view of the current board, used by the interactive completer to
+    // read live cell state (see completion.h). The REPL reaches this through
+    // Solver's intent-level accessors rather than touching the board directly.
+    const Board &board() const { return mBoard; }
+
     void print(std::ostream &outs) const {
         mBoard.print(outs);
     }

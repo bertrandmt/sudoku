@@ -43,7 +43,8 @@ src = coord.cpp \
 	  analyzer-ywing.cpp \
 	  analyzer-xychain.cpp \
 	  solverstate.cpp \
-	  solver.cpp
+	  solver.cpp \
+	  completion.cpp
 
 obj = $(addprefix $(BUILD)/,sudoku-solver.o $(src:.cpp=.o))
 
@@ -64,18 +65,19 @@ $(BUILD):
 test: sudoku-solver
 	./tests/run.sh
 
-# Whitebox unit tests. They link every library object (everything except the
-# REPL's main, sudoku-solver.o) plus the test's own main, and reach the
-# Analyzer's private members through the AnalyzerTest friend. The test source
-# lives under tests/unit, so it needs -I. to find the project headers.
+# Whitebox unit tests. Each test binary links every library object (everything
+# except the REPL's main, sudoku-solver.o) plus its own main: test_analyzer
+# reaches the Analyzer's private members through the AnalyzerTest friend;
+# test_completion drives the pure complete_move() core. The test sources live
+# under tests/unit, so they need -I. to find the project headers.
 lib_obj = $(addprefix $(BUILD)/,$(src:.cpp=.o))
-unit_bin = tests/unit/test_analyzer
+unit_bins = tests/unit/test_analyzer tests/unit/test_completion
 
 .PHONY: unit
-unit: $(unit_bin)
-	$(unit_bin)
+unit: $(unit_bins)
+	@for b in $(unit_bins); do echo "== $$b =="; "$$b" || exit $$?; done
 
-$(unit_bin): tests/unit/test_analyzer.cpp $(lib_obj)
+tests/unit/%: tests/unit/%.cpp $(lib_obj)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I. $^ $(LDFLAGS) -o $@
 
 # One-shot coverage report. Rebuilds instrumented from clean, exercises both
@@ -96,7 +98,7 @@ coverage:
 .PHONY: clean
 clean:
 	rm -rf $(BUILD) sudoku-solver
-	rm -f $(unit_bin) $(unit_bin).d
+	rm -f $(unit_bins) $(addsuffix .d,$(unit_bins))
 	rm -f tests/unit/*.gcno tests/unit/*.gcda
 	rm -rf tests/unit/*.dSYM
 

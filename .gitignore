@@ -46,6 +46,7 @@ coverage*.css
 build/
 sudoku-solver
 tests/unit/test_analyzer
+tests/unit/test_completion
 *.dSYM/
 *.bak
 out.txt
