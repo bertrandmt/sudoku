@@ -201,7 +201,7 @@ void Board::print_candidates(std::ostream &out) const {
                 out << c.value();
             } else {
                 bool any = false;
-                for (Value v : value_range(kOne, kUnset)) {
+                for (Value v : value_range()) {
                     if (c.check(v)) { out << static_cast<int>(v); any = true; }
                 }
                 if (!any) out << '-';

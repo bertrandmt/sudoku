@@ -7,38 +7,23 @@
 
 void Cell::set(const Value &v) {
     assert(isNote());
-    assert(v != kUnset);
 
     mNotes.clear();
     mValue = v;
 }
 
 bool Notes::set(const Value &v, bool set) {
-
-    bool note = mNotes.at(v - 1);
-    mNotes[v - 1] = set;
+    bool note = check(v);
+    if (set) mNotes |=  bit(v);
+    else     mNotes &= ~bit(v);
     return note;
-}
-
-size_t Notes::count() const {
-    size_t count = 0;
-    for (auto const &v : mNotes) {
-        if (v) count++;
-    }
-    return count;
 }
 
 std::vector<Value> Notes::values() const {
     std::vector<Value> v;
-    if (check(kOne))   v.push_back(kOne);
-    if (check(kTwo))   v.push_back(kTwo);
-    if (check(kThree)) v.push_back(kThree);
-    if (check(kFour))  v.push_back(kFour);
-    if (check(kFive))  v.push_back(kFive);
-    if (check(kSix))   v.push_back(kSix);
-    if (check(kSeven)) v.push_back(kSeven);
-    if (check(kEight)) v.push_back(kEight);
-    if (check(kNine))  v.push_back(kNine);
+    for (Value value : value_range()) {
+        if (check(value)) v.push_back(value);
+    }
     return v;
 }
 
@@ -57,7 +42,7 @@ void Cell::print_row(std::ostream &outs, size_t row) const {
     }
     else {
         // A solved cell shows its value centered on the middle line only.
-        if (row == 1) outs << "  " << mValue << "  ";
+        if (row == 1) outs << "  " << *mValue << "  ";
         else          outs << "     ";
     }
 }

@@ -179,7 +179,7 @@ bool Analyzer::find_color_chains() {
     //          chain can see two colors on the chain, then it can be eliminated.
     bool did_find = false;
 
-    for (Value val : value_range(kOne, kUnset)) {
+    for (Value val : value_range()) {
         did_find = find_color_chains(val);
         if (!did_find) continue;
         break;

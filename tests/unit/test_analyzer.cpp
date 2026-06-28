@@ -286,12 +286,11 @@ void test_ywing_rejects_non_patterns() {
     set_candidates(board, 2, 0, {2, 5});   // shares 2, other 5 (!= 3)
 
     Analyzer analyzer(board);
-    Value out = kUnset;
+    Value out;  // out-param; only meaningful when test_ywing returns true
     bool both_share_one = AnalyzerTest::test_ywing(analyzer,
         cell_at(board, 0, 0), cell_at(board, 0, 1), cell_at(board, 1, 0), out);
     check(!both_share_one, "rejected: both wings share the same value with the pivot");
 
-    out = kUnset;
     bool others_differ = AnalyzerTest::test_ywing(analyzer,
         cell_at(board, 0, 0), cell_at(board, 0, 1), cell_at(board, 2, 0), out);
     check(!others_differ, "rejected: the wings' non-shared values differ");

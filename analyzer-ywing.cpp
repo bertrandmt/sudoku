@@ -61,7 +61,7 @@ bool Analyzer::test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing
     assert(mBoard.see_each_other(pivot, wing2));
 
     // does wing1 share only one value with pivot (and which is it?)
-    Value wing1_shared = kUnset;
+    std::optional<Value> wing1_shared;
     if (pivot.check(wing1.notes().values()[0])) {
         if (pivot.check(wing1.notes().values()[1])) return false;
         wing1_shared = wing1.notes().values()[0];
@@ -71,7 +71,7 @@ bool Analyzer::test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing
     }
 
     // yes! but does wing2 share only one value with pivot (and which is it?)
-    Value wing2_shared = kUnset;
+    std::optional<Value> wing2_shared;
     if (pivot.check(wing2.notes().values()[0])) {
         if (pivot.check(wing2.notes().values()[1])) return false;
         wing2_shared = wing2.notes().values()[0];
@@ -141,7 +141,7 @@ bool Analyzer::find_ywing(const Cell &pivot) {
             const Cell &wing1 = *it1;
             const Cell &wing2 = *it2;
 
-            Value ywing_value = kUnset;
+            Value ywing_value;  // set by test_ywing when it returns true
             if (!test_ywing(pivot, wing1, wing2, ywing_value)) continue;
             assert(wing1.check(ywing_value));
             assert(wing2.check(ywing_value));
