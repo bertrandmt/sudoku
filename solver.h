@@ -11,7 +11,7 @@ public:
     using ptr = std::unique_ptr<Solver>;
 
     Solver(const std::string &board_desc) {
-        mStates.push_back(SolverState::ptr(new SolverState(board_desc)));
+        mStates.push_back(std::make_unique<SolverState>(board_desc));
     }
 
     bool solve_one_step(bool singles_only);

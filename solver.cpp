@@ -6,7 +6,7 @@
 bool Solver::solve_one_step(bool singles_only) {
     if (mStates.back()->solved()) return false;
 
-    SolverState::ptr nextState(new SolverState(*mStates.back()));
+    SolverState::ptr nextState = std::make_unique<SolverState>(*mStates.back());
     std::cout << "Step #" << nextState->generation() << ":" << std::endl;
 
     if (nextState->act(singles_only)) {
@@ -68,7 +68,7 @@ bool Solver::reset() {
 }
 
 bool Solver::edit_note(const std::string &entry) {
-    SolverState::ptr nextState(new SolverState(*mStates.back()));
+    SolverState::ptr nextState = std::make_unique<SolverState>(*mStates.back());
 
     bool did_act = false;
 
@@ -82,7 +82,7 @@ bool Solver::edit_note(const std::string &entry) {
 }
 
 bool Solver::set_value(const std::string &entry) {
-    SolverState::ptr nextState(new SolverState(*mStates.back()));
+    SolverState::ptr nextState = std::make_unique<SolverState>(*mStates.back());
 
     bool did_act = false;
 

@@ -114,7 +114,7 @@ bool routine(Solver::ptr &solver) {
 
         case 'n': { // it's a new game
             try {
-                solver.reset(new Solver(nowsline.substr(1)));
+                solver = std::make_unique<Solver>(nowsline.substr(1));
             }
             catch (const std::runtime_error &e) {
                 std::cout << e.what() << std::endl;
