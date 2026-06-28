@@ -9,7 +9,7 @@
 
 class SolverState {
 public:
-    using ptr = std::shared_ptr<SolverState>;
+    using ptr = std::unique_ptr<SolverState>;
 
     SolverState(const std::string &board_desc)
         : mBoard(board_desc)
