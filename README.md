@@ -449,15 +449,208 @@ Additionally, "Rule 4" also applies, with `[8, 4]` and `[8, 6]` seeing both red 
 
 ## Y-Wing
 
-TODO
+The Sudoku Wiki [explainer page](https://www.sudokuwiki.org/Y_Wing_Strategy) on the Y-Wing Strategy describes a structure of three note cells, each with exactly two candidates: a *pivot* with candidates `AB`, and two *wings*, one with candidates `AC` and the other with candidates `BC`. The pivot must see both wings (sharing a row, column or nonet with each), though the wings need not see each other. Whichever of its two values the pivot takes, one of the wings is forced to value `C`. Therefore any cell that can see *both* wings cannot be a candidate for `C`, and `C` can be eliminated from it.
+
+For example:
+```
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[    *|     |     ][     |     |     ][     |    *|     ]
+[  *  |    *|  2  ][  8  |  *  |  4  ][     |    *|  1  ]
+[     |    *|     ][     |*   *|     ][*   *|*   *|     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|*    |     ][*    |     |*    ][     |    *|     ]
+[  *  |     |  4  ][     |  6  |  *  ][  2  |     |  8  ]
+[     |    *|     ][*   *|     |    *][     |*   *|     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |*    ][     |     |*    ][     |     |     ]
+[  8  |  7  |    *][  3  |  2  |     ][  4  |    *|  5  ]
+[     |     |     ][     |     |    *][     |    *|     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][     |     |     ][     |     |     ]
+[  9  |  2  |  3  ][  6  |  1  |  8  ][  *  |  *  |  4  ]
+[     |     |     ][     |     |     ][*    |*    |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |*    |     ][  *  |     |  *  ][     |*    |     ]
+[  4  |     |  5  ][     |     |     ][  6  |     |  3  ]
+[     |  *  |     ][*   *|*   *|    *][     |  *  |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |*    |*    ][     |     |     ][*    |     |     ]
+[  7  |    *|    *][  5  |  4  |  3  ][     |  2  |  9  ]
+[     |  *  |     ][     |     |     ][  *  |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][*    |     |     ][*    |     |     ]
+[  2  |  5  |  8  ][     |  3  |  7  ][     |  4  |  6  ]
+[     |     |     ][    *|     |     ][    *|     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][* *  |     |* *  ][     |*    |     ]
+[  6  |  4  |  9  ][     |  8  |  *  ][  3  |  *  |  7  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[  1  |  3  |  7  ][  4  |  *  |  6  ][  *  |  *  |  2  ]
+[     |     |     ][     |    *|     ][  * *|  * *|     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+Left to solve:   31
+Notes remaining: 73
+[NS](0) {}
+[HS](0) {}
+[NP](0) {}
+[LC](0) {}
+[HP](0) {}
+[XW](0) {}
+[SC](0) {}
+[YW](2) {{[3, 3]Y{[1, 2],[3, 6]}#9}, {[3, 3]Y{[2, 2],[3, 8]}#9}}
+[SF](0) {}
+[XY](0) {}
+```
+This indicates two Y-Wings, both pivoting on `[3, 3]` (candidates `{1, 6}`) for elimination value 9. The first uses wings `[1, 2]` (candidates `{6, 9}`, sharing 6 with the pivot) and `[3, 6]` (candidates `{1, 9}`, sharing 1 with the pivot); the value common to both wings but absent from the pivot is 9. The second Y-Wing pivots on the same cell, with wings `[2, 2]` and `[3, 8]`.
+
+The summary syntax for each entry is `pivotY{wing1,wing2}#value`. In the first entry, `[3, 3]Y{[1, 2],[3, 6]}#9`, cell `[1, 5]` sees both wings (it shares row 1 with `[1, 2]` and a nonet with `[3, 6]`) and so loses candidate 9. In the second, `[2, 8]` sees both `[2, 2]` (row 2) and `[3, 8]` (column 8).
+
+Unlike X-Wing, Simple Coloring and the chaining heuristics below, the solver executes *all* available Y-Wing eliminations in a single step:
+```
+λ >
+Step #2:
+[YW] [1, 5] x9
+[YW] [2, 8] x9
+```
 
 ## Swordfish
 
-TODO
+The Sudoku Wiki [explainer page](https://www.sudokuwiki.org/Sword_Fish_Strategy) on the Swordfish Strategy extends the X-Wing from two rows/columns to three. When a candidate, in each of three columns, is confined to the same three rows (each column holding two or three of them), then that candidate can be eliminated from those three rows wherever it appears in any *other* column. As with the X-Wing, rows and columns can be swapped: a row-based Swordfish instead eliminates in columns.
+
+For example:
+```
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][     |     |     ][     |     |     ]
+[  5  |  2  |  9  ][  4  |  1  |    *][  7  |    *|  3  ]
+[     |     |     ][     |     |  *  ][     |  *  |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |*    |     ][     |     |     ][*    |*    |     ]
+[*    |*    |  6  ][  *  |     |  3  ][     |* *  |  2  ]
+[* *  |  *  |     ][    *|* * *|     ][  *  |  * *|     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |*    |     ][     |     |     ][*    |     |*    ]
+[*    |*    |  3  ][  2  |     |  * *][     |  * *|*    ]
+[* *  |  *  |     ][     |* * *|     ][  * *|     |  * *]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][     |     |*    ][*    |     |     ]
+[*    |  5  |  2  ][  3  |     |*    ][     |  7  |  6  ]
+[  *  |     |     ][     |  * *|  *  ][  * *|     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][*    |     |*    ][     |*    |*    ]
+[  6  |  3  |  7  ][     |  5  |*    ][  2  |*    |*    ]
+[     |     |     ][    *|     |  *  ][     |  * *|  * *]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[  1  |  9  |*    ][  6  |  2  |  7  ][  5  |  3  |*    ]
+[     |     |  *  ][     |     |     ][     |     |  *  ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |*    ][*    |     |     ][     |     |*    ]
+[  3  |     |  *  ][  *  |  6  |  9  ][  4  |  2  |     ]
+[     |* *  |  *  ][     |     |     ][     |     |* *  ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |*    ][     |     |*    ][     |*    |*    ]
+[  2  |*    |* *  ][  8  |  3  |  *  ][  6  |     |     ]
+[     |*    |     ][     |     |     ][     |    *|*   *]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |*    ][     |     |     ][     |*    |     ]
+[  9  |  6  |     ][  7  |  4  |  2  ][  3  |     |  5  ]
+[     |     |  *  ][     |     |     ][     |  *  |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+Left to solve:   36
+Notes remaining: 95
+[NS](0) {}
+[HS](0) {}
+[NP](0) {}
+[LC](0) {}
+[HP](0) {}
+[XW](0) {}
+[SC](0) {}
+[YW](0) {}
+[SF](1) {{{[2, 1],[2, 5],[2, 7]}#8[^r]}}
+[XY](0) {}
+```
+This indicates one Swordfish for candidate value 8. The three anchor cells `[2, 1]`, `[2, 5]` and `[2, 7]` identify the three base sets, here columns 1, 5 and 7 (each anchor is the first candidate cell encountered in its base set). The `[^r]` tag, echoing the Locked Candidates notation, indicates that eliminations fall in the *rows*, making this a column-based Swordfish. Candidate 8 appears in columns 1, 5 and 7 only within rows 2, 3 and 4, so it can be removed from those three rows wherever it appears in any other column.
+
+On execution, the solver acts on this single pattern, removing candidate 8 from the affected cells in rows 2, 3 and 4:
+```
+λ >
+Step #14:
+[SF] [2, 2] x8 [r]
+[SF] [2, 8] x8 [r]
+[SF] [3, 2] x8 [r]
+[SF] [3, 9] x8 [r]
+[SF] [4, 6] x8 [r]
+```
 
 ## XY-Chain
 
-TODO
+The Sudoku Wiki [explainer page](https://www.sudokuwiki.org/XY_Chains) on XY-Chains describes a chain of bivalue cells (cells with exactly two candidates) in which each cell shares one candidate with the next. Label the chain's starting candidate `X`. Following the alternating "if this end is not `X`, then its other value is forced, which forces the next link, ..." logic along the chain, one of the two chain ends is guaranteed to be `X`. Therefore any cell off the chain that can see *both* ends cannot be a candidate for `X`.
+
+Because many chains may exist at once, the solver scores them by number of eliminations (more is better) and length (shorter is better), and acts only on the single most desirable one.
+
+For example:
+```
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[*   *|     |*   *][    *|     |    *][     |     |     ]
+[  *  |  2  |  *  ][  * *|    *|  * *][    *|  9  |  4  ]
+[  *  |     |  *  ][  *  |* *  |* *  ][*    |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][  * *|     |  * *]
+[  7  |  6  |*    ][  9  |  1  |*    ][     |  5  |     ]
+[     |     |  *  ][     |     |  *  ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|     |    *][    *|     |     ][     |     |     ]
+[* *  |  9  |* *  ][* * *|*   *|  2  ][    *|  8  |  1  ]
+[     |     |     ][     |*    |     ][*    |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[    *|     |  *  ][  *  |     |     ][  * *|     |  * *]
+[*   *|  7  |     ][*   *|  5  |*   *][*    |  1  |     ]
+[     |     |    *][  *  |     |  *  ][    *|     |    *]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[*    |    *|*    ][     |  *  |     ][     |  * *|     ]
+[* * *|  *  |* * *][  7  |*   *|  9  ][* *  |     |  8  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |  *  ][  *  |     |     ][  *  |     |     ]
+[* *  |  8  |     ][*    |  3  |  1  ][* *  |  6  |  7  ]
+[     |     |    *][     |     |     ][    *|     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |    *][     |     |    *][    *|     |    *]
+[  2  |  4  |  * *][  1  |    *|  * *][     |  7  |     ]
+[     |     |  *  ][     |  *  |  *  ][  * *|     |    *]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|     |    *][  * *|     |    *][  * *|     |     ]
+[    *|  1  |    *][    *|  9  |    *][     |  4  |  5  ]
+[  *  |     |* *  ][  *  |     |* *  ][  *  |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |    *|     ][     |  *  |     ][     |  * *|     ]
+[  9  |  *  |  *  ][* *  |*    |* *  ][  1  |     |  6  ]
+[     |     |* *  ][  *  |* *  |* *  ][     |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+Left to solve:   47
+Notes remaining: 142
+[NS](0) {}
+[HS](0) {}
+[NP](0) {}
+[LC](0) {}
+[HP](0) {}
+[XW](0) {}
+[SC](0) {}
+[YW](0) {}
+[SF](0) {}
+[XY](1) {{{[5, 8]:[5, 2]:[6, 1]:[6, 4]}#2x2}}
+```
+This indicates one XY-Chain for value 2 with two eliminations (the `x2` suffix), running `[5, 8]` -> `[5, 2]` -> `[6, 1]` -> `[6, 4]`. Those cells carry candidates `{2, 3}`, `{3, 5}`, `{4, 5}` and `{2, 4}` respectively; each consecutive pair shares exactly one value (3, then 5, then 4), and both ends carry the chain value 2. Cells `[5, 5]` and `[6, 7]` each see both ends of the chain and so lose candidate 2.
+
+The summary lists the full chain as `{c1:c2:..:cn}#value`, suffixed with `x` and the elimination count. Each action line abbreviates the chain to `{front:..:back}#value`:
+```
+λ >
+Step #9:
+[XY] [5, 5] x2 ({[5, 8]:..:[6, 4]}#2)
+[XY] [6, 7] x2 ({[5, 8]:..:[6, 4]}#2)
+```
 
 ## Order of analysis and resolution
 
