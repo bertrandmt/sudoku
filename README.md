@@ -177,10 +177,11 @@ Notes remaining: 210
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
+[SF](0) {}
 [XY](0) {}
 ```
 
-There are currently nine implemented heuristics: 
+There are currently ten implemented heuristics: 
 
 1. `naked-single`, denoted as `[NS]`,
 1. `hidden-single`, denoted as `[HS]`,
@@ -189,7 +190,8 @@ There are currently nine implemented heuristics:
 1. `hidden-pairs`, denoted as `[HP]`,
 1. `x-wing`, denoted as `[XW]`,
 1. `simple-coloring`, denoted as `[SC]`,
-1. `y-wing`, denoted as `[YW]`, and
+1. `y-wing`, denoted as `[YW]`,
+1. `swordfish`, denoted as `[SF]`, and
 1. `XY-chain`, denoted as `[XY]`.
 
 For each heuristic, the number of available actions associated with the heuristic appears in parentheses, followed by a summary description of such actions.
@@ -430,6 +432,7 @@ Notes remaining: 47
 [XW](0) {}
 [SC](1) {{{[4, 8]🟩,[9, 8]🟥,[8, 7]🟩,[6, 5]🟩,[6, 7]🟥,[9, 5]🟥}#5}}
 [YW](0) {}
+[SF](0) {}
 [XY](0) {}
 ```
 However, `[9, 5]` is colored red, but sees `[9, 8]` also colored red. Per "Rule 2", all reds from the chain can be eliminated:
@@ -448,13 +451,17 @@ Additionally, "Rule 4" also applies, with `[8, 4]` and `[8, 6]` seeing both red 
 
 TODO
 
+## Swordfish
+
+TODO
+
 ## XY-Chain
 
 TODO
 
 ## Order of analysis and resolution
 
-The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring and XY-Chain.
+The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring, Swordfish and XY-Chain.
 
 # Editing the table
 

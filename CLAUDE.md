@@ -27,6 +27,10 @@ echo -e "v\nn.board_string\n.\n.\n.\n.\n.\n.\n.\n.\n.\n." | ./sudoku-solver | gr
 - [LC] = Locked Candidates
 - [HP] = Hidden Pairs
 - [XW] = XWing patterns
+- [SC] = Simple Coloring (single's chains)
+- [YW] = Y-Wing
+- [SF] = Swordfish
+- [XY] = XY-Chain
 
 ## Reading board display output
 The visual board display shows each Sudoku cell as a 3x3 grid of positions representing candidate values:

@@ -71,9 +71,9 @@ void Analyzer::analyze() {
     if (!did_find) did_find = find_locked_candidates();
     if (!did_find) did_find = find_hidden_pairs();
     if (!did_find) did_find = find_xwings();
-    if (!did_find) did_find = find_swordfish();
     if (!did_find) did_find = find_color_chains();
     if (!did_find) did_find = find_ywings();
+    if (!did_find) did_find = find_swordfish();
     if (!did_find) did_find = find_xychains();
 }
 
@@ -88,9 +88,9 @@ bool Analyzer::act(const bool singles_only) {
         if (!did_act) did_act = act_on_locked_candidate();
         if (!did_act) did_act = act_on_hidden_pair();
         if (!did_act) did_act = act_on_xwing();
-        if (!did_act) did_act = act_on_swordfish();
         if (!did_act) did_act = act_on_color_chain();
         if (!did_act) did_act = act_on_ywing();
+        if (!did_act) did_act = act_on_swordfish();
         if (!did_act) did_act = act_on_xychain();
     }
 
@@ -123,9 +123,9 @@ std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
     print_section(outs, "LC", a.mLockedCandidates, true);  outs << std::endl;
     print_section(outs, "HP", a.mHiddenPairs,      true);  outs << std::endl;
     print_section(outs, "XW", a.mXWings,           true);  outs << std::endl;
-    print_section(outs, "SF", a.mSwordfish,        true);  outs << std::endl;
     print_section(outs, "SC", a.mColorChains,      true);  outs << std::endl; // a.k.a. single's chains
     print_section(outs, "YW", a.mYWings,           true);  outs << std::endl;
+    print_section(outs, "SF", a.mSwordfish,        true);  outs << std::endl;
     print_section(outs, "XY", a.mXYChains,         true);
 
     return outs;
