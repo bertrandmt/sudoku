@@ -8,11 +8,10 @@
 
 class Solver {
 public:
-    using ptr = std::shared_ptr<Solver>;
+    using ptr = std::unique_ptr<Solver>;
 
     Solver(const std::string &board_desc) {
-        SolverState::ptr initial_state(new SolverState(board_desc));
-        mStates.push_back(initial_state);
+        mStates.push_back(SolverState::ptr(new SolverState(board_desc)));
     }
 
     bool solve_one_step(bool singles_only);

@@ -10,9 +10,9 @@ bool Solver::solve_one_step(bool singles_only) {
     std::cout << "Step #" << nextState->generation() << ":" << std::endl;
 
     if (nextState->act(singles_only)) {
-        mStates.push_back(nextState);
+        mStates.push_back(std::move(nextState));
 
-        if (nextState->solved()) {
+        if (mStates.back()->solved()) {
             std::cout << "SOLVED!" << std::endl;
         }
         return true;
@@ -77,7 +77,7 @@ bool Solver::edit_note(const std::string &entry) {
         std::cout << "Step #" << nextState->generation() << ":" << std::endl;
     }
 
-    if (did_act) mStates.push_back(nextState);
+    if (did_act) mStates.push_back(std::move(nextState));
     return did_act;
 }
 
@@ -91,7 +91,7 @@ bool Solver::set_value(const std::string &entry) {
         std::cout << "Step #" << nextState->generation() << ":" << std::endl;
     }
 
-    if (did_act) mStates.push_back(nextState);
+    if (did_act) mStates.push_back(std::move(nextState));
     return did_act;
 }
 
