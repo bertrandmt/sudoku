@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <string_view>
 
 class Row;
 class Column;
@@ -19,7 +20,14 @@ class Nonet;
 enum class Unit { Row, Column, Nonet };
 
 // Single-character display tag for a unit: "r" / "c" / "n".
-const char *tag(Unit);
+constexpr std::string_view tag(Unit unit) {
+    switch (unit) {
+        case Unit::Row:    return "r";
+        case Unit::Column: return "c";
+        case Unit::Nonet:  return "n";
+    }
+    return "?"; // unreachable; silences -Wreturn-type
+}
 
 // Parse a 3-character "row,column,value" triple, each a digit 1-9, into
 // zero-based row/column indices and a Value. Returns false (leaving the

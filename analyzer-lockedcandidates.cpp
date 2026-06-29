@@ -9,8 +9,8 @@
 
 namespace { // anon
 template<class Set>
-bool would_act_on_set(std::vector<Coord> const &coords, Value const &value, std::string const &tag, Set const &set) {
-    assert(set.tag() == tag);
+bool would_act_on_set(std::vector<Coord> const &coords, Value const &value, std::string const &expected_tag, Set const &set) {
+    assert(tag(set.kind()) == expected_tag);
 
     bool would_act = false;
 
@@ -95,7 +95,7 @@ bool Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 
 
     if (would_act) {
         // but is this entry already recorded?
-        LockedCandidates lc(lc_coords, value, set_to_ignore.tag());
+        LockedCandidates lc(lc_coords, value, std::string(tag(set_to_ignore.kind())));
         if (std::find(mLockedCandidates.begin(), mLockedCandidates.end(), lc) != mLockedCandidates.end()) return did_find;
 
         // no! let's record it

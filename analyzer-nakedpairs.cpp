@@ -123,12 +123,12 @@ bool Analyzer::act_on_naked_pair(const NakedPair &entry, Set &set) {
 
         if (other_cell.check(entry.values.first)) {
             mBoard.clear_note_at(other_cell.coord(), entry.values.first);
-            std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.first << " [" << set.tag() << "]" << std::endl;
+            std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.first << " [" << tag(set.kind()) << "]" << std::endl;
             did_act = true;
         }
         if (other_cell.check(entry.values.second)) {
             mBoard.clear_note_at(other_cell.coord(), entry.values.second);
-            std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.second << " [" << set.tag() << "]" << std::endl;
+            std::cout << "[NP] " << other_cell.coord() << " x" << entry.values.second << " [" << tag(set.kind()) << "]" << std::endl;
             did_act = true;
         }
     }

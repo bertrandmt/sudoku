@@ -288,15 +288,6 @@ const Nonet &Board::nonet(const Coord &coord) const {
     return mNonets.at(nonetRow + nonetCol / 3);
 }
 
-const char *tag(Unit unit) {
-    switch (unit) {
-        case Unit::Row:    return "r";
-        case Unit::Column: return "c";
-        case Unit::Nonet:  return "n";
-    }
-    return "?"; // unreachable; silences -Wreturn-type
-}
-
 std::optional<Unit> Board::see_each_other(const Coord &coord1, const Coord &coord2) const {
     if      (row(coord1)    == row(coord2))    return Unit::Row;
     else if (column(coord1) == column(coord2)) return Unit::Column;

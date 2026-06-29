@@ -21,7 +21,7 @@ bool Analyzer::test_hidden_single(const Cell &cell, const Value &value, const Se
 
         return false;
     }
-    out_tag.append(set.tag());
+    out_tag.append(tag(set.kind()));
     return true;
 }
 

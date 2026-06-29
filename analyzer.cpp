@@ -22,7 +22,7 @@ void Analyzer::filter_notes(Cell &cell, const Set &set) {
             if (!cell.check(other_cell.value())) continue;
 
             if (sVerbose) std::cout << "  [FNn] " << cell.coord() << " x" << other_cell.value()
-                      << " " << set.tag() << "(" << other_cell.coord() << ")" << std::endl;
+                      << " " << tag(set.kind()) << "(" << other_cell.coord() << ")" << std::endl;
             mBoard.clear_note_at(cell.coord(), other_cell.value());
         }
     }
@@ -36,7 +36,7 @@ void Analyzer::filter_notes(Cell &cell, const Set &set) {
             if (!other_cell.check(cell.value())) continue;
 
             if (sVerbose) std::cout << "  [FNv] " << other_cell.coord() << " x" << cell.value()
-                      << " " << set.tag() << "(" << cell.coord() << ")" << std::endl;
+                      << " " << tag(set.kind()) << "(" << cell.coord() << ")" << std::endl;
             mBoard.clear_note_at(other_cell.coord(), cell.value());
         }
     }

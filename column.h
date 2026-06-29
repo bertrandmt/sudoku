@@ -19,7 +19,7 @@ public:
         , mCellStart(index) // line 0, column 'index'
         , mCellSentinel(index + board.height * board.width) { }
 
-    std::string tag() const { return ::tag(Unit::Column); }
+    Unit kind() const { return Unit::Column; }
 
     class Iterator {
     public:
