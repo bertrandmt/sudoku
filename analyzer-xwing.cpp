@@ -91,25 +91,15 @@ bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateS
         // subsequent csets only
         if (!(cset < other_cset)) continue;
 
-        // are there exactly two candidates for this value on this other cset?
+        // is this a valid XWing pattern anchored on (cset, eset)?
+        if (!test_xwing(value, cset, other_cset, eset, other_eset)) continue;
+
+        // yes! the diagonal corner is the other cset's candidate in the diagonal eset
         auto other_cset_candidates = candidates(other_cset, value);
-        if (other_cset_candidates.size() != 2) continue;
-
-        // yes! does this other cset have candidates in the same esets as our cset
-        assert(!(eset.contains(other_cset_candidates[1]) && other_eset.contains(other_cset_candidates[0])));
-        if (!eset.contains(other_cset_candidates[0])) continue;
-        if (!other_eset.contains(other_cset_candidates[1])) continue;
-
-        // yes! identify the diagonal cell
-        const Cell& diagonal = other_cset_candidates[1];
+        const Cell &diagonal = other_cset_candidates[1];
         assert(other_eset.contains(diagonal));
 
-        // is this a valid XWing pattern (i.e. other candidates in the same esets would be eliminated)?
-        auto anchor_eliminates = candidates(eset, value);
-        auto diagonal_eliminates = candidates(other_eset, value);
-        if (anchor_eliminates.size() <= 2 && diagonal_eliminates.size() <= 2) continue;
-
-        // yes! record the pattern
+        // record the pattern
         XWing candidate_xwing{value, cell.coord(), diagonal.coord(), by_row};
         assert(mXWings.empty());
         mXWings.push_back(candidate_xwing);
