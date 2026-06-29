@@ -9,6 +9,7 @@
 #include <set>
 #include <unordered_map>
 #include <memory>
+#include <optional>
 
 class Analyzer {
 public:
@@ -76,14 +77,14 @@ private:
     struct HiddenSingle {
         Coord coord;
         Value value;
-        std::string tag;
+        Unit unit;
     };
     friend std::ostream& operator<<(std::ostream& outs, const HiddenSingle &);
     std::vector<HiddenSingle> mHiddenSingles;
 
     // find
     template<class Set>
-    bool test_hidden_single(const Cell &, const Value &, const Set &, std::string &) const;
+    std::optional<Unit> test_hidden_single(const Cell &, const Value &, const Set &) const;
     bool find_hidden_singles();
 
     // act
@@ -117,7 +118,7 @@ private:
     struct LockedCandidates {
         std::vector<Coord> coords;
         Value value;
-        std::string tag;
+        Unit unit;
 
         bool operator==(const LockedCandidates &other) const;
     };
@@ -179,7 +180,7 @@ private:
     // act
     template<class CandidateSet, class EliminationSet>
     bool act_on_xwing(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2,
-                                          const EliminationSet &eset, const std::string &tag);
+                                          const EliminationSet &eset, Unit unit);
     bool act_on_xwing();
 
 private:
@@ -203,7 +204,7 @@ private:
     // act
     template<class CandidateSet, class EliminationSet>
     bool act_on_swordfish(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2, const CandidateSet &cset3,
-                                              const EliminationSet &eset, const std::string &tag);
+                                              const EliminationSet &eset, Unit unit);
     bool act_on_swordfish();
 
 private:

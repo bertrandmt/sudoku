@@ -7,33 +7,8 @@
 
 #include <algorithm>
 
-namespace { // anon
-template<class Set>
-bool would_act_on_set(std::vector<Coord> const &coords, Value const &value, std::string const &expected_tag, Set const &set) {
-    assert(tag(set.kind()) == expected_tag);
-
-    bool would_act = false;
-
-    for (auto const &cell : set) {
-        // is it a note cell?
-        if (!cell.isNote()) continue;
-
-        // yes! but is it a candidate?
-        if (!cell.check(value)) continue;
-
-        // yes! but is it one of the locked candidates?
-        if (std::find(coords.begin(), coords.end(), cell.coord()) != coords.end()) continue;
-
-        would_act = true;
-        break;
-    }
-
-    return would_act;
-}
-}
-
 bool Analyzer::LockedCandidates::operator==(const LockedCandidates &other) const {
-    if (tag != other.tag) return false;
+    if (unit != other.unit) return false;
     if (value != other.value) return false;
     if (coords.size() != other.coords.size()) return false;
     for (const Coord &c : coords) {
@@ -95,7 +70,7 @@ bool Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 
 
     if (would_act) {
         // but is this entry already recorded?
-        LockedCandidates lc(lc_coords, value, std::string(tag(set_to_ignore.kind())));
+        LockedCandidates lc(lc_coords, value, set_to_ignore.kind());
         if (std::find(mLockedCandidates.begin(), mLockedCandidates.end(), lc) != mLockedCandidates.end()) return did_find;
 
         // no! let's record it
@@ -155,7 +130,7 @@ bool Analyzer::act_on_locked_candidate(const LockedCandidates &entry, Set &set) 
         if (!other_cell.check(entry.value)) continue;
 
         // yes! we'll act
-        std::cout << "[LC] " << other_cell.coord() << " x" << entry.value << " [" << entry.tag << "]" << std::endl;
+        std::cout << "[LC] " << other_cell.coord() << " x" << entry.value << " [" << tag(entry.unit) << "]" << std::endl;
         mBoard.clear_note_at(other_cell.coord(), entry.value);
         did_act = true;
     }
@@ -169,15 +144,15 @@ bool Analyzer::act_on_locked_candidate() {
     if (mLockedCandidates.empty()) return did_act;
 
     for (auto const &entry : mLockedCandidates) {
-        switch (entry.tag[0]) {
-        case 'r':
+        switch (entry.unit) {
+        case Unit::Row:
             did_act |= act_on_locked_candidate(entry, mBoard.row(entry.coords.at(0)));
             break;
-        case 'c':
+        case Unit::Column:
             did_act |= act_on_locked_candidate(entry, mBoard.column(entry.coords.at(0)));
             break;
-        case 'n':
-            did_act |=  act_on_locked_candidate(entry, mBoard.nonet(entry.coords.at(0)));
+        case Unit::Nonet:
+            did_act |= act_on_locked_candidate(entry, mBoard.nonet(entry.coords.at(0)));
             break;
         }
     }
@@ -195,6 +170,6 @@ std::ostream& operator<<(std::ostream& outs, const Analyzer::LockedCandidates &l
         is_first = false;
         outs << coord;
     }
-    outs << "}#" << lc.value << "[^" << lc.tag << "]";
+    outs << "}#" << lc.value << "[^" << tag(lc.unit) << "]";
     return outs;
 }
