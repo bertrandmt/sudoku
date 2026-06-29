@@ -155,6 +155,13 @@ bool Analyzer::act_on_naked_pair() {
     return did_act;
 }
 
+// Explicit instantiation so the whitebox test (tests/unit/test_analyzer.cpp)
+// can link test_naked_pair<Row> directly. Its only in-TU caller is
+// find_naked_pair, which at -O3 g++ inlines, emitting no out-of-line copy of
+// the predicate; the external reference from the test TU then fails to link
+// (clang happens to keep a weak definition, so it only bit the gcc build).
+template bool Analyzer::test_naked_pair<Row>(const Cell &, const Cell &, const Row &) const;
+
 std::ostream& operator<<(std::ostream& outs, const Analyzer::NakedPair &np) {
     return outs << "{" << np.coords.first << "," << np.coords.second << "}#{" << np.values.first << "," << np.values.second << "}";
 }
