@@ -9,6 +9,7 @@
 #include <iterator>
 #include <cstddef>
 #include <memory>
+#include <optional>
 
 class Row;
 class Column;
