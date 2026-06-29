@@ -8,10 +8,10 @@
 #include <algorithm>
 
 template<class Set>
-bool Analyzer::test_hidden_single(const Cell &cell, const Value &value, const Set &set, std::string &out_tag) const {
-    if (!cell.isNote()) return false;
-    if (cell.notes().count() <= 1) return false; // either a naked single, or an impossibility
-    if (!cell.check(value)) return false;        // note a candidate for value any longer
+std::optional<Unit> Analyzer::test_hidden_single(const Cell &cell, const Value &value, const Set &set) const {
+    if (!cell.isNote()) return std::nullopt;
+    if (cell.notes().count() <= 1) return std::nullopt; // either a naked single, or an impossibility
+    if (!cell.check(value)) return std::nullopt;        // not a candidate for value any longer
 
     for (auto const &other_cell : set) {
         if (other_cell == cell) continue;               // do not consider the current cell
@@ -19,10 +19,9 @@ bool Analyzer::test_hidden_single(const Cell &cell, const Value &value, const Se
         if (other_cell.isValue()) continue;             // only considering note cells
         if (!other_cell.notes().check(value)) continue; // this note cell is _not_ a candidate
 
-        return false;
+        return std::nullopt;
     }
-    out_tag.append(set.tag());
-    return true;
+    return set.kind();
 }
 
 bool Analyzer::find_hidden_singles() {
@@ -36,18 +35,18 @@ bool Analyzer::find_hidden_singles() {
 
         // yes!
         for (auto const &value : cell.notes().values()) { // for each candidate value in this note cell
-            // is this a hidden single?
-            std::string tag;
-            if (!test_hidden_single(cell, value, mBoard.row(cell), tag)
-             && !test_hidden_single(cell, value, mBoard.column(cell), tag)
-             && !test_hidden_single(cell, value, mBoard.nonet(cell), tag)) continue;
+            // is this a hidden single in its row, column, or nonet?
+            auto unit = test_hidden_single(cell, value, mBoard.row(cell));
+            if (!unit) unit = test_hidden_single(cell, value, mBoard.column(cell));
+            if (!unit) unit = test_hidden_single(cell, value, mBoard.nonet(cell));
+            if (!unit) continue;
 
             // yes! but do we already know about it?
             if (std::find_if(mHiddenSingles.begin(), mHiddenSingles.end(),
                        [cell](const auto &entry) { return cell.coord() == entry.coord; }) != mHiddenSingles.end()) continue;
 
             // no! let's record it
-            HiddenSingle hs(cell.coord(), value, tag);
+            HiddenSingle hs(cell.coord(), value, *unit);
             mHiddenSingles.push_back(hs);
             if (sVerbose) std::cout << "  [fHS] " << hs << std::endl;
             did_find = true;
@@ -63,7 +62,7 @@ bool Analyzer::act_on_hidden_single() {
     if (mHiddenSingles.empty()) return did_act;
 
     for (auto const &entry : mHiddenSingles) {
-        std::cout << "[HS] " << entry.coord << " =" << entry.value << " [" << entry.tag << "]" << std::endl;
+        std::cout << "[HS] " << entry.coord << " =" << entry.value << " [" << tag(entry.unit) << "]" << std::endl;
         mBoard.set_value_at(entry.coord, entry.value);
         did_act = true;
     }
@@ -74,5 +73,5 @@ bool Analyzer::act_on_hidden_single() {
 }
 
 std::ostream& operator<<(std::ostream& outs, const Analyzer::HiddenSingle &hs) {
-    return outs << hs.coord << "#" << hs.value << "[" << hs.tag << "]";
+    return outs << hs.coord << "#" << hs.value << "[" << tag(hs.unit) << "]";
 }

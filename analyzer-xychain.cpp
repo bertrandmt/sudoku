@@ -39,9 +39,8 @@ size_t Analyzer::test_xychain(const Value &value, const std::vector<Coord> &chai
         if (std::find(chain.begin(), chain.end(), cell.coord()) != chain.end()) continue;
 
         // no! but can it see both ends?
-        std::string tag;
-        if (!mBoard.see_each_other(cell.coord(), chain.front(), tag)) continue;
-        if (!mBoard.see_each_other(cell.coord(), chain.back(), tag)) continue;
+        if (!mBoard.see_each_other(cell.coord(), chain.front())) continue;
+        if (!mBoard.see_each_other(cell.coord(), chain.back())) continue;
 
         // yes! count it
         num_elim++;
@@ -193,8 +192,7 @@ bool Analyzer::act_on_xychain(const XYChain &entry, const Set &chain_front_set) 
         if (std::find(entry.chain.begin(), entry.chain.end(), cell.coord()) != entry.chain.end()) continue;
 
         // no! but can it see the other end of the chain?
-        std::string tag;
-        if (!mBoard.see_each_other(cell.coord(), entry.chain.back(), tag)) continue;
+        if (!mBoard.see_each_other(cell.coord(), entry.chain.back())) continue;
 
         // yes! ELIMINATE!
         std::cout << "[XY] " << cell.coord() << " x" << entry.value

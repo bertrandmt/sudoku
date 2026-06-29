@@ -162,7 +162,7 @@ bool Analyzer::find_xwings() {
 
 template<class CandidateSet, class EliminationSet>
 bool Analyzer::act_on_xwing(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2,
-                                                const EliminationSet &eset, const std::string &tag) {
+                                                const EliminationSet &eset, Unit unit) {
     bool did_act = false;
 
     for (auto &cell : eset) {
@@ -172,7 +172,7 @@ bool Analyzer::act_on_xwing(const Value &value, const CandidateSet &cset1, const
         assert(cell.isNote());
         assert(cell.check(value));
 
-        std::cout << "[XW] " << cell.coord() << " x" << value << " [" << tag << "]" << std::endl;
+        std::cout << "[XW] " << cell.coord() << " x" << value << " [" << tag(unit) << "]" << std::endl;
         mBoard.clear_note_at(cell.coord(), value);
         did_act = true;
     }
@@ -195,9 +195,9 @@ bool Analyzer::act_on_xwing() {
         auto diagonal_column_eliminates = candidates(mBoard.column(entry.diagonal), entry.value);
 
         did_act |= act_on_xwing(entry.value, anchor_row_candidates, diagonal_row_candidates,
-                                           anchor_column_eliminates, "c");
+                                           anchor_column_eliminates, Unit::Column);
         did_act |= act_on_xwing(entry.value, anchor_row_candidates, diagonal_row_candidates,
-                                           diagonal_column_eliminates, "c");
+                                           diagonal_column_eliminates, Unit::Column);
     } else {
         // Column-based X-Wing: eliminate candidates from the two rows
         auto anchor_column_candidates = candidates(mBoard.column(entry.anchor), entry.value);
@@ -206,9 +206,9 @@ bool Analyzer::act_on_xwing() {
         auto diagonal_row_eliminates = candidates(mBoard.row(entry.diagonal), entry.value);
 
         did_act |= act_on_xwing(entry.value, anchor_column_candidates, diagonal_column_candidates,
-                                           anchor_row_eliminates, "r");
+                                           anchor_row_eliminates, Unit::Row);
         did_act |= act_on_xwing(entry.value, anchor_column_candidates, diagonal_column_candidates,
-                                           diagonal_row_eliminates, "r");
+                                           diagonal_row_eliminates, Unit::Row);
     }
     mXWings.clear();
 

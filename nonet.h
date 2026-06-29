@@ -21,7 +21,7 @@ public:
                  (coord.column() / width)  * width)
         , mSentinel(mCoord.row() + height, mCoord.column()) { }
 
-    std::string tag() const { return "n"; }
+    Unit kind() const { return Unit::Nonet; }
 
     class Iterator {
     public:

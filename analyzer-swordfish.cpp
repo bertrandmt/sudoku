@@ -193,7 +193,7 @@ bool Analyzer::find_swordfish() {
 
 template<class CandidateSet, class EliminationSet>
 bool Analyzer::act_on_swordfish(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2, const CandidateSet &cset3,
-                                                     const EliminationSet &eset, const std::string &tag) {
+                                                     const EliminationSet &eset, Unit unit) {
     bool did_act = false;
 
     for (auto &cell : eset) {
@@ -209,7 +209,7 @@ bool Analyzer::act_on_swordfish(const Value &value, const CandidateSet &cset1, c
         if (cset3.contains(cell)) continue;
 
         // Eliminate the candidate
-        std::cout << "[SF] " << cell.coord() << " x" << value << " [" << tag << "]" << std::endl;
+        std::cout << "[SF] " << cell.coord() << " x" << value << " [" << tag(unit) << "]" << std::endl;
         mBoard.clear_note_at(cell.coord(), value);
         did_act = true;
     }
@@ -251,7 +251,7 @@ bool Analyzer::act_on_swordfish() {
 
         // Eliminate from each column
         for (const auto* col_ptr : elimination_columns) {
-            did_act |= act_on_swordfish(entry.value, row1, row2, row3, *col_ptr, "c");
+            did_act |= act_on_swordfish(entry.value, row1, row2, row3, *col_ptr, Unit::Column);
         }
     } else {
         // Column-based Swordfish: the pattern is in three columns, eliminate from rows
@@ -279,7 +279,7 @@ bool Analyzer::act_on_swordfish() {
 
         // Eliminate from each row
         for (const auto* row_ptr : elimination_rows) {
-            did_act |= act_on_swordfish(entry.value, col1, col2, col3, *row_ptr, "r");
+            did_act |= act_on_swordfish(entry.value, col1, col2, col3, *row_ptr, Unit::Row);
         }
     }
 

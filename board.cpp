@@ -288,30 +288,24 @@ const Nonet &Board::nonet(const Coord &coord) const {
     return mNonets.at(nonetRow + nonetCol / 3);
 }
 
-bool Board::see_each_other(const Coord &coord1, const Coord &coord2, std::string &out_tag) const {
-    bool did_see_each_other = false;
+std::optional<Unit> Board::see_each_other(const Coord &coord1, const Coord &coord2) const {
+    if      (row(coord1)    == row(coord2))    return Unit::Row;
+    else if (column(coord1) == column(coord2)) return Unit::Column;
+    else if (nonet(coord1)  == nonet(coord2))  return Unit::Nonet;
 
-    if      (row(coord1)    == row(coord2))    { did_see_each_other = true; out_tag.append("r"); }
-    else if (column(coord1) == column(coord2)) { did_see_each_other = true; out_tag.append("c"); }
-    else if (nonet(coord1)  == nonet(coord2))  { did_see_each_other = true; out_tag.append("n"); }
-
-    return did_see_each_other;
+    return std::nullopt;
 }
 
-bool Board::any_see_each_other(const std::vector<Coord> &coords, std::string &out_tag) const {
-    bool did_any_see_each_other = false;
-
+std::optional<Unit> Board::any_see_each_other(const std::vector<Coord> &coords) const {
     for (size_t i = 0; i < coords.size(); ++i) {
         for (size_t j = i + 1; j < coords.size(); ++j) {
-            if (see_each_other(coords[i], coords[j], out_tag)) {
-                did_any_see_each_other = true;
-                break;
+            if (auto unit = see_each_other(coords[i], coords[j])) {
+                return unit;
             }
         }
-        if (did_any_see_each_other) break;
     }
 
-    return did_any_see_each_other;
+    return std::nullopt;
 }
 
 std::ostream& operator<<(std::ostream& outs, const Board &b) {
