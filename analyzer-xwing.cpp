@@ -27,7 +27,7 @@ namespace {
 
 template<class CandidateSet, class EliminationSet>
 bool Analyzer::test_xwing(const Value &value, const CandidateSet &cset1,   const CandidateSet &cset2,
-                                              const EliminationSet &eset1, const EliminationSet &eset2) {
+                                              const EliminationSet &eset1, const EliminationSet &eset2) const {
     // are there exactly two candidates for value in cset1?
     auto candidates1 = candidates(cset1, value);
     if (candidates1.size() != 2) return false;
