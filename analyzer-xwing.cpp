@@ -104,26 +104,19 @@ bool Analyzer::find_xwings() {
     // When there are only two possible cells for a value in each of two different rows,
     // and these candidates lie also in the same columns, then all other candidates for
     // this value in the columns can be eliminated.
-    bool did_find = false;
-
     for (auto const &cell: mBoard.cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
         // for each value in this cell...
-        auto values = cell.notes().values();
-        for (auto pv = values.begin(); pv != values.end(); ++pv) {
-            // let's see if we can anchor an X-Wing pattern in this cell for this value
-            did_find = find_xwing(cell, *pv);
-            if (!did_find) continue;
-            break;
+        for (auto const &value : cell.notes().values()) {
+            // let's see if we can anchor an X-Wing pattern in this cell for this value;
+            // stop at the first one found
+            if (find_xwing(cell, value)) return true;
         }
-
-        if (!did_find) continue;
-        break;
     }
 
-    return did_find;
+    return false;
 }
 
 template<class CandidateSet, class EliminationSet>
