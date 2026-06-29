@@ -25,36 +25,32 @@ namespace {
     }
 }
 
-template<class CandidateSet, class EliminationSet>
-bool Analyzer::test_xwing(const Value &value, const CandidateSet &cset1,   const CandidateSet &cset2,
+// The candidate cells of the two base lines are passed in (the caller has
+// already built them), so this only materialises the cross lines' candidate
+// lists -- and only once the cheap geometric checks have confirmed a rectangle,
+// keeping the common rejection paths allocation-free.
+template<class EliminationSet>
+bool Analyzer::test_xwing(const Value &value, const std::vector<Cell> &candidates1, const std::vector<Cell> &candidates2,
                                               const EliminationSet &eset1, const EliminationSet &eset2) const {
-    // are there exactly two candidates for value in cset1?
-    auto candidates1 = candidates(cset1, value);
+    // are there exactly two candidates for value in each base line?
     if (candidates1.size() != 2) return false;
-
-    // yes, but are there exactly two candidates for value in cset2?
-    auto candidates2 = candidates(cset2, value);
     if (candidates2.size() != 2) return false;
 
-    // yes, but are there at least two candidates in both eset1 and eset2?
+    // yes, but do both base lines place their candidates in the same two cross
+    // lines? The cells are already value-candidates, so geometric membership in a
+    // cross line is equivalent to being one of its value-candidates -- no need to
+    // materialise the cross lines' candidate lists just to test containment.
+    if (!eset1.contains(candidates1[0])) return false;
+    if (!eset2.contains(candidates1[1])) return false;
+    if (!eset1.contains(candidates2[0])) return false;
+    if (!eset2.contains(candidates2[1])) return false;
+
+    // yes, a rectangle -- but is it actionable? The four corners already sit in
+    // the two cross lines, so each holds at least two candidates; at least one
+    // must hold a third for anything to be eliminated.
     auto eliminates1 = candidates(eset1, value);
     auto eliminates2 = candidates(eset2, value);
-    if (eliminates1.size() < 2 || eliminates2.size() < 2) return false;
-
-    // yes, but are there more than two candidates in eset1 or eset 2?
     if (eliminates1.size() <= 2 && eliminates2.size() <= 2) return false;
-
-    // yes, but does eliminates1 contain the first cell in candidates1?
-    if (std::find(eliminates1.begin(), eliminates1.end(), candidates1[0]) == eliminates1.end()) return false;
-
-    // yes, but does eliminates2 contain the second cell in candidates1?
-    if (std::find(eliminates2.begin(), eliminates2.end(), candidates1[1]) == eliminates2.end()) return false;
-
-    // yes, but does eliminates1 contain the first cell in candidates2?
-    if (std::find(eliminates1.begin(), eliminates1.end(), candidates2[0]) == eliminates1.end()) return false;
-
-    // yes, but does eliminates2 contain the second cell in candidates2?
-    if (std::find(eliminates2.begin(), eliminates2.end(), candidates2[1]) == eliminates2.end()) return false;
 
     return true;
 }
@@ -102,11 +98,11 @@ bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateS
                  && other_eset.contains(other_cset_candidates[0])));
 
         // is this a valid XWing pattern anchored on (cset, eset)?
-        if (!test_xwing(value, cset, other_cset, eset, other_eset)) continue;
+        if (!test_xwing(value, cset_candidates, other_cset_candidates, eset, other_eset)) continue;
 
         // yes! take the diagonal corner: the other cset's candidate in the
         // diagonal eset, which test_xwing already verified lies there
-        const Cell diagonal = candidates(other_cset, value)[1];
+        const Cell diagonal = other_cset_candidates[1];
 
         // record the pattern
         XWing candidate_xwing{value, cell.coord(), diagonal.coord(), by_row};

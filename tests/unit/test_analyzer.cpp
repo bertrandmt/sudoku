@@ -78,20 +78,28 @@ struct AnalyzerTest {
     static Value  ywing_value(const Analyzer &a)                                                   { return a.mYWings.at(0).value; }
 
     // --- x-wing ---
-    // The rectangle predicate is templated on which lines hold the candidates and
-    // which hold the eliminations; find_xwing instantiates it both ways, so both
-    // are exercised here. r1/r2 and c1/c2 name any cell in each line.
-    //
+    // test_xwing takes the two base lines' candidate cells precomputed (its
+    // callers already have them), so collect them here the same way the analyzer
+    // does. find_xwing instantiates the predicate both ways (elimination sets are
+    // columns, then rows), so both are exercised. r1/r2 and c1/c2 name any cell
+    // in each line.
+    template<class Set>
+    static std::vector<Cell> line_candidates(const Set &set, const Value &v) {
+        std::vector<Cell> out;
+        for (auto const &cell : set)
+            if (cell.isNote() && cell.check(v)) out.push_back(cell);
+        return out;
+    }
     // Row-based: candidate sets are the two rows, elimination sets the columns.
     static bool test_xwing_rows(const Analyzer &a, const Value &v,
                                 const Cell &r1, const Cell &r2, const Cell &c1, const Cell &c2) {
-        return a.test_xwing(v, a.mBoard.row(r1), a.mBoard.row(r2),
+        return a.test_xwing(v, line_candidates(a.mBoard.row(r1), v), line_candidates(a.mBoard.row(r2), v),
                                a.mBoard.column(c1), a.mBoard.column(c2));
     }
     // Column-based: candidate sets are the two columns, elimination sets the rows.
     static bool test_xwing_cols(const Analyzer &a, const Value &v,
                                 const Cell &c1, const Cell &c2, const Cell &r1, const Cell &r2) {
-        return a.test_xwing(v, a.mBoard.column(c1), a.mBoard.column(c2),
+        return a.test_xwing(v, line_candidates(a.mBoard.column(c1), v), line_candidates(a.mBoard.column(c2), v),
                                a.mBoard.row(r1), a.mBoard.row(r2));
     }
 
