@@ -200,6 +200,52 @@ void test_swordfish_column_based() {
           "all six pattern cells kept candidate 8");
 }
 
+// A row-based Swordfish on value 8 -- the transpose of the column-based case
+// above. The act side reaches the row-based branch (eliminate from columns)
+// only here in the whitebox tests; the integration suite drives it, but this
+// locks it in as a regression guard.
+//
+//        c0 c1 c2
+//   r0    8  8  .
+//   r1    .  8  8
+//   r2    8  .  8
+//   r4    8  .  .      <- (4,0) is outside the base rows
+//   r5    .  8  .      <- (5,1) is outside the base rows
+//
+// Base rows {0,1,2}, each with two 8s; their columns union to exactly {0,1,2}.
+// So 8 in those columns occupies the three base rows, and the strays at (4,0)
+// and (5,1) are eliminable. As with the column-based case, every cover column
+// holds exactly three 8s (two in the pattern, one outside): a tight cover line.
+void test_swordfish_row_based() {
+    std::cout << "[swordfish] row-based detection and action (eliminate from columns)\n";
+    Board board = empty_board();
+    const Value V = kEight;
+    confine_value(board, V, {
+        {0,0},{0,1},        // row 0: columns {0,1}
+        {1,1},{1,2},        // row 1: columns {1,2}
+        {2,0},{2,2},        // row 2: columns {0,2}
+        {4,0},{5,1},        // strays to be eliminated
+    });
+
+    Analyzer analyzer(board);
+    bool found = AnalyzerTest::find_swordfish(analyzer, cell_at(board, 0, 0), V);
+    check(found, "row Swordfish detected on a position with only tight cover lines");
+    check(AnalyzerTest::swordfish_count(analyzer) == 1, "exactly one Swordfish recorded");
+    if (AnalyzerTest::swordfish_count(analyzer) == 1) {
+        check(AnalyzerTest::swordfish_row_based(analyzer), "recorded Swordfish is row-based");
+        check(AnalyzerTest::swordfish_value(analyzer) == V, "recorded Swordfish is for value 8");
+    }
+
+    bool acted = AnalyzerTest::act_on_swordfish(analyzer);
+    check(acted, "act_on_swordfish reports an elimination");
+    check(!has_candidate(board, 4, 0, V), "stray 8 at (4,0) eliminated");
+    check(!has_candidate(board, 5, 1, V), "stray 8 at (5,1) eliminated");
+    check(has_candidate(board, 0, 0, V) && has_candidate(board, 0, 1, V)
+       && has_candidate(board, 1, 1, V) && has_candidate(board, 1, 2, V)
+       && has_candidate(board, 2, 0, V) && has_candidate(board, 2, 2, V),
+          "all six pattern cells kept candidate 8");
+}
+
 // Same base columns, strays removed: a Swordfish shape with nothing to
 // eliminate must not be recorded (recording it would assert in act).
 void test_swordfish_no_elimination() {
@@ -668,6 +714,7 @@ void test_colorchain_benign_not_actionable() {
 
 int main() {
     test_swordfish_column_based();
+    test_swordfish_row_based();
     test_swordfish_no_elimination();
     test_xychain_detect_and_act();
     test_xychain_best_selection();
