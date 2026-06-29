@@ -51,12 +51,12 @@ bool Analyzer::test_naked_pair(const Cell &c1, const Cell &c2, const Set &set) c
     // (checked above), so identical candidate sets is one bitmask compare.
     if (c1.notes() != c2.notes()) return false;
 
-    auto c1v = c1.notes().values();
-    auto v11 = c1v.at(0);
-    auto v12 = c1v.at(1);
+    auto values = c1.notes().values();
+    auto v1 = values.at(0);
+    auto v2 = values.at(1);
 
     // yes! but would acting on them have an effet?
-    if (!would_act(set, c1, c2, v11, v12)) return false;
+    if (!would_act(set, c1, c2, v1, v2)) return false;
 
     // yes!
     return true;
