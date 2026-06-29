@@ -26,56 +26,6 @@ namespace {
 }
 
 template<class CandidateSet, class EliminationSet>
-bool Analyzer::test_xwing(const Value &value, const CandidateSet &cset1,   const CandidateSet &cset2,
-                                              const EliminationSet &eset1, const EliminationSet &eset2) const {
-    // are there exactly two candidates for value in cset1?
-    auto candidates1 = candidates(cset1, value);
-    if (candidates1.size() != 2) return false;
-
-    // yes, but are there exactly two candidates for value in cset2?
-    auto candidates2 = candidates(cset2, value);
-    if (candidates2.size() != 2) return false;
-
-    // yes, but is the rectangle actionable -- does either cross line hold more
-    // than its two corners, so there is a third candidate to eliminate? (A lower
-    // bound of two needs no separate check: the containment tests below require
-    // each cross line to hold both its corners, which are distinct cells whenever
-    // cset1 != cset2 -- the only way find_xwing calls this.)
-    auto eliminates1 = candidates(eset1, value);
-    auto eliminates2 = candidates(eset2, value);
-    if (eliminates1.size() <= 2 && eliminates2.size() <= 2) return false;
-
-    // yes -- so the four corners must line up: both base lines' first candidate
-    // in eset1, both their second in eset2. This relies on candidates() yielding
-    // each line's cells in a consistent cross-line order, so index [0] names the
-    // eset1 side and [1] the eset2 side for both base lines. A violation could
-    // only ever cost a false negative (a missed pattern), never a wrong
-    // elimination -- returning true still requires all four real corners. The
-    // production caller find_xwing asserts the order holds for its construction
-    // (the crossed-corner assert at its call site).
-
-    // does eliminates1 contain the first cell in candidates1?
-    if (std::find(eliminates1.begin(), eliminates1.end(), candidates1[0]) == eliminates1.end()) return false;
-
-    // yes, but does eliminates2 contain the second cell in candidates1?
-    if (std::find(eliminates2.begin(), eliminates2.end(), candidates1[1]) == eliminates2.end()) return false;
-
-    // yes, but does eliminates1 contain the first cell in candidates2?
-    if (std::find(eliminates1.begin(), eliminates1.end(), candidates2[0]) == eliminates1.end()) return false;
-
-    // yes, but does eliminates2 contain the second cell in candidates2?
-    if (std::find(eliminates2.begin(), eliminates2.end(), candidates2[1]) == eliminates2.end()) return false;
-
-    return true;
-}
-
-// Explicit instantiations: test_xwing's only in-TU callers are find_xwing, where
-// it is inlined, so without these GCC emits no standalone symbol and the unit
-// test (which calls it across translation units via AnalyzerTest) fails to link.
-template bool Analyzer::test_xwing<Row, Column>(const Value &, const Row &, const Row &, const Column &, const Column &) const;
-template bool Analyzer::test_xwing<Column, Row>(const Value &, const Column &, const Column &, const Row &, const Row &) const;
-
-template<class CandidateSet, class EliminationSet>
 bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateSet &cset, const EliminationSet &eset, const std::vector<CandidateSet> &csets, bool by_row) {
     assert(cell.isNote());
     assert(cell.check(value));
@@ -107,24 +57,25 @@ bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateS
         // subsequent csets only
         if (!(cset < other_cset)) continue;
 
-        // Invariant: candidates() yields cells in a consistent cross-line order,
-        // so a two-candidate partner can only align with our anchor's corners,
-        // never cross them. test_xwing reports a crossed config as "no" (and we
-        // skip it); assert the impossibility here so a broken ordering invariant
-        // aborts a debug build rather than silently dropping a real pattern.
+        // are there exactly two candidates for this value on this other cset?
         auto other_cset_candidates = candidates(other_cset, value);
-        assert(!(other_cset_candidates.size() == 2
-                 && eset.contains(other_cset_candidates[1])
-                 && other_eset.contains(other_cset_candidates[0])));
+        if (other_cset_candidates.size() != 2) continue;
 
-        // is this a valid XWing pattern anchored on (cset, eset)?
-        if (!test_xwing(value, cset, other_cset, eset, other_eset)) continue;
+        // yes! does this other cset have candidates in the same esets as our cset
+        assert(!(eset.contains(other_cset_candidates[1]) && other_eset.contains(other_cset_candidates[0])));
+        if (!eset.contains(other_cset_candidates[0])) continue;
+        if (!other_eset.contains(other_cset_candidates[1])) continue;
 
-        // yes! take the diagonal corner: the other cset's candidate in the
-        // diagonal eset, which test_xwing already verified lies there
-        const Cell diagonal = other_cset_candidates[1];
+        // yes! identify the diagonal cell
+        const Cell& diagonal = other_cset_candidates[1];
+        assert(other_eset.contains(diagonal));
 
-        // record the pattern
+        // is this a valid XWing pattern (i.e. other candidates in the same esets would be eliminated)?
+        auto anchor_eliminates = candidates(eset, value);
+        auto diagonal_eliminates = candidates(other_eset, value);
+        if (anchor_eliminates.size() <= 2 && diagonal_eliminates.size() <= 2) continue;
+
+        // yes! record the pattern
         XWing candidate_xwing{value, cell.coord(), diagonal.coord(), by_row};
         assert(mXWings.empty());
         mXWings.push_back(candidate_xwing);

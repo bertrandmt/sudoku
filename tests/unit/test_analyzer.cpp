@@ -78,22 +78,13 @@ struct AnalyzerTest {
     static Value  ywing_value(const Analyzer &a)                                                   { return a.mYWings.at(0).value; }
 
     // --- x-wing ---
-    // test_xwing is a set predicate -- it extracts the candidates itself -- so
-    // pass the lines directly. find_xwing instantiates it both ways (elimination
-    // sets are columns, then rows), so both are exercised. r1/r2 and c1/c2 name
-    // any cell in each line.
-    // Row-based: candidate sets are the two rows, elimination sets the columns.
-    static bool test_xwing_rows(const Analyzer &a, const Value &v,
-                                const Cell &r1, const Cell &r2, const Cell &c1, const Cell &c2) {
-        return a.test_xwing(v, a.mBoard.row(r1), a.mBoard.row(r2),
-                               a.mBoard.column(c1), a.mBoard.column(c2));
-    }
-    // Column-based: candidate sets are the two columns, elimination sets the rows.
-    static bool test_xwing_cols(const Analyzer &a, const Value &v,
-                                const Cell &c1, const Cell &c2, const Cell &r1, const Cell &r2) {
-        return a.test_xwing(v, a.mBoard.column(c1), a.mBoard.column(c2),
-                               a.mBoard.row(r1), a.mBoard.row(r2));
-    }
+    // find_xwing validates inline (like find_swordfish), so drive it on crafted
+    // boards through its anchor entry point and inspect the recorded result.
+    static bool   find_xwing(Analyzer &a, const Cell &c, const Value &v) { return a.find_xwing(c, v); }
+    static bool   act_on_xwing(Analyzer &a)                              { return a.act_on_xwing(); }
+    static size_t xwing_count(const Analyzer &a)                         { return a.mXWings.size(); }
+    static bool   xwing_row_based(const Analyzer &a)                     { return a.mXWings.at(0).is_row_based; }
+    static Value  xwing_value(const Analyzer &a)                         { return a.mXWings.at(0).value; }
 
     // --- simple coloring ---
     static bool test_color_chain(const Analyzer &a, const Analyzer::ColorChain &ch) { return a.test_color_chain(ch); }
@@ -318,128 +309,107 @@ void test_ywing_rejects_non_patterns() {
 // X-Wing
 // ===========================================================================
 
-// test_xwing is the rectangle predicate find_xwing relies on. The black-box
-// suite only ever drives it down one happy-path board, so its rejection
-// branches -- candidate line not exactly two, corners not aligned in the same
-// cross-lines, and no third candidate to eliminate -- go unverified there.
-//
-// find_xwing instantiates the predicate two ways (rows-hold-candidates and
-// columns-hold-candidates), so both are tested below on transposed boards.
+// find_xwing validates inline. The black-box suite drives it on real solves;
+// these whitebox cases craft small boards and drive find_xwing through its
+// anchor entry point -- the same way the Swordfish tests drive find_swordfish --
+// to cover both orientations and the rejection paths a happy-path solve does not
+// isolate.
 
-// Row-based: one distribution of value 7 supplies a real X-Wing plus three
-// near-misses:
+// A row-based X-Wing on value 7: rows 0 and 3 each hold 7 in exactly columns 1
+// and 5. Columns 1 and 5 carry one extra 7 apiece (rows 6 and 7), so the pattern
+// is actionable and those strays are eliminated.
 //
-//        c1 c2 c3 c4 c5 c6 c7 c8
-//   r0    7              7              <- top of the real X-Wing (cols 1,5)
-//   r2    7                       7     <- misaligned: shares c1, not c5 (also a c1 stray)
-//   r3    7              7              <- bottom of the real X-Wing (cols 1,5)
-//   r4       7        7  7              <- three 7s: too many to anchor (cols 2,6,7)
-//   r6    7                             <- a second c1 stray; the X-Wing clears r2 and r6
-//   r7          7  7                    <- aligned pair on cols 3,4 ...
-//   r8          7  7                    <- ... but c3/c4 hold nothing else to clear
-void test_xwing_rows_detect_and_reject() {
-    std::cout << "[x-wing] row-based: the predicate accepts a real X-Wing and rejects near-misses\n";
+//        c1 c5
+//   r0    7  7      <- top corners
+//   r3    7  7      <- bottom corners
+//   r6    7         <- stray cleared from column 1
+//   r7       7      <- stray cleared from column 5
+void test_xwing_row_based() {
+    std::cout << "[x-wing] row-based detection, action\n";
     Board board = empty_board();
     const Value V = kSeven;
-    confine_value(board, V, {
-        {0,1},{0,5},        // row 0   real X-Wing top
-        {3,1},{3,5},        // row 3   real X-Wing bottom (aligned on cols 1,5)
-        {6,1},              // row 6   stray in col 1 -> an eliminable candidate
-        {2,1},{2,8},        // row 2   misaligned partner (col 8, not col 5); (2,1) is a second col-1 stray
-        {4,2},{4,6},{4,7},  // row 4   three candidates -> cannot anchor
-        {7,3},{7,4},        // row 7   aligned pair on cols 3,4 ...
-        {8,3},{8,4},        // row 8   ... with no stray in either column
-    });
+    confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5}, {6,1}, {7,5} });
 
     Analyzer analyzer(board);
+    // Anchor on (0,1), the first 7 of row 0 -- find_xwing's top-left corner.
+    bool found = AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 1), V);
+    check(found, "row X-Wing detected with anchor (0,1)");
+    check(AnalyzerTest::xwing_count(analyzer) == 1, "exactly one X-Wing recorded");
+    if (AnalyzerTest::xwing_count(analyzer) == 1) {
+        check(AnalyzerTest::xwing_row_based(analyzer), "recorded X-Wing is row-based");
+        check(AnalyzerTest::xwing_value(analyzer) == V, "recorded X-Wing is for value 7");
+    }
 
-    // Positive control: rows 0 and 3 share columns 1 and 5, and column 1 carries
-    // two further candidates outside the rectangle (rows 2 and 6), so it is real
-    // and actionable -- both would be eliminated.
-    check(AnalyzerTest::test_xwing_rows(analyzer, V,
-              cell_at(board, 0, 0), cell_at(board, 3, 0),    // candidate rows 0, 3
-              cell_at(board, 0, 1), cell_at(board, 0, 5)),   // elimination cols 1, 5
-          "accepted: aligned rows with a third candidate to eliminate");
-
-    // Reject: row 2's second 7 is in column 8, so the fourth corner is absent.
-    check(!AnalyzerTest::test_xwing_rows(analyzer, V,
-              cell_at(board, 0, 0), cell_at(board, 2, 0),
-              cell_at(board, 0, 1), cell_at(board, 0, 5)),
-          "rejected: the two rows' candidates lie in different columns");
-
-    // Reject: row 4 holds three 7s, so it cannot be a base of the rectangle.
-    // Pass it in the FIRST candidate slot so this exercises the candidates1 size
-    // guard; the column test below keeps its three-candidate line second, so the
-    // two guards are each covered once.
-    check(!AnalyzerTest::test_xwing_rows(analyzer, V,
-              cell_at(board, 4, 0), cell_at(board, 0, 0),   // three-candidate row first
-              cell_at(board, 0, 1), cell_at(board, 0, 5)),
-          "rejected: a candidate row has three candidates, not two");
-
-    // Reject: rows 7 and 8 align perfectly on columns 3 and 4, but neither
-    // column carries a third 7, so there is nothing to eliminate.
-    check(!AnalyzerTest::test_xwing_rows(analyzer, V,
-              cell_at(board, 7, 0), cell_at(board, 8, 0),
-              cell_at(board, 0, 3), cell_at(board, 0, 4)),
-          "rejected: a perfect rectangle with no third candidate to eliminate");
+    bool acted = AnalyzerTest::act_on_xwing(analyzer);
+    check(acted, "act_on_xwing reports an elimination");
+    check(!has_candidate(board, 6, 1, V), "stray 7 at (6,1) eliminated from column 1");
+    check(!has_candidate(board, 7, 5, V), "stray 7 at (7,5) eliminated from column 5");
+    check(has_candidate(board, 0, 1, V) && has_candidate(board, 0, 5, V)
+       && has_candidate(board, 3, 1, V) && has_candidate(board, 3, 5, V),
+          "all four corner cells kept candidate 7");
 }
 
-// Column-based: the transpose of the row-based board, so the candidate sets are
-// columns and the elimination sets are rows. Same four cases, mirrored:
+// The transpose: a column-based X-Wing on value 7. Columns 0 and 3 each hold 7
+// in exactly rows 1 and 5; rows 1 and 5 carry one extra 7 apiece to eliminate.
+// Anchoring on (1,0) makes the row search bail (row 1 has three 7s) before the
+// column search succeeds, so this exercises the column orientation.
 //
-//        c0 c2 c3 c4 c6 c7 c8
-//   r1    7  7  7     7              <- real X-Wing top (cols 0,3); c2 and c6 are strays it clears
-//   r2             7                 <- col 4: one of three 7s -> cannot anchor
-//   r3                   7  7        <- aligned pair on cols 7,8 ...
-//   r4                   7  7        <- ... but rows 3,4 hold nothing else to clear
-//   r5    7     7                    <- bottom of the real X-Wing (cols 0,3)
-//   r6             7                 <- col 4: second of three 7s
-//   r7             7                 <- col 4: third of three 7s
-//   r8       7                       <- misaligned: shares r1's col 2, not col 3 (its (1,2) is the second r1 stray)
-void test_xwing_cols_detect_and_reject() {
-    std::cout << "[x-wing] column-based: the predicate accepts a real X-Wing and rejects near-misses\n";
+//        c0 c3 c6 c7
+//   r1    7  7  7        <- left/right corners; c6 stray cleared from row 1
+//   r5    7  7     7     <- left/right corners; c7 stray cleared from row 5
+void test_xwing_column_based() {
+    std::cout << "[x-wing] column-based detection, action\n";
     Board board = empty_board();
     const Value V = kSeven;
-    confine_value(board, V, {
-        {1,0},{5,0},        // col 0   real X-Wing left
-        {1,3},{5,3},        // col 3   real X-Wing right (aligned on rows 1,5)
-        {1,6},              // col 6   stray in row 1 -> an eliminable candidate
-        {1,2},{8,2},        // col 2   misaligned partner (row 8, not row 5); (1,2) is a second row-1 stray
-        {2,4},{6,4},{7,4},  // col 4   three candidates -> cannot anchor
-        {3,7},{4,7},        // col 7   aligned pair on rows 3,4 ...
-        {3,8},{4,8},        // col 8   ... with no stray in either row
-    });
+    confine_value(board, V, { {1,0},{5,0}, {1,3},{5,3}, {1,6}, {5,7} });
 
     Analyzer analyzer(board);
+    bool found = AnalyzerTest::find_xwing(analyzer, cell_at(board, 1, 0), V);
+    check(found, "column X-Wing detected with anchor (1,0)");
+    check(AnalyzerTest::xwing_count(analyzer) == 1, "exactly one X-Wing recorded");
+    if (AnalyzerTest::xwing_count(analyzer) == 1) {
+        check(!AnalyzerTest::xwing_row_based(analyzer), "recorded X-Wing is column-based");
+        check(AnalyzerTest::xwing_value(analyzer) == V, "recorded X-Wing is for value 7");
+    }
 
-    // Positive control: columns 0 and 3 share rows 1 and 5, and row 1 carries
-    // two further candidates outside the rectangle (cols 2 and 6), so it is real
-    // and actionable -- both would be eliminated.
-    check(AnalyzerTest::test_xwing_cols(analyzer, V,
-              cell_at(board, 0, 0), cell_at(board, 0, 3),    // candidate cols 0, 3
-              cell_at(board, 1, 0), cell_at(board, 5, 0)),   // elimination rows 1, 5
-          "accepted: aligned columns with a third candidate to eliminate");
+    bool acted = AnalyzerTest::act_on_xwing(analyzer);
+    check(acted, "act_on_xwing reports an elimination");
+    check(!has_candidate(board, 1, 6, V), "stray 7 at (1,6) eliminated from row 1");
+    check(!has_candidate(board, 5, 7, V), "stray 7 at (5,7) eliminated from row 5");
+    check(has_candidate(board, 1, 0, V) && has_candidate(board, 5, 0, V)
+       && has_candidate(board, 1, 3, V) && has_candidate(board, 5, 3, V),
+          "all four corner cells kept candidate 7");
+}
 
-    // Reject: col 2's second 7 is in row 8, so the fourth corner is absent.
-    check(!AnalyzerTest::test_xwing_cols(analyzer, V,
-              cell_at(board, 0, 0), cell_at(board, 0, 2),
-              cell_at(board, 1, 0), cell_at(board, 5, 0)),
-          "rejected: the two columns' candidates lie in different rows");
+// A perfect rectangle with nothing to eliminate must not be recorded (recording
+// it would assert in act). Rows 0 and 3 hold 7 in columns 1 and 5 and nowhere
+// else, so neither column carries a third candidate.
+void test_xwing_no_elimination() {
+    std::cout << "[x-wing] a rectangle with nothing to eliminate is not recorded\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5} });
 
-    // Reject: col 4 holds three 7s, so it cannot be a base of the rectangle.
-    // Kept in the SECOND candidate slot, exercising the candidates2 size guard
-    // (the row test above covers candidates1).
-    check(!AnalyzerTest::test_xwing_cols(analyzer, V,
-              cell_at(board, 0, 0), cell_at(board, 0, 4),
-              cell_at(board, 1, 0), cell_at(board, 5, 0)),
-          "rejected: a candidate column has three candidates, not two");
+    Analyzer analyzer(board);
+    bool found = AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 1), V);
+    check(!found, "no X-Wing reported when there is nothing to eliminate");
+    check(AnalyzerTest::xwing_count(analyzer) == 0, "no X-Wing recorded");
+}
 
-    // Reject: cols 7 and 8 align perfectly on rows 3 and 4, but neither row
-    // carries a third 7, so there is nothing to eliminate.
-    check(!AnalyzerTest::test_xwing_cols(analyzer, V,
-              cell_at(board, 0, 7), cell_at(board, 0, 8),
-              cell_at(board, 3, 0), cell_at(board, 4, 0)),
-          "rejected: a perfect rectangle with no third candidate to eliminate");
+// A near-miss: the two candidate rows do not share both columns, so no rectangle
+// forms. Row 0 holds 7 in columns 1 and 5; row 3 in columns 1 and 8 -- they
+// share column 1 only, so the fourth corner is absent and find_xwing reports
+// nothing from either orientation.
+void test_xwing_misaligned_not_found() {
+    std::cout << "[x-wing] misaligned candidate lines yield no pattern\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,1},{0,5}, {3,1},{3,8}, {7,5} });
+
+    Analyzer analyzer(board);
+    bool found = AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 1), V);
+    check(!found, "no X-Wing reported when the candidate lines are misaligned");
+    check(AnalyzerTest::xwing_count(analyzer) == 0, "no X-Wing recorded");
 }
 
 // ===========================================================================
@@ -501,8 +471,10 @@ int main() {
     test_xychain_best_selection();
     test_ywing_detect_and_act();
     test_ywing_rejects_non_patterns();
-    test_xwing_rows_detect_and_reject();
-    test_xwing_cols_detect_and_reject();
+    test_xwing_row_based();
+    test_xwing_column_based();
+    test_xwing_no_elimination();
+    test_xwing_misaligned_not_found();
     test_colorchain_rule2_contradiction();
     test_colorchain_benign_not_actionable();
 
