@@ -180,6 +180,8 @@ private:
     template<class CandidateSet, class EliminationSet>
     bool act_on_xwing(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2,
                                           const EliminationSet &eset, Unit unit);
+    template<class EliminationSet>
+    bool act_on_xwing(const XWing &entry);
     bool act_on_xwing();
 
 private:

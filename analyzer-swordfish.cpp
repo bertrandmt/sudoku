@@ -2,36 +2,14 @@
 // See LICENSE for details of BSD 3-Clause License
 
 #include "analyzer.h"
+#include "analyzer-util.h"
 #include "board.h"
 #include "verbose.h"
 #include <cassert>
 #include <type_traits>
 
-namespace {
-    // Helper function for Swordfish pattern detection
-    template<class Set>
-    std::vector<Cell> candidates(const Set &set, const Value &value) {
-        std::vector<Cell> candidates;
-
-        for (auto const &cell : set) {
-            if (!cell.isNote()) continue;
-            if (!cell.check(value)) continue;
-
-            candidates.push_back(cell);
-        }
-
-        return candidates;
-    }
-
-    // Map a cell (or coordinate) to the Row or Column it lies on, selecting
-    // which by the Line type parameter. Board exposes both row()/column()
-    // overloads, so one helper serves both find and act, for cells and coords.
-    template<class Line, class CellOrCoord>
-    const Line &line_of(const Board &board, const CellOrCoord &x) {
-        if constexpr (std::is_same_v<Line, Column>) return board.column(x);
-        else                                        return board.row(x);
-    }
-}
+using analyzer_util::candidates;
+using analyzer_util::line_of;
 
 template<class CandidateSet, class EliminationSet>
 bool Analyzer::find_swordfish(const Cell &cell, const Value &value, const CandidateSet &cset, const EliminationSet &eset,

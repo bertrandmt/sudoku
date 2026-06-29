@@ -2,28 +2,15 @@
 // See LICENSE for details of BSD 3-Clause License
 
 #include "analyzer.h"
+#include "analyzer-util.h"
 #include "board.h"
 #include "verbose.h"
 #include <algorithm>
 #include <cassert>
 #include <type_traits>
 
-namespace {
-    // Helper function for X-Wing pattern detection
-    template<class Set>
-    std::vector<Cell> candidates(const Set &set, const Value &value) {
-        std::vector<Cell> candidates;
-
-        for (auto const &cell : set) {
-            if (!cell.isNote()) continue;
-            if (!cell.check(value)) continue;
-
-            candidates.push_back(cell);
-        }
-
-        return candidates;
-    }
-}
+using analyzer_util::candidates;
+using analyzer_util::line_of;
 
 template<class CandidateSet, class EliminationSet>
 bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateSet &cset, const EliminationSet &eset, const std::vector<CandidateSet> &csets, bool by_row) {
@@ -41,13 +28,7 @@ bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateS
     const Cell& other_cell = cset_candidates[1];
 
     // Get the elimination set for the other cell
-    const EliminationSet &other_eset = [&]() -> const EliminationSet& {
-        if constexpr (std::is_same_v<EliminationSet, Column>) {
-            return mBoard.column(other_cell);
-        } else {
-            return mBoard.row(other_cell);
-        }
-    }();
+    const EliminationSet &other_eset = line_of<EliminationSet>(mBoard, other_cell);
     assert(eset < other_eset);
 
     // yes! for every subsequent cset
@@ -133,38 +114,40 @@ bool Analyzer::act_on_xwing(const Value &value, const CandidateSet &cset1, const
     return did_act;
 }
 
-bool Analyzer::act_on_xwing() {
+template<class EliminationSet>
+bool Analyzer::act_on_xwing(const XWing &entry) {
+    // The base lines and the elimination lines are always opposite kinds, so
+    // derive one from the other rather than letting a caller pass a mismatched
+    // pair (e.g. <Row, Row>) that would compile and silently misbehave.
+    using CandidateSet = std::conditional_t<std::is_same_v<EliminationSet, Column>, Row, Column>;
+
+    // The two base lines hold the pattern; the two elimination lines are where
+    // strays for `value` get cleared. line_of picks row vs column once.
+    auto anchor_candidates   = candidates(line_of<CandidateSet>(mBoard, entry.anchor),   entry.value);
+    auto diagonal_candidates = candidates(line_of<CandidateSet>(mBoard, entry.diagonal), entry.value);
+    auto anchor_eliminates   = candidates(line_of<EliminationSet>(mBoard, entry.anchor),   entry.value);
+    auto diagonal_eliminates = candidates(line_of<EliminationSet>(mBoard, entry.diagonal), entry.value);
+
+    // `unit` is fully determined by EliminationSet -- derive it, don't thread it.
+    constexpr Unit unit = std::is_same_v<EliminationSet, Column> ? Unit::Column : Unit::Row;
+
     bool did_act = false;
+    did_act |= act_on_xwing(entry.value, anchor_candidates, diagonal_candidates, anchor_eliminates, unit);
+    did_act |= act_on_xwing(entry.value, anchor_candidates, diagonal_candidates, diagonal_eliminates, unit);
+    return did_act;
+}
 
-    if (mXWings.empty()) return did_act;
+bool Analyzer::act_on_xwing() {
+    if (mXWings.empty()) return false;
     assert(mXWings.size() == 1);
-
     auto const entry = mXWings.back();
-    if (entry.is_row_based) {
-        // Row-based X-Wing: eliminate candidates from the two columns
-        auto anchor_row_candidates = candidates(mBoard.row(entry.anchor), entry.value);
-        auto diagonal_row_candidates = candidates(mBoard.row(entry.diagonal), entry.value);
-        auto anchor_column_eliminates = candidates(mBoard.column(entry.anchor), entry.value);
-        auto diagonal_column_eliminates = candidates(mBoard.column(entry.diagonal), entry.value);
 
-        did_act |= act_on_xwing(entry.value, anchor_row_candidates, diagonal_row_candidates,
-                                           anchor_column_eliminates, Unit::Column);
-        did_act |= act_on_xwing(entry.value, anchor_row_candidates, diagonal_row_candidates,
-                                           diagonal_column_eliminates, Unit::Column);
-    } else {
-        // Column-based X-Wing: eliminate candidates from the two rows
-        auto anchor_column_candidates = candidates(mBoard.column(entry.anchor), entry.value);
-        auto diagonal_column_candidates = candidates(mBoard.column(entry.diagonal), entry.value);
-        auto anchor_row_eliminates = candidates(mBoard.row(entry.anchor), entry.value);
-        auto diagonal_row_eliminates = candidates(mBoard.row(entry.diagonal), entry.value);
+    // Row-based pattern eliminates from columns; column-based, from rows.
+    bool did_act = entry.is_row_based
+        ? act_on_xwing<Column>(entry)
+        : act_on_xwing<Row>(entry);
 
-        did_act |= act_on_xwing(entry.value, anchor_column_candidates, diagonal_column_candidates,
-                                           anchor_row_eliminates, Unit::Row);
-        did_act |= act_on_xwing(entry.value, anchor_column_candidates, diagonal_column_candidates,
-                                           diagonal_row_eliminates, Unit::Row);
-    }
     mXWings.clear();
-
     assert(did_act);
     return did_act;
 }
