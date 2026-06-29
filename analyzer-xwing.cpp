@@ -47,7 +47,11 @@ bool Analyzer::test_xwing(const Value &value, const CandidateSet &cset1,   const
     // yes -- so the four corners must line up: both base lines' first candidate
     // in eset1, both their second in eset2. This relies on candidates() yielding
     // each line's cells in a consistent cross-line order, so index [0] names the
-    // eset1 side and [1] the eset2 side for both base lines.
+    // eset1 side and [1] the eset2 side for both base lines. A violation could
+    // only ever cost a false negative (a missed pattern), never a wrong
+    // elimination -- returning true still requires all four real corners. The
+    // production caller find_xwing asserts the order holds for its construction
+    // (the crossed-corner assert at its call site).
 
     // does eliminates1 contain the first cell in candidates1?
     if (std::find(eliminates1.begin(), eliminates1.end(), candidates1[0]) == eliminates1.end()) return false;
