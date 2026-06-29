@@ -104,9 +104,9 @@ bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateS
         // is this a valid XWing pattern anchored on (cset, eset)?
         if (!test_xwing(value, cset, other_cset, eset, other_eset)) continue;
 
-        // yes! the diagonal corner is the other cset's candidate in the diagonal
-        // eset (test_xwing already verified it lies there)
-        const Cell &diagonal = other_cset_candidates[1];
+        // yes! take the diagonal corner: the other cset's candidate in the
+        // diagonal eset, which test_xwing already verified lies there
+        const Cell diagonal = candidates(other_cset, value)[1];
 
         // record the pattern
         XWing candidate_xwing{value, cell.coord(), diagonal.coord(), by_row};
