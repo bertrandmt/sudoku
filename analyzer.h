@@ -247,7 +247,7 @@ private:
     std::vector<YWing> mYWings;
 
     // find
-    bool test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing2, Value &out_value) const;
+    bool test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing2, std::optional<Value> &out_value) const;
     bool find_ywing(const Cell &pivot);
     bool find_ywings();
 

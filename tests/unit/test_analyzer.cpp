@@ -72,7 +72,7 @@ struct AnalyzerTest {
 
     // --- y-wing ---
     static bool   find_ywing(Analyzer &a, const Cell &pivot)                                       { return a.find_ywing(pivot); }
-    static bool   test_ywing(const Analyzer &a, const Cell &p, const Cell &w1, const Cell &w2, Value &out) { return a.test_ywing(p, w1, w2, out); }
+    static bool   test_ywing(const Analyzer &a, const Cell &p, const Cell &w1, const Cell &w2, std::optional<Value> &out) { return a.test_ywing(p, w1, w2, out); }
     static bool   act_on_ywing(Analyzer &a)                                                        { return a.act_on_ywing(); }
     static size_t ywing_count(const Analyzer &a)                                                   { return a.mYWings.size(); }
     static Value  ywing_value(const Analyzer &a)                                                   { return a.mYWings.at(0).value; }
@@ -286,12 +286,11 @@ void test_ywing_rejects_non_patterns() {
     set_candidates(board, 2, 0, {2, 5});   // shares 2, other 5 (!= 3)
 
     Analyzer analyzer(board);
-    Value out = kUnset;
+    std::optional<Value> out;  // out-param; only engaged when test_ywing returns true
     bool both_share_one = AnalyzerTest::test_ywing(analyzer,
         cell_at(board, 0, 0), cell_at(board, 0, 1), cell_at(board, 1, 0), out);
     check(!both_share_one, "rejected: both wings share the same value with the pivot");
 
-    out = kUnset;
     bool others_differ = AnalyzerTest::test_ywing(analyzer,
         cell_at(board, 0, 0), cell_at(board, 0, 1), cell_at(board, 2, 0), out);
     check(!others_differ, "rejected: the wings' non-shared values differ");

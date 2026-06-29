@@ -43,7 +43,7 @@ namespace { // anon
     }
 }
 
-bool Analyzer::test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing2, Value &out_value) const {
+bool Analyzer::test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing2, std::optional<Value> &out_value) const {
     // by construct, all these assertions apply for input parameters
     assert(pivot != wing1);
     assert(pivot != wing2);
@@ -61,7 +61,7 @@ bool Analyzer::test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing
     assert(mBoard.see_each_other(pivot, wing2));
 
     // does wing1 share only one value with pivot (and which is it?)
-    Value wing1_shared = kUnset;
+    std::optional<Value> wing1_shared;
     if (pivot.check(wing1.notes().values()[0])) {
         if (pivot.check(wing1.notes().values()[1])) return false;
         wing1_shared = wing1.notes().values()[0];
@@ -71,7 +71,7 @@ bool Analyzer::test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing
     }
 
     // yes! but does wing2 share only one value with pivot (and which is it?)
-    Value wing2_shared = kUnset;
+    std::optional<Value> wing2_shared;
     if (pivot.check(wing2.notes().values()[0])) {
         if (pivot.check(wing2.notes().values()[1])) return false;
         wing2_shared = wing2.notes().values()[0];
@@ -90,7 +90,7 @@ bool Analyzer::test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing
 
     out_value = wing1_other;
 
-    if (!would_act(mBoard, pivot, wing1, wing2, out_value)) return false;
+    if (!would_act(mBoard, pivot, wing1, wing2, wing1_other)) return false;
 
     return true;
 }
@@ -141,13 +141,14 @@ bool Analyzer::find_ywing(const Cell &pivot) {
             const Cell &wing1 = *it1;
             const Cell &wing2 = *it2;
 
-            Value ywing_value = kUnset;
+            std::optional<Value> ywing_value;
             if (!test_ywing(pivot, wing1, wing2, ywing_value)) continue;
-            assert(wing1.check(ywing_value));
-            assert(wing2.check(ywing_value));
+            assert(ywing_value.has_value());
+            assert(wing1.check(*ywing_value));
+            assert(wing2.check(*ywing_value));
 
             // Record the Y-Wing pattern
-            YWing yw{ywing_value, pivot.coord(), {wing1.coord(), wing2.coord()}};
+            YWing yw{*ywing_value, pivot.coord(), {wing1.coord(), wing2.coord()}};
             if (std::find(mYWings.begin(), mYWings.end(), yw) != mYWings.end()) continue;
 
             mYWings.push_back(yw);
