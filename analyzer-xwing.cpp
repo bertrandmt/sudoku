@@ -109,11 +109,10 @@ bool Analyzer::find_xwings() {
         if (!cell.isNote()) continue;
 
         // for each value in this cell...
-        auto values = cell.notes().values();
-        for (auto pv = values.begin(); pv != values.end(); ++pv) {
+        for (auto const &value : cell.notes().values()) {
             // let's see if we can anchor an X-Wing pattern in this cell for this value;
             // stop at the first one found
-            if (find_xwing(cell, *pv)) return true;
+            if (find_xwing(cell, value)) return true;
         }
     }
 

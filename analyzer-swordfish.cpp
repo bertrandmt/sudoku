@@ -169,26 +169,19 @@ bool Analyzer::find_swordfish() {
     // and all these candidates lie in the same three columns (or rows),
     // then all other candidates for that value in those columns (or rows) can be eliminated.
 
-    bool did_find = false;
-
     for (auto const &cell: mBoard.cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
         // for each value in this cell...
-        auto values = cell.notes().values();
-        for (auto pv = values.begin(); pv != values.end(); ++pv) {
-            // let's see if we can anchor a Swordfish pattern in this cell for this value
-            did_find = find_swordfish(cell, *pv);
-            if (!did_find) continue;
-            break;
+        for (auto const &value : cell.notes().values()) {
+            // let's see if we can anchor a Swordfish pattern in this cell for this value;
+            // stop at the first one found
+            if (find_swordfish(cell, value)) return true;
         }
-
-        if (!did_find) continue;
-        break;
     }
 
-    return did_find;
+    return false;
 }
 
 template<class CandidateSet, class EliminationSet>
