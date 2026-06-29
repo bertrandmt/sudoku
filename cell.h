@@ -53,6 +53,14 @@ public:
     size_t count() const { return std::popcount(mNotes); }
     std::vector<Value> values() const;
 
+    // For a two-candidate cell, the candidate that isn't v. Clearing v's bit
+    // leaves a single bit standing; its position (0-based) is the value minus 1.
+    Value other_value(const Value &v) const {
+        assert(count() == 2);
+        assert(check(v));
+        return static_cast<Value>(std::countr_zero<uint16_t>(mNotes & ~bit(v)) + 1);
+    }
+
 private:
     static constexpr uint16_t bit(const Value &v) { return static_cast<uint16_t>(1u << (v - 1)); }
     static constexpr uint16_t kAllCandidates = 0x1ffu; // bits 0..8 -> values 1..9
@@ -74,10 +82,7 @@ public:
     Notes &notes() { assert(isNote()); return mNotes; }
     const Notes &notes() const { assert(isNote()); return mNotes; }
     Value other_value(const Value &value) const {
-        assert(isNote());
-        assert(notes().count() == 2);
-        assert(check(value));
-        return notes().values()[0] == value ? notes().values()[1] : notes().values()[0];
+        return notes().other_value(value);
     }
 
     bool check(const Value &v) const { return isNote() && mNotes.check(v); }
