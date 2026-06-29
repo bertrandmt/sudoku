@@ -20,6 +20,9 @@ bool Notes::set(const Value &v, bool set) {
 }
 
 ValueList Notes::values() const {
+    // value_range() is ascending, so candidates come out ascending; see the
+    // declaration for why that order is an enumeration contract, not a
+    // set-comparison invariant.
     ValueList v;
     for (Value value : value_range()) {
         if (check(value)) v.push_back(value);

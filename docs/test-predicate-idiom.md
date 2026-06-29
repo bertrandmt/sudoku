@@ -90,12 +90,31 @@ matches, with one exception:
 
 ## A note on templates
 
-Of the techniques with a `test_`, only `test_ywing` is exercised *directly* by
-the unit tests — and it is the only one that is **not** templated on the unit
-type. The templated predicates (`test_naked_pair`, etc.) are tested only
-*through* their `find_`. A templated `test_` called directly across translation
-units risks GCC inlining it away with no emitted symbol, forcing explicit
-instantiations (the link failure PR #24 hit and then shed by deleting the
-predicate). So when extracting a templated predicate, decide up front: test it
-through `find_` (cheap, coarser), or pay the explicit-instantiation tax for
-direct per-branch predicate tests.
+Most `test_` predicates are templated on the unit type (`test_naked_pair`, etc.);
+`test_ywing` is the lone non-templated one. Testing a templated predicate
+*directly* (not just through its `find_`) has a known sharp edge, now settled by
+PR #27 for `test_naked_pair`:
+
+- **The failure mode.** A templated `test_` whose only in-TU caller is its
+  `find_` gets that one use inlined by g++ at `-O3`, so no out-of-line symbol is
+  emitted. A unit test referencing the predicate across the TU boundary then
+  fails to link — but *only on gcc*: clang keeps a weak definition, so the build
+  passes locally and on the macos/linux-clang legs and breaks solely on
+  linux-gcc. (PR #24 hit the same link failure from the other direction and shed
+  it by deleting a dead predicate.)
+
+- **The fix, when you want direct per-branch tests.** Add a friend hook in
+  `AnalyzerTest` that instantiates the predicate on a concrete unit (e.g.
+  `test_naked_pair_row` calls `a.test_naked_pair(c1, c2, a.mBoard.row(c1))`), and
+  add an explicit instantiation next to the definition:
+  `template bool Analyzer::test_naked_pair<Row>(const Cell &, const Cell &, const Row &) const;`.
+  The explicit instantiation forces a standalone symbol regardless of inlining.
+  Confirm on CI, not locally: the Apple-clang `g++` shim cannot reproduce the
+  gcc-only link failure.
+
+- **The decision.** When extracting a templated predicate, choose up front: test
+  it through `find_` (cheap, coarser, no link tax), or pay the friend-hook +
+  explicit-instantiation tax for direct per-branch predicate tests. The hidden
+  pair extraction (above) will face exactly this choice; `test_naked_pair` in
+  `tests/unit/test_analyzer.cpp` and `analyzer-nakedpairs.cpp` is the worked
+  example to copy.

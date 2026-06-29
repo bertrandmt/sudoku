@@ -86,6 +86,14 @@ struct AnalyzerTest {
     static bool   xwing_row_based(const Analyzer &a)                     { return a.mXWings.at(0).is_row_based; }
     static Value  xwing_value(const Analyzer &a)                         { return a.mXWings.at(0).value; }
 
+    // --- naked pair ---
+    // test_naked_pair is given-tuple shaped: find_ enumerates cell pairs and the
+    // predicate judges each. Drive it directly on a crafted unit. It is a
+    // template on the set type; instantiate it on the cells' shared Row.
+    static bool test_naked_pair_row(const Analyzer &a, const Cell &c1, const Cell &c2) {
+        return a.test_naked_pair(c1, c2, a.mBoard.row(c1));
+    }
+
     // --- simple coloring ---
     static bool test_color_chain(const Analyzer &a, const Analyzer::ColorChain &ch) { return a.test_color_chain(ch); }
     static bool act_on_color_chain(Analyzer &a)                                     { return a.act_on_color_chain(); }
@@ -306,6 +314,80 @@ void test_ywing_rejects_non_patterns() {
 }
 
 // ===========================================================================
+// Notes set operations
+// ===========================================================================
+
+// The bitmask set primitives the analyzers now lean on (#28). Tested directly,
+// not just through their call sites, so a regression names the primitive.
+void test_notes_set_ops() {
+    std::cout << "[notes] bitmask set operations: ==, intersects, shared_value\n";
+    Notes a; a.clear(); a.set(kThree, true); a.set(kFive, true);   // {3,5}
+    Notes b; b.clear(); b.set(kFive, true);  b.set(kThree, true);  // {3,5}, set reversed
+    Notes c; c.clear(); c.set(kThree, true); c.set(kSix, true);    // {3,6}, overlaps a on 3
+    Notes d; d.clear(); d.set(kOne, true);   d.set(kTwo, true);    // {1,2}, disjoint from a
+
+    // operator== is set equality on the mask: order-insensitive, both directions.
+    check(a == b && b == a, "equal: same candidates regardless of set order");
+    check(!(a == c), "unequal: candidate sets {3,5} and {3,6} differ");
+
+    // intersects: zero shared is a legal answer (no assert), unlike shared_value.
+    check(a.intersects(c), "intersects: {3,5} and {3,6} share one (3)");
+    check(a.intersects(b), "intersects: {3,5} and {3,5} share two (3 and 5)");
+    check(!a.intersects(d), "disjoint: {3,5} and {1,2} share nothing");
+
+    // shared_value: the single common candidate.
+    check(a.shared_value(c) == kThree, "shared_value: {3,5} and {3,6} share 3");
+}
+
+// ===========================================================================
+// Naked Pair
+// ===========================================================================
+
+// test_naked_pair is the archetypal given-tuple predicate (see
+// docs/test-predicate-idiom.md): find_ enumerates cell pairs, the predicate
+// judges each. The black-box suite only reaches it on a real solve that happens
+// to route through a naked pair; these whitebox cases hand it crafted tuples to
+// pin down its branches directly.
+//
+// test_naked_pair is a composite: it accepts only a genuine pair (Notes::==)
+// that is *also* actionable (would_act). Those two gates are tested separately
+// below so a would_act change surfaces as an actionability failure, not a
+// phantom pair-match regression.
+void test_naked_pair_accept_and_reject() {
+    std::cout << "[naked pair] the pair-match and actionability gates\n";
+
+    // --- pair-match gate ---
+    // Every other cell in the row carries all nine candidates, so any genuine
+    // pair here is trivially actionable; this isolates the pair-match decision.
+    Board board = empty_board();
+    set_candidates(board, 0, 0, {3, 5});   // the pair...
+    set_candidates(board, 0, 1, {3, 5});   // ...its twin in the same row
+    set_candidates(board, 0, 2, {3, 6});   // shares only one value -- not a pair
+    Analyzer analyzer(board);
+
+    check(AnalyzerTest::test_naked_pair_row(analyzer, cell_at(board, 0, 0), cell_at(board, 0, 1)),
+          "accepted: two cells holding the same candidate pair {3,5}");
+    // Reject short-circuits on the set compare, before would_act: a pure
+    // pair-match check, immune to changes in actionability logic.
+    check(!AnalyzerTest::test_naked_pair_row(analyzer, cell_at(board, 0, 0), cell_at(board, 0, 2)),
+          "rejected: candidate sets {3,5} and {3,6} differ");
+
+    // --- actionability gate (would_act) ---
+    // Same shape of matching pair, but its two values live nowhere else in the
+    // row, so there is nothing to eliminate and the predicate must decline. This
+    // pins the would_act gate explicitly rather than leaning on it implicitly.
+    Board inert = empty_board();
+    set_candidates(inert, 0, 0, {7, 8});
+    set_candidates(inert, 0, 1, {7, 8});
+    confine_value(inert, kSeven, { {0, 0}, {0, 1} });
+    confine_value(inert, kEight, { {0, 0}, {0, 1} });
+    Analyzer inert_analyzer(inert);
+
+    check(!AnalyzerTest::test_naked_pair_row(inert_analyzer, cell_at(inert, 0, 0), cell_at(inert, 0, 1)),
+          "rejected: a real pair with nothing to act on (would_act gate)");
+}
+
+// ===========================================================================
 // X-Wing
 // ===========================================================================
 
@@ -503,6 +585,8 @@ int main() {
     test_xychain_best_selection();
     test_ywing_detect_and_act();
     test_ywing_rejects_non_patterns();
+    test_notes_set_ops();
+    test_naked_pair_accept_and_reject();
     test_xwing_row_based();
     test_xwing_column_based();
     test_xwing_no_elimination();

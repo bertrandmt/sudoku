@@ -40,9 +40,9 @@ class Cell;
 // holds at most nine candidates, so a fixed nine-slot array plus a count covers
 // every case while staying trivially copyable. This is a drop-in for the
 // std::vector<Value> that Notes::values() used to return, exposing exactly what
-// the analyzer call sites need: range iteration, indexing, size, and equality.
-// Values are stored ascending (values() fills it in value_range order), so
-// equality between two lists is a positional candidate-set comparison.
+// the analyzer call sites need: range iteration, indexing, and size. (Set
+// equality of two cells' candidates goes through Notes::operator== on the
+// bitmask, so ValueList itself needs no equality.)
 class ValueList {
 public:
     using const_iterator = const Value *;
@@ -56,12 +56,6 @@ public:
 
     const_iterator begin() const { return mData.data(); }
     const_iterator end() const { return mData.data() + mCount; }
-
-    bool operator==(const ValueList &other) const {
-        if (mCount != other.mCount) return false;
-        for (size_t i = 0; i < mCount; ++i) if (mData[i] != other.mData[i]) return false;
-        return true;
-    }
 
 private:
     std::array<Value, 9> mData {};
@@ -82,7 +76,19 @@ public:
     bool set(const Value &v, bool set);
     bool set_all(bool set) { mNotes = set ? kAllCandidates : 0; return true; }
 
+    // Two note sets are equal iff they hold the same candidates. The bitmask is
+    // the canonical set representation, so this is one integer compare -- order-
+    // blind and independent of how the candidates were set.
+    bool operator==(const Notes &other) const { return mNotes == other.mNotes; }
+
     size_t count() const { return std::popcount(mNotes); }
+
+    // Enumerate the candidates, ascending. The ascending order is an
+    // enumeration-order contract (stable board display; canonical NakedPair
+    // value tuples so dedup compares like with like), NOT a correctness
+    // invariant for comparing two sets: candidate-set questions go through the
+    // bitmask directly (operator==, shared_value, other_value), so no consumer's
+    // correctness depends on the order here. Reserve values() for iteration.
     ValueList values() const;
 
     // For a two-candidate cell, the candidate that isn't v. Clearing v's bit
@@ -91,6 +97,18 @@ public:
         assert(count() == 2);
         assert(check(v));
         return static_cast<Value>(std::countr_zero<uint16_t>(mNotes & ~bit(v)) + 1);
+    }
+
+    // Whether the two sets share any candidate (non-empty intersection). Unlike
+    // shared_value, zero shared candidates is a legal answer, not an assert.
+    bool intersects(const Notes &other) const { return (mNotes & other.mNotes) != 0; }
+
+    // The single candidate this set shares with other. Mirror of other_value on
+    // the intersection: AND the masks, require exactly one bit, read its value.
+    Value shared_value(const Notes &other) const {
+        uint16_t both = mNotes & other.mNotes;
+        assert(std::popcount(both) == 1);
+        return static_cast<Value>(std::countr_zero<uint16_t>(both) + 1);
     }
 
 private:

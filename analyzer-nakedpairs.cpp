@@ -47,18 +47,16 @@ bool Analyzer::test_naked_pair(const Cell &c1, const Cell &c2, const Set &set) c
     if (c1.notes().count() != 2) return false;
     if (c2.notes().count() != 2) return false;
 
-    // yes! but are they the same pairs of candidates?
-    auto c1v = c1.notes().values();
-    auto c2v = c2.notes().values();
-    auto v11 = c1v.at(0);
-    auto v12 = c1v.at(1);
-    auto v21 = c2v.at(0);
-    auto v22 = c2v.at(1);
+    // yes! but are they the same pairs of candidates? Both cells are bivalue
+    // (checked above), so identical candidate sets is one bitmask compare.
+    if (c1.notes() != c2.notes()) return false;
 
-    if (!((v11 == v21 && v12 == v22) || (v11 == v22 && v12 == v21))) return false;
+    auto values = c1.notes().values();
+    auto v1 = values.at(0);
+    auto v2 = values.at(1);
 
     // yes! but would acting on them have an effet?
-    if (!would_act(set, c1, c2, v11, v12)) return false;
+    if (!would_act(set, c1, c2, v1, v2)) return false;
 
     // yes!
     return true;
@@ -156,6 +154,13 @@ bool Analyzer::act_on_naked_pair() {
     assert(did_act);
     return did_act;
 }
+
+// Explicit instantiation so the whitebox test (tests/unit/test_analyzer.cpp)
+// can link test_naked_pair<Row> directly. Its only in-TU caller is
+// find_naked_pair, which at -O3 g++ inlines, emitting no out-of-line copy of
+// the predicate; the external reference from the test TU then fails to link
+// (clang happens to keep a weak definition, so it only bit the gcc build).
+template bool Analyzer::test_naked_pair<Row>(const Cell &, const Cell &, const Row &) const;
 
 std::ostream& operator<<(std::ostream& outs, const Analyzer::NakedPair &np) {
     return outs << "{" << np.coords.first << "," << np.coords.second << "}#{" << np.values.first << "," << np.values.second << "}";

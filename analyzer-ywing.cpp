@@ -64,15 +64,10 @@ bool Analyzer::test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing
     // skipped (at least one shared), and candidates with the identical 2-value
     // set as the pivot are skipped (no more than one shared).
 
-    // which value does wing1 share with pivot?
-    const auto w1 = wing1.notes().values();
-    assert(pivot.check(w1[0]) != pivot.check(w1[1]));
-    Value wing1_shared = pivot.check(w1[0]) ? w1[0] : w1[1];
-
-    // which value does wing2 share with pivot?
-    const auto w2 = wing2.notes().values();
-    assert(pivot.check(w2[0]) != pivot.check(w2[1]));
-    Value wing2_shared = pivot.check(w2[0]) ? w2[0] : w2[1];
+    // which value does each wing share with pivot? By construction exactly one,
+    // so this is the single bit in each wing's intersection with the pivot.
+    Value wing1_shared = wing1.notes().shared_value(pivot.notes());
+    Value wing2_shared = wing2.notes().shared_value(pivot.notes());
 
     // yes! but do wing1 and wing2 share different values with pivot?
     if (wing1_shared == wing2_shared) return false;
@@ -94,8 +89,6 @@ namespace {
     void select_wing_candidates(const Cell &pivot, const Set &set, std::unordered_set<Cell> &wing_candidates) {
         assert(set.contains(pivot));
 
-        const auto pivot_values = pivot.notes().values();
-
         for (auto const &cell : set) {
             // is this another cell than the pivot?
             if (cell == pivot) continue;
@@ -107,11 +100,11 @@ namespace {
             if (cell.notes().count() != 2) continue;
 
             // yes! but is one of the candidates also a candidate for pivot?
-            const auto cell_values = cell.notes().values();
-            if (!pivot.check(cell_values[0]) && !pivot.check(cell_values[1])) continue;
+            if (!pivot.notes().intersects(cell.notes())) continue;
 
-            // yes! but are both candidates not candidates for pivot?
-            if (pivot_values == cell_values) continue;
+            // yes! but are both candidates not candidates for pivot? Both cells
+            // are bivalue, so identical candidate sets is one bitmask compare.
+            if (pivot.notes() == cell.notes()) continue;
 
             // yes! ok, this is a bona fide wing candidate; record it
             // unordered_set automatically handles duplicates
