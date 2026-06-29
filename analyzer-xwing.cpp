@@ -32,14 +32,12 @@ bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateS
     assert(cset.contains(cell));
     assert(eset.contains(cell));
 
-    bool did_find = false;
-
     // are there exactly two candidates for this value on this candidate set?
     auto cset_candidates = candidates(cset, value);
-    if (cset_candidates.size() != 2) return did_find;
+    if (cset_candidates.size() != 2) return false;
 
     // yes! if cell is not the first candidate, we've already considered this cset and found it unsuitable
-    if (cell != cset_candidates[0]) return did_find;
+    if (cell != cset_candidates[0]) return false;
     const Cell& other_cell = cset_candidates[1];
 
     // Get the elimination set for the other cell
@@ -80,23 +78,19 @@ bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateS
         assert(mXWings.empty());
         mXWings.push_back(candidate_xwing);
         if (sVerbose) std::cout << "  [fXW] " << candidate_xwing << std::endl;
-        did_find = true;
-        break;
+        return true;
     }
 
-    return did_find;
+    return false;
 }
 
 bool Analyzer::find_xwing(const Cell &cell, const Value &value) {
     assert(cell.isNote());
     assert(cell.check(value));
 
-    bool did_find = false;
-
-    did_find = find_xwing(cell, value, mBoard.row(cell), mBoard.column(cell), mBoard.rows(), true);
-    if (!did_find) did_find = find_xwing(cell, value, mBoard.column(cell), mBoard.row(cell), mBoard.columns(), false);
-
-    return did_find;
+    if (find_xwing(cell, value, mBoard.row(cell), mBoard.column(cell), mBoard.rows(), true))
+        return true;
+    return find_xwing(cell, value, mBoard.column(cell), mBoard.row(cell), mBoard.columns(), false);
 }
 
 bool Analyzer::find_xwings() {
