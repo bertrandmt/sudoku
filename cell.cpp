@@ -19,8 +19,8 @@ bool Notes::set(const Value &v, bool set) {
     return note;
 }
 
-std::vector<Value> Notes::values() const {
-    std::vector<Value> v;
+ValueList Notes::values() const {
+    ValueList v;
     for (Value value : value_range()) {
         if (check(value)) v.push_back(value);
     }
