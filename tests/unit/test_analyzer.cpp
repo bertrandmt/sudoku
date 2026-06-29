@@ -331,7 +331,8 @@ void test_notes_set_ops() {
     check(!(a == c), "unequal: candidate sets {3,5} and {3,6} differ");
 
     // intersects: zero shared is a legal answer (no assert), unlike shared_value.
-    check(a.intersects(c), "intersects: {3,5} and {3,6} share 3");
+    check(a.intersects(c), "intersects: {3,5} and {3,6} share one (3)");
+    check(a.intersects(b), "intersects: {3,5} and {3,5} share two (3 and 5)");
     check(!a.intersects(d), "disjoint: {3,5} and {1,2} share nothing");
 
     // shared_value: the single common candidate.
