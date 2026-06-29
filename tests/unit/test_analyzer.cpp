@@ -339,10 +339,10 @@ void test_ywing_rejects_non_patterns() {
 //
 //        c1 c2 c3 c4 c5 c6 c7 c8
 //   r0    7              7              <- top of the real X-Wing (cols 1,5)
-//   r2    7                       7     <- misaligned: shares c1, not c5
+//   r2    7                       7     <- misaligned: shares c1, not c5 (also a c1 stray)
 //   r3    7              7              <- bottom of the real X-Wing (cols 1,5)
 //   r4       7        7  7              <- three 7s: too many to anchor (cols 2,6,7)
-//   r6    7                             <- stray in c1: what the real X-Wing clears
+//   r6    7                             <- a second c1 stray; the X-Wing clears r2 and r6
 //   r7          7  7                    <- aligned pair on cols 3,4 ...
 //   r8          7  7                    <- ... but c3/c4 hold nothing else to clear
 void test_xwing_rows_detect_and_reject() {
@@ -352,8 +352,8 @@ void test_xwing_rows_detect_and_reject() {
     confine_value(board, V, {
         {0,1},{0,5},        // row 0   real X-Wing top
         {3,1},{3,5},        // row 3   real X-Wing bottom (aligned on cols 1,5)
-        {6,1},              // row 6   stray in col 1 -> the eliminable candidate
-        {2,1},{2,8},        // row 2   misaligned partner (col 8, not col 5)
+        {6,1},              // row 6   stray in col 1 -> an eliminable candidate
+        {2,1},{2,8},        // row 2   misaligned partner (col 8, not col 5); (2,1) is a second col-1 stray
         {4,2},{4,6},{4,7},  // row 4   three candidates -> cannot anchor
         {7,3},{7,4},        // row 7   aligned pair on cols 3,4 ...
         {8,3},{8,4},        // row 8   ... with no stray in either column
@@ -362,7 +362,8 @@ void test_xwing_rows_detect_and_reject() {
     Analyzer analyzer(board);
 
     // Positive control: rows 0 and 3 share columns 1 and 5, and column 1 carries
-    // the row-6 stray, so the rectangle is real and actionable.
+    // two further candidates outside the rectangle (rows 2 and 6), so it is real
+    // and actionable -- both would be eliminated.
     check(AnalyzerTest::test_xwing_rows(analyzer, V,
               cell_at(board, 0, 0), cell_at(board, 3, 0),    // candidate rows 0, 3
               cell_at(board, 0, 1), cell_at(board, 0, 5)),   // elimination cols 1, 5
