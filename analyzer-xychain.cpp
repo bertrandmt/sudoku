@@ -169,8 +169,9 @@ bool Analyzer::find_xychains() {
         if (cell.notes().count() != 2) continue;
 
         // yes! attempt to build chains from this cell for each candidate value
-        did_find |= find_xychain(cell, cell.notes().values()[0]);
-        did_find |= find_xychain(cell, cell.notes().values()[1]);
+        auto values = cell.notes().values();
+        did_find |= find_xychain(cell, values[0]);
+        did_find |= find_xychain(cell, values[1]);
     }
 
     return did_find;

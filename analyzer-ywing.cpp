@@ -65,12 +65,12 @@ bool Analyzer::test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing
     // set as the pivot are skipped (no more than one shared).
 
     // which value does wing1 share with pivot?
-    const auto &w1 = wing1.notes().values();
+    const auto w1 = wing1.notes().values();
     assert(pivot.check(w1[0]) != pivot.check(w1[1]));
     Value wing1_shared = pivot.check(w1[0]) ? w1[0] : w1[1];
 
     // which value does wing2 share with pivot?
-    const auto &w2 = wing2.notes().values();
+    const auto w2 = wing2.notes().values();
     assert(pivot.check(w2[0]) != pivot.check(w2[1]));
     Value wing2_shared = pivot.check(w2[0]) ? w2[0] : w2[1];
 
@@ -94,6 +94,8 @@ namespace {
     void select_wing_candidates(const Cell &pivot, const Set &set, std::unordered_set<Cell> &wing_candidates) {
         assert(set.contains(pivot));
 
+        const auto pivot_values = pivot.notes().values();
+
         for (auto const &cell : set) {
             // is this another cell than the pivot?
             if (cell == pivot) continue;
@@ -105,10 +107,11 @@ namespace {
             if (cell.notes().count() != 2) continue;
 
             // yes! but is one of the candidates also a candidate for pivot?
-            if (!pivot.check(cell.notes().values()[0]) && !pivot.check(cell.notes().values()[1])) continue;
+            const auto cell_values = cell.notes().values();
+            if (!pivot.check(cell_values[0]) && !pivot.check(cell_values[1])) continue;
 
             // yes! but are both candidates not candidates for pivot?
-            if (pivot.notes().values() == cell.notes().values()) continue;
+            if (pivot_values == cell_values) continue;
 
             // yes! ok, this is a bona fide wing candidate; record it
             // unordered_set automatically handles duplicates

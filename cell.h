@@ -3,13 +3,13 @@
 #pragma once
 
 #include <functional>
+#include <array>
 #include <cassert>
 #include <bit>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <type_traits>
-#include <vector>
 #include <ranges>
 
 #include "coord.h"
@@ -36,6 +36,38 @@ inline auto value_range() {
 
 class Cell;
 
+// The candidates of a Notes, materialized inline with no heap allocation. A cell
+// holds at most nine candidates, so a fixed nine-slot array plus a count covers
+// every case while staying trivially copyable. This is a drop-in for the
+// std::vector<Value> that Notes::values() used to return, exposing exactly what
+// the analyzer call sites need: range iteration, indexing, size, and equality.
+// Values are stored ascending (values() fills it in value_range order), so
+// equality between two lists is a positional candidate-set comparison.
+class ValueList {
+public:
+    using const_iterator = const Value *;
+
+    void push_back(const Value &v) { assert(mCount < mData.size()); mData[mCount++] = v; }
+
+    size_t size() const { return mCount; }
+
+    Value operator[](size_t i) const { assert(i < mCount); return mData[i]; }
+    Value at(size_t i) const { return (*this)[i]; }
+
+    const_iterator begin() const { return mData.data(); }
+    const_iterator end() const { return mData.data() + mCount; }
+
+    bool operator==(const ValueList &other) const {
+        if (mCount != other.mCount) return false;
+        for (size_t i = 0; i < mCount; ++i) if (mData[i] != other.mData[i]) return false;
+        return true;
+    }
+
+private:
+    std::array<Value, 9> mData {};
+    size_t mCount = 0;
+};
+
 // The nine candidate flags packed into a bitmask: bit (v - 1) is set when v is
 // still a candidate. A plain integer keeps Notes (and therefore Cell) trivially
 // copyable, with no per-cell heap allocation.
@@ -51,7 +83,7 @@ public:
     bool set_all(bool set) { mNotes = set ? kAllCandidates : 0; return true; }
 
     size_t count() const { return std::popcount(mNotes); }
-    std::vector<Value> values() const;
+    ValueList values() const;
 
     // For a two-candidate cell, the candidate that isn't v. Clearing v's bit
     // leaves a single bit standing; its position (0-based) is the value minus 1.

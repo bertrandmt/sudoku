@@ -48,10 +48,12 @@ bool Analyzer::test_naked_pair(const Cell &c1, const Cell &c2, const Set &set) c
     if (c2.notes().count() != 2) return false;
 
     // yes! but are they the same pairs of candidates?
-    auto v11 = c1.notes().values().at(0);
-    auto v12 = c1.notes().values().at(1);
-    auto v21 = c2.notes().values().at(0);
-    auto v22 = c2.notes().values().at(1);
+    auto c1v = c1.notes().values();
+    auto c2v = c2.notes().values();
+    auto v11 = c1v.at(0);
+    auto v12 = c1v.at(1);
+    auto v21 = c2v.at(0);
+    auto v22 = c2v.at(1);
 
     if (!((v11 == v21 && v12 == v22) || (v11 == v22 && v12 == v21))) return false;
 
@@ -71,7 +73,8 @@ bool Analyzer::find_naked_pair(const Cell &cell, const Set &set) {
         if (!test_naked_pair(cell, pair_cell, set)) continue;
 
         // yes! but is it already recorded?
-        NakedPair np({cell.coord(), pair_cell.coord()}, {cell.notes().values().at(0), cell.notes().values().at(1)});
+        auto cellv = cell.notes().values();
+        NakedPair np({cell.coord(), pair_cell.coord()}, {cellv.at(0), cellv.at(1)});
         if (std::find(mNakedPairs.begin(), mNakedPairs.end(), np) != mNakedPairs.end()) continue;
 
         // no! let's record it
