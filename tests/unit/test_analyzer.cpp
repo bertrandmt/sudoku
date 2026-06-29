@@ -86,6 +86,14 @@ struct AnalyzerTest {
     static bool   xwing_row_based(const Analyzer &a)                     { return a.mXWings.at(0).is_row_based; }
     static Value  xwing_value(const Analyzer &a)                         { return a.mXWings.at(0).value; }
 
+    // --- naked pair ---
+    // test_naked_pair is given-tuple shaped: find_ enumerates cell pairs and the
+    // predicate judges each. Drive it directly on a crafted unit. It is a
+    // template on the set type; instantiate it on the cells' shared Row.
+    static bool test_naked_pair_row(const Analyzer &a, const Cell &c1, const Cell &c2) {
+        return a.test_naked_pair(c1, c2, a.mBoard.row(c1));
+    }
+
     // --- simple coloring ---
     static bool test_color_chain(const Analyzer &a, const Analyzer::ColorChain &ch) { return a.test_color_chain(ch); }
     static bool act_on_color_chain(Analyzer &a)                                     { return a.act_on_color_chain(); }
@@ -306,6 +314,58 @@ void test_ywing_rejects_non_patterns() {
 }
 
 // ===========================================================================
+// ValueList
+// ===========================================================================
+
+// ValueList::operator== underpins the naked-pair pair-match check but otherwise
+// ships untested. It is positional (notes().values() always fills ascending),
+// so it is equality of same-length, same-order candidate lists.
+void test_valuelist_equality() {
+    std::cout << "[value list] positional equality of candidate lists\n";
+    ValueList a; a.push_back(kThree); a.push_back(kFive);
+    ValueList b; b.push_back(kThree); b.push_back(kFive);
+    ValueList c; c.push_back(kThree); c.push_back(kSix);
+    ValueList d; d.push_back(kThree);
+
+    check(a == b, "equal: same values in the same order");
+    check(!(a == c), "unequal: a differing element");
+    check(!(a == d), "unequal: differing length");
+}
+
+// ===========================================================================
+// Naked Pair
+// ===========================================================================
+
+// test_naked_pair is the archetypal given-tuple predicate (see
+// docs/test-predicate-idiom.md): find_ enumerates cell pairs, the predicate
+// judges each. The black-box suite only reaches it on a real solve that happens
+// to route through a naked pair; these whitebox cases hand it crafted tuples to
+// pin down the accept and reject branches directly.
+//
+// The accept case also locks the invariant the pair-match check now leans on:
+// notes().values() returns candidates ascending and ValueList::operator== is
+// positional, so two cells holding the same two candidates compare equal.
+void test_naked_pair_accept_and_reject() {
+    std::cout << "[naked pair] the predicate accepts a real pair and rejects a mismatch\n";
+    Board board = empty_board();
+    set_candidates(board, 0, 0, {3, 5});   // the pair...
+    set_candidates(board, 0, 1, {3, 5});   // ...its twin in the same row
+    set_candidates(board, 0, 2, {3, 6});   // shares only one value -- not a pair
+    // Every other cell in row 0 still carries all nine candidates, so a genuine
+    // pair has somewhere to act and would_act() does not veto the accept case.
+
+    Analyzer analyzer(board);
+
+    bool accepted = AnalyzerTest::test_naked_pair_row(analyzer,
+        cell_at(board, 0, 0), cell_at(board, 0, 1));
+    check(accepted, "accepted: two cells holding the same candidate pair {3,5}");
+
+    bool rejected = AnalyzerTest::test_naked_pair_row(analyzer,
+        cell_at(board, 0, 0), cell_at(board, 0, 2));
+    check(!rejected, "rejected: candidate sets {3,5} and {3,6} differ");
+}
+
+// ===========================================================================
 // X-Wing
 // ===========================================================================
 
@@ -503,6 +563,8 @@ int main() {
     test_xychain_best_selection();
     test_ywing_detect_and_act();
     test_ywing_rejects_non_patterns();
+    test_valuelist_equality();
+    test_naked_pair_accept_and_reject();
     test_xwing_row_based();
     test_xwing_column_based();
     test_xwing_no_elimination();
