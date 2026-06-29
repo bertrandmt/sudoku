@@ -17,7 +17,7 @@ bool Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &
 
     // can we find another note cell with the same pair in the same set,
     // but no other cell with either candidate in the set?
-    Cell *ppair_cell = NULL; // "the" other potential candidate
+    Cell *ppair_cell = nullptr; // "the" other potential candidate
     bool condition_met = true;
 
     for (auto &other_cell : set) {

@@ -6,7 +6,6 @@
 #include "column.h"
 #include "nonet.h"
 #include "cell.h"
-#include "verbose.h"
 
 #include <array>
 #include <cassert>
