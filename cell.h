@@ -99,6 +99,10 @@ public:
         return static_cast<Value>(std::countr_zero<uint16_t>(mNotes & ~bit(v)) + 1);
     }
 
+    // Whether the two sets share any candidate (non-empty intersection). Unlike
+    // shared_value, zero shared candidates is a legal answer, not an assert.
+    bool intersects(const Notes &other) const { return (mNotes & other.mNotes) != 0; }
+
     // The single candidate this set shares with other. Mirror of other_value on
     // the intersection: AND the masks, require exactly one bit, read its value.
     Value shared_value(const Notes &other) const {

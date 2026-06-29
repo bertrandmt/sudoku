@@ -100,8 +100,7 @@ namespace {
             if (cell.notes().count() != 2) continue;
 
             // yes! but is one of the candidates also a candidate for pivot?
-            const auto cell_values = cell.notes().values();
-            if (!pivot.check(cell_values[0]) && !pivot.check(cell_values[1])) continue;
+            if (!pivot.notes().intersects(cell.notes())) continue;
 
             // yes! but are both candidates not candidates for pivot? Both cells
             // are bivalue, so identical candidate sets is one bitmask compare.
