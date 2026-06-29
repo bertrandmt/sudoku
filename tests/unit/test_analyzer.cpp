@@ -396,20 +396,52 @@ void test_xwing_no_elimination() {
     check(AnalyzerTest::xwing_count(analyzer) == 0, "no X-Wing recorded");
 }
 
-// A near-miss: the two candidate rows do not share both columns, so no rectangle
-// forms. Row 0 holds 7 in columns 1 and 5; row 3 in columns 1 and 8 -- they
-// share column 1 only, so the fourth corner is absent and find_xwing reports
-// nothing from either orientation.
+// Near-misses: the partner row shares only one of the anchor's two columns, so
+// the fourth corner is absent. find_xwing has two containment checks -- one per
+// corner of the partner -- and which rejects depends on which column is the odd
+// one out, so cover both.
 void test_xwing_misaligned_not_found() {
     std::cout << "[x-wing] misaligned candidate lines yield no pattern\n";
+    const Value V = kSeven;
+
+    // Partner's SECOND candidate is off the rectangle: row 0 in cols 1,5; row 3
+    // in cols 1,8 -- shares col 1, misses col 5 (rejected at the other_eset check).
+    {
+        Board board = empty_board();
+        confine_value(board, V, { {0,1},{0,5}, {3,1},{3,8}, {7,5} });
+        Analyzer analyzer(board);
+        check(!AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 1), V),
+              "no X-Wing when the partner's second candidate is off the rectangle");
+        check(AnalyzerTest::xwing_count(analyzer) == 0, "nothing recorded");
+    }
+
+    // Partner's FIRST candidate is off the rectangle: row 0 in cols 1,5; row 3 in
+    // cols 2,5 -- shares col 5, misses col 1 (rejected at the eset check).
+    {
+        Board board = empty_board();
+        confine_value(board, V, { {0,1},{0,5}, {3,2},{3,5} });
+        Analyzer analyzer(board);
+        check(!AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 1), V),
+              "no X-Wing when the partner's first candidate is off the rectangle");
+        check(AnalyzerTest::xwing_count(analyzer) == 0, "nothing recorded");
+    }
+}
+
+// find_xwing canonicalises on the first candidate of the anchor's line: anchored
+// on a line's *second* candidate it bails at once (a row X-Wing is recorded only
+// when anchored on its first candidate, so find_xwings never double-records it).
+// Same board as the row-based test, which finds the pattern from (0,1); from
+// (0,5) it must find nothing.
+void test_xwing_anchor_not_first() {
+    std::cout << "[x-wing] anchoring on a non-first candidate finds nothing\n";
     Board board = empty_board();
     const Value V = kSeven;
-    confine_value(board, V, { {0,1},{0,5}, {3,1},{3,8}, {7,5} });
+    confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5}, {6,1}, {7,5} });
 
     Analyzer analyzer(board);
-    bool found = AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 1), V);
-    check(!found, "no X-Wing reported when the candidate lines are misaligned");
-    check(AnalyzerTest::xwing_count(analyzer) == 0, "no X-Wing recorded");
+    check(!AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 5), V),
+          "no X-Wing reported when anchored on the row's second candidate");
+    check(AnalyzerTest::xwing_count(analyzer) == 0, "nothing recorded from the non-first anchor");
 }
 
 // ===========================================================================
@@ -475,6 +507,7 @@ int main() {
     test_xwing_column_based();
     test_xwing_no_elimination();
     test_xwing_misaligned_not_found();
+    test_xwing_anchor_not_first();
     test_colorchain_rule2_contradiction();
     test_colorchain_benign_not_actionable();
 
