@@ -60,32 +60,27 @@ bool Analyzer::test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing
     assert(mBoard.see_each_other(pivot, wing1));
     assert(mBoard.see_each_other(pivot, wing2));
 
-    // does wing1 share only one value with pivot (and which is it?)
-    std::optional<Value> wing1_shared;
-    if (pivot.check(wing1.notes().values()[0])) {
-        if (pivot.check(wing1.notes().values()[1])) return false;
-        wing1_shared = wing1.notes().values()[0];
-    } else {
-        if (pivot.check(wing1.notes().values()[0])) return false;
-        wing1_shared = wing1.notes().values()[1];
-    }
+    // by construct (select_wing_candidates), each wing shares exactly one value
+    // with the pivot: candidates with no value in common with the pivot are
+    // skipped (at least one shared), and candidates with the identical 2-value
+    // set as the pivot are skipped (no more than one shared).
 
-    // yes! but does wing2 share only one value with pivot (and which is it?)
-    std::optional<Value> wing2_shared;
-    if (pivot.check(wing2.notes().values()[0])) {
-        if (pivot.check(wing2.notes().values()[1])) return false;
-        wing2_shared = wing2.notes().values()[0];
-    } else {
-        if (pivot.check(wing2.notes().values()[0])) return false;
-        wing2_shared = wing2.notes().values()[1];
-    }
+    // which value does wing1 share with pivot?
+    const auto &w1 = wing1.notes().values();
+    assert(pivot.check(w1[0]) != pivot.check(w1[1]));
+    Value wing1_shared = pivot.check(w1[0]) ? w1[0] : w1[1];
+
+    // which value does wing2 share with pivot?
+    const auto &w2 = wing2.notes().values();
+    assert(pivot.check(w2[0]) != pivot.check(w2[1]));
+    Value wing2_shared = pivot.check(w2[0]) ? w2[0] : w2[1];
 
     // yes! but do wing1 and wing2 share different values with pivot?
     if (wing1_shared == wing2_shared) return false;
 
     // Find the elimination candidate (the candidate that both wings have but pivot doesn't)
-    Value wing1_other = wing1_shared == wing1.notes().values()[0] ? wing1.notes().values()[1] : wing1.notes().values()[0];
-    Value wing2_other = wing2_shared == wing2.notes().values()[0] ? wing2.notes().values()[1] : wing2.notes().values()[0];
+    Value wing1_other = wing1.other_value(wing1_shared);
+    Value wing2_other = wing2.other_value(wing2_shared);
     if (wing1_other != wing2_other) return false;
 
     out_value = wing1_other;
