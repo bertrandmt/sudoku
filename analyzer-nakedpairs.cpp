@@ -48,14 +48,12 @@ bool Analyzer::test_naked_pair(const Cell &c1, const Cell &c2, const Set &set) c
     if (c2.notes().count() != 2) return false;
 
     // yes! but are they the same pairs of candidates?
+    // values() returns candidates ascending, so equal lists means equal pairs.
     auto c1v = c1.notes().values();
-    auto c2v = c2.notes().values();
+    if (c1v != c2.notes().values()) return false;
+
     auto v11 = c1v.at(0);
     auto v12 = c1v.at(1);
-    auto v21 = c2v.at(0);
-    auto v22 = c2v.at(1);
-
-    if (!((v11 == v21 && v12 == v22) || (v11 == v22 && v12 == v21))) return false;
 
     // yes! but would acting on them have an effet?
     if (!would_act(set, c1, c2, v11, v12)) return false;
