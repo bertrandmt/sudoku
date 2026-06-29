@@ -94,6 +94,14 @@ struct AnalyzerTest {
         return a.test_naked_pair(c1, c2, a.mBoard.row(c1));
     }
 
+    // --- hidden pair ---
+    // test_hidden_pair is given-tuple shaped too (identity is (c1,c2,v1,v2)):
+    // find_ enumerates the partner, the predicate judges each. Drive it directly
+    // on a crafted Row, the same way as naked pair.
+    static bool test_hidden_pair_row(const Analyzer &a, const Cell &c1, const Cell &c2, const Value &v1, const Value &v2) {
+        return a.test_hidden_pair(c1, c2, v1, v2, a.mBoard.row(c1));
+    }
+
     // --- simple coloring ---
     static bool test_color_chain(const Analyzer &a, const Analyzer::ColorChain &ch) { return a.test_color_chain(ch); }
     static bool act_on_color_chain(Analyzer &a)                                     { return a.act_on_color_chain(); }
@@ -388,6 +396,86 @@ void test_naked_pair_accept_and_reject() {
 }
 
 // ===========================================================================
+// Hidden pair
+// ===========================================================================
+
+// test_hidden_pair is given-tuple shaped like test_naked_pair (see
+// docs/test-predicate-idiom.md): find_ enumerates the partner cell, the
+// predicate judges each (c1,c2,v1,v2). These cases pin down its substantive
+// branches -- value ordering, cell ordering, the hidden loop, actionability,
+// and partner incompleteness -- and leave the trivial distinctness/shape guards
+// (c1 == c2, v1 == v2, set membership, isNote, c1 failing to carry the pair)
+// untested, as the test_naked_pair sibling does. Most of these branches are
+// also hit incidentally by any black-box solve, since find_hidden_pair feeds
+// every unfiltered cell to the predicate; the one find_ genuinely cannot reach
+// is value ordering
+// (find_hidden_pairs enumerates pv2 = pv1 + 1, so v1 < v2 always holds), which
+// is the load-bearing reason to test the predicate directly rather than only
+// through find_.
+void test_hidden_pair_accept_and_reject() {
+    std::cout << "[hidden pair] the hidden, actionability, ordering and partner gates\n";
+
+    // --- "hidden" gate ---
+    // (0,0) and (0,1) carry {3,5} among all nine candidates; 3 and 5 live
+    // nowhere else, so the pair is genuinely hidden and actionable (each cell
+    // still holds seven other candidates to strip).
+    Board board = empty_board();
+    confine_value(board, kThree, { {0, 0}, {0, 1} });
+    confine_value(board, kFive,  { {0, 0}, {0, 1} });
+    Analyzer analyzer(board);
+
+    check(AnalyzerTest::test_hidden_pair_row(analyzer, cell_at(board, 0, 0), cell_at(board, 0, 1), kThree, kFive),
+          "accepted: {3,5} confined to two cells, each with more to strip");
+
+    // A third cell in the row carrying just one of the values breaks "hidden".
+    Board stray = empty_board();
+    confine_value(stray, kThree, { {0, 0}, {0, 1}, {0, 2} });
+    confine_value(stray, kFive,  { {0, 0}, {0, 1} });
+    Analyzer stray_analyzer(stray);
+
+    check(!AnalyzerTest::test_hidden_pair_row(stray_analyzer, cell_at(stray, 0, 0), cell_at(stray, 0, 1), kThree, kFive),
+          "rejected: a third cell carries 3, so {3,5} is not hidden");
+
+    // --- actionability gate ---
+    // Same hidden {3,5}, but both cells are bivalue: that is a naked pair, with
+    // nothing for hidden pair to eliminate.
+    Board naked = empty_board();
+    set_candidates(naked, 0, 0, {3, 5});
+    set_candidates(naked, 0, 1, {3, 5});
+    confine_value(naked, kThree, { {0, 0}, {0, 1} });
+    confine_value(naked, kFive,  { {0, 0}, {0, 1} });
+    Analyzer naked_analyzer(naked);
+
+    check(!AnalyzerTest::test_hidden_pair_row(naked_analyzer, cell_at(naked, 0, 0), cell_at(naked, 0, 1), kThree, kFive),
+          "rejected: both cells bivalue {3,5} -- a naked pair, nothing to strip");
+
+    // --- ordering and partner gates (reuse the accepting board) ---
+    // Cell ordering: c2 must come after c1.
+    check(!AnalyzerTest::test_hidden_pair_row(analyzer, cell_at(board, 0, 1), cell_at(board, 0, 0), kThree, kFive),
+          "rejected: cells passed out of order (c2 before c1)");
+
+    // Value ordering: v2 must come after v1. find_ guarantees this; the friend
+    // hook can violate it, so the guard must be tested through the hook.
+    check(!AnalyzerTest::test_hidden_pair_row(analyzer, cell_at(board, 0, 0), cell_at(board, 0, 1), kFive, kThree),
+          "rejected: values passed out of order (v2 < v1)");
+
+    // Partner incompleteness: c2 carries only one of the two values. find_ does
+    // reach this branch (it hands every unfiltered cell to the predicate). Both
+    // values are confined to the pair so the hidden loop finds nothing: the carry
+    // gate is then the *only* thing that can reject, so deleting it would flip the
+    // case to accept -- isolating this gate rather than letting the hidden loop
+    // mask it.
+    Board partial = empty_board();
+    confine_value(partial, kThree, { {0, 0}, {0, 1} });
+    confine_value(partial, kFive,  { {0, 0} });   // 5 lives only in (0,0)
+    set_candidates(partial, 0, 1, {3});           // partner carries 3 but not 5
+    Analyzer partial_analyzer(partial);
+
+    check(!AnalyzerTest::test_hidden_pair_row(partial_analyzer, cell_at(partial, 0, 0), cell_at(partial, 0, 1), kThree, kFive),
+          "rejected: partner carries 3 but not 5");
+}
+
+// ===========================================================================
 // X-Wing
 // ===========================================================================
 
@@ -587,6 +675,7 @@ int main() {
     test_ywing_rejects_non_patterns();
     test_notes_set_ops();
     test_naked_pair_accept_and_reject();
+    test_hidden_pair_accept_and_reject();
     test_xwing_row_based();
     test_xwing_column_based();
     test_xwing_no_elimination();

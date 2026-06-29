@@ -8,62 +8,66 @@
 #include <algorithm>
 
 template<class Set>
-bool Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set) {
-    assert(cell.isNote());
-    assert(cell.notes().check(v1));
-    assert(cell.notes().check(v2));
+bool Analyzer::test_hidden_pair(const Cell &c1, const Cell &c2,
+                                const Value &v1, const Value &v2, const Set &set) const {
+    // are these two different cells, carrying two different values?
+    if (c1 == c2) return false;
+    if (v1 == v2) return false;
 
-    bool did_find = false;
+    // yes! but is v2 strictly "after" v1? (find_ enumerates v1<v2; the friend
+    // hook can pass them either way, so the predicate guards the precondition
+    // itself. The v1==v2 case above is the other half of that guard.)
+    if (v2 < v1) return false;
 
-    // can we find another note cell with the same pair in the same set,
-    // but no other cell with either candidate in the set?
-    Cell *ppair_cell = nullptr; // "the" other potential candidate
-    bool condition_met = true;
+    // yes! but is c2 "after" c1?
+    if (c2.coord() < c1.coord()) return false;
 
-    for (auto &other_cell : set) {
-        // is this other cell a note cell?
+    // yes! but are both cells in the same set?
+    if (!set.contains(c1)) return false;
+    if (!set.contains(c2)) return false;
+
+    // yes! but are both cells notes?
+    if (!c1.isNote()) return false;
+    if (!c2.isNote()) return false;
+
+    // yes! but do both cells carry the candidate pair?
+    if (!c1.check(v1) || !c1.check(v2)) return false;
+    if (!c2.check(v1) || !c2.check(v2)) return false;
+
+    // yes! but is the pair "hidden", i.e. no other cell in the set carries
+    // either value? (A stray cell carrying exactly one value, or a third cell
+    // carrying both, are equally disqualifying -- this one test subsumes both
+    // rejection paths the old discovery scan handled separately.)
+    for (auto const &other_cell : set) {
         if (!other_cell.isNote()) continue;
-
-        // yes! but is it a different cell?
-        if (other_cell == cell) continue;
-
-        // yes! but are the values possible candidates for it?
-        if (!other_cell.check(v1) && !other_cell.check(v2)) continue;                      // no impact on algorithm; check next cell in row
-        if (other_cell.check(v1) ^ other_cell.check(v2)) { condition_met = false; break; } // either v1 or v2 is disqualified
-        assert(other_cell.check(v1) && other_cell.check(v2));
-
-        // yes! but did we already find a pair candidate cell for this hidden pair?
-        if (ppair_cell) {
-            condition_met = false;      // this is disqualifying: we have more than two candidates in the row
-            break;
-        }
-
-        // this is "the" other candidate
-        ppair_cell = &other_cell;
+        if (other_cell == c1 || other_cell == c2) continue;
+        if (other_cell.check(v1) || other_cell.check(v2)) return false;
     }
-    if (!condition_met) return did_find;
 
-    // did we, in fact, find another candidate?
-    if (!ppair_cell) return did_find;
+    // yes! but is it actionable (i.e. *not* a naked pair, with nothing else to strip)?
+    if (c1.notes().count() == 2 && c2.notes().count() == 2) return false;
 
-    // yes! but is this other cell "after" this cell
-    if (ppair_cell->coord() < cell.coord()) return did_find;
+    // yes!
+    return true;
+}
 
-    // and also, is the candidate pair we found actionable (i.e. is it *not* a naked pair)?
-    if (cell.notes().count() == 2 && ppair_cell->notes().count() == 2) return did_find;
+template<class Set>
+bool Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set) {
+    for (auto const &other_cell : set) {
+        // is this candidate hidden pair good?
+        if (!test_hidden_pair(cell, other_cell, v1, v2, set)) continue;
 
-    // yes! but is the entry duplicated?
-    assert(cell.coord() < ppair_cell->coord());
-    assert(v2 > v1);
-    HiddenPair hp(std::make_pair(cell.coord(), ppair_cell->coord()), std::make_pair(v1, v2));
-    if (std::find(mHiddenPairs.begin(), mHiddenPairs.end(), hp) != mHiddenPairs.end()) return did_find;
+        // yes! but is it already recorded?
+        HiddenPair hp({cell.coord(), other_cell.coord()}, {v1, v2});
+        if (std::find(mHiddenPairs.begin(), mHiddenPairs.end(), hp) != mHiddenPairs.end()) continue;
 
-    // yes! let's record the entry
-    mHiddenPairs.push_back(hp);
-    if (sVerbose) std::cout << "  [fHP] " << hp << std::endl;
-    did_find = true;
+        // no! let's record it
+        mHiddenPairs.push_back(hp);
+        if (sVerbose) std::cout << "  [fHP] " << hp << std::endl;
+        return true;
+    }
 
-    return did_find;
+    return false;
 }
 
 bool Analyzer::find_hidden_pairs() {
@@ -134,6 +138,13 @@ bool Analyzer::act_on_hidden_pair() {
     assert(did_act);
     return did_act;
 }
+
+// Explicit instantiation so the whitebox test (tests/unit/test_analyzer.cpp)
+// can link test_hidden_pair<Row> directly. Its only in-TU caller is
+// find_hidden_pair, which at -O3 g++ inlines, emitting no out-of-line copy of
+// the predicate; the external reference from the test TU then fails to link
+// (clang happens to keep a weak definition, so it only bit the gcc build).
+template bool Analyzer::test_hidden_pair<Row>(const Cell &, const Cell &, const Value &, const Value &, const Row &) const;
 
 std::ostream& operator<<(std::ostream& outs, const Analyzer::HiddenPair &hp) {
     return outs << "{" << hp.coords.first << "," << hp.coords.second << "}#{" << hp.values.first << "," << hp.values.second << "}";

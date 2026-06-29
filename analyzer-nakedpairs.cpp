@@ -64,8 +64,6 @@ bool Analyzer::test_naked_pair(const Cell &c1, const Cell &c2, const Set &set) c
 
 template<class Set>
 bool Analyzer::find_naked_pair(const Cell &cell, const Set &set) {
-    bool did_find = false;
-
     // cell is fixed across the loop, so its candidate pair is too; enumerate once.
     auto cellv = cell.notes().values();
 
@@ -80,11 +78,10 @@ bool Analyzer::find_naked_pair(const Cell &cell, const Set &set) {
         // no! let's record it
         mNakedPairs.push_back(np);
         if (sVerbose) std::cout << "  [fNP] " << np << std::endl;
-        did_find = true;
-        break;
+        return true;
     }
 
-    return did_find;
+    return false;
 }
 
 bool Analyzer::find_naked_pairs() {
