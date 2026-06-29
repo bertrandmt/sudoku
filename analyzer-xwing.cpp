@@ -91,11 +91,20 @@ bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateS
         // subsequent csets only
         if (!(cset < other_cset)) continue;
 
+        // Invariant: candidates() yields cells in a consistent cross-line order,
+        // so a two-candidate partner can only align with our anchor's corners,
+        // never cross them. test_xwing reports a crossed config as "no" (and we
+        // skip it); assert the impossibility here so a broken ordering invariant
+        // aborts a debug build rather than silently dropping a real pattern.
+        auto other_cset_candidates = candidates(other_cset, value);
+        assert(!(other_cset_candidates.size() == 2
+                 && eset.contains(other_cset_candidates[1])
+                 && other_eset.contains(other_cset_candidates[0])));
+
         // is this a valid XWing pattern anchored on (cset, eset)?
         if (!test_xwing(value, cset, other_cset, eset, other_eset)) continue;
 
         // yes! the diagonal corner is the other cset's candidate in the diagonal eset
-        auto other_cset_candidates = candidates(other_cset, value);
         const Cell &diagonal = other_cset_candidates[1];
         assert(other_eset.contains(diagonal));
 
