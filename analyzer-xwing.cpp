@@ -28,7 +28,7 @@ namespace {
 // The candidate cells of the two base lines are passed in (the caller has
 // already built them), so this only materialises the cross lines' candidate
 // lists -- and only once the cheap geometric checks have confirmed a rectangle,
-// keeping the common rejection paths allocation-free.
+// keeping test_xwing's own rejection paths allocation-free.
 template<class EliminationSet>
 bool Analyzer::test_xwing(const Value &value, const std::vector<Cell> &candidates1, const std::vector<Cell> &candidates2,
                                               const EliminationSet &eset1, const EliminationSet &eset2) const {
