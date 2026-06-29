@@ -41,8 +41,6 @@ bool Analyzer::find_swordfish(const Cell &cell, const Value &value, const Candid
     assert(cset.contains(cell));
     assert(eset.contains(cell));
 
-    bool did_find = false;
-
     // Map a set of candidate cells to the elimination lines they fall on.
     auto esets_of = [&](const std::vector<Cell> &cells) {
         std::set<const EliminationSet*> s;
@@ -53,10 +51,10 @@ bool Analyzer::find_swordfish(const Cell &cell, const Value &value, const Candid
 
     // Check if the current candidate set has 2-3 candidates for this value
     auto cset_candidates = candidates(cset, value);
-    if (cset_candidates.size() < 2 || cset_candidates.size() > 3) return did_find;
+    if (cset_candidates.size() < 2 || cset_candidates.size() > 3) return false;
 
     // If cell is not the first candidate, we've already considered this cset
-    if (cell != cset_candidates[0]) return did_find;
+    if (cell != cset_candidates[0]) return false;
 
     // Collect elimination sets for the first candidate set
     std::set<const EliminationSet*> eset_set1 = esets_of(cset_candidates);
@@ -131,31 +129,22 @@ bool Analyzer::find_swordfish(const Cell &cell, const Value &value, const Candid
             assert(mSwordfish.empty());
             mSwordfish.push_back(candidate_swordfish);
             if (sVerbose) std::cout << "  [fSF] " << candidate_swordfish << std::endl;
-            did_find = true;
-            break;
+            return true;
         }
-
-        if (did_find) break;
     }
 
-    return did_find;
+    return false;
 }
 
 bool Analyzer::find_swordfish(const Cell &cell, const Value &value) {
     assert(cell.isNote());
     assert(cell.check(value));
 
-    bool did_find = false;
-
-    // Try row-based Swordfish (eliminations in columns)
-    did_find = find_swordfish(cell, value, mBoard.row(cell), mBoard.column(cell), mBoard.rows(), true);
-
-    // If not found, try column-based Swordfish (eliminations in rows)
-    if (!did_find) {
-        did_find = find_swordfish(cell, value, mBoard.column(cell), mBoard.row(cell), mBoard.columns(), false);
-    }
-
-    return did_find;
+    // Try row-based Swordfish (eliminations in columns); if not found, try
+    // column-based Swordfish (eliminations in rows)
+    if (find_swordfish(cell, value, mBoard.row(cell), mBoard.column(cell), mBoard.rows(), true))
+        return true;
+    return find_swordfish(cell, value, mBoard.column(cell), mBoard.row(cell), mBoard.columns(), false);
 }
 
 bool Analyzer::find_swordfish() {
