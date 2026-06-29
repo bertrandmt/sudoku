@@ -23,8 +23,7 @@ namespace { // anon
             if (cell.coord() == wing2.coord()) continue;
             if (!cell.check(value)) continue;
 
-            std::string tag;
-            if (board.see_each_other(cell.coord(), wing2.coord(), tag)) {
+            if (board.see_each_other(cell.coord(), wing2.coord())) {
                 would_act = true;
                 break;
             }
@@ -192,8 +191,7 @@ bool Analyzer::act_on_ywing(const YWing &entry, const Set &wing1_set) {
         if (cell.coord() == entry.wings.second) continue;
         if (!cell.check(entry.value)) continue;
 
-        std::string tag;
-        if (mBoard.see_each_other(cell.coord(), entry.wings.second, tag)) {
+        if (mBoard.see_each_other(cell.coord(), entry.wings.second)) {
             std::cout << "[YW] " << cell.coord() << " x" << entry.value << std::endl;
             mBoard.clear_note_at(cell.coord(), entry.value);
             did_act = true;

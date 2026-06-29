@@ -14,6 +14,12 @@ class Row;
 class Column;
 class Nonet;
 
+// Identifies which kind of unit relates two cells that see each other.
+enum class Unit { Row, Column, Nonet };
+
+// Single-character display tag for a unit: "r" / "c" / "n".
+const char *tag(Unit);
+
 // Parse a 3-character "row,column,value" triple, each a digit 1-9, into
 // zero-based row/column indices and a Value. Returns false (leaving the
 // out-parameters unspecified) if the entry is the wrong length or any field
@@ -59,15 +65,16 @@ public:
     const std::vector<Column> &columns() const { return mColumns; }
     const std::vector<Nonet> &nonets() const { return mNonets; }
 
-    // are these two coords in the same row, column or nonet?
-    bool see_each_other(const Coord &, const Coord &, std::string &out_tag) const;
+    // are these two coords in the same row, column or nonet? returns the shared
+    // unit kind, or nullopt if they do not see each other.
+    std::optional<Unit> see_each_other(const Coord &, const Coord &) const;
     bool see_each_other(const Cell &c1, const Cell &c2) const {
-        std::string tag;
-        return see_each_other(c1.coord(), c2.coord(), tag);
+        return see_each_other(c1.coord(), c2.coord()).has_value();
     }
 
-    // do any two of the passed coords see each other?
-    bool any_see_each_other(const std::vector<Coord> &, std::string &out_tag) const;
+    // do any two of the passed coords see each other? returns the unit shared by
+    // the first such pair found, or nullopt if none do.
+    std::optional<Unit> any_see_each_other(const std::vector<Coord> &) const;
 
     friend std::ostream& operator<< (std::ostream& outs, const Board &);
     friend class Row;

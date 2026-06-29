@@ -22,8 +22,7 @@ bool Analyzer::ColorChain::cell_sees_both_colors(const Cell &cell, const Board &
     bool did_see_red = false;
 
     for (const auto &[colored_coord, color] : cells) {
-        std::string tag;
-        if (board.see_each_other(cell.coord(), colored_coord, tag)) {
+        if (board.see_each_other(cell.coord(), colored_coord)) {
             if (color) { did_see_green = true; }
             else       { did_see_red = true; }
             if (did_see_green && did_see_red) break;
@@ -39,9 +38,8 @@ bool Analyzer::test_color_chain(const ColorChain &chain) const {
 
     // Check rule 2: cells of same color in the same unit
     auto [green_cells, red_cells] = chain.group_cells_by_color();
-    std::string tag;
-    if (mBoard.any_see_each_other(green_cells, tag)
-     || mBoard.any_see_each_other(red_cells, tag)) {
+    if (mBoard.any_see_each_other(green_cells)
+     || mBoard.any_see_each_other(red_cells)) {
         return true;
     }
 
@@ -194,10 +192,9 @@ bool act_on_color_chain_rule_2(Board &board, const std::vector<Coord> &coords, c
 
     bool did_act = false;
 
-    std::string tag;
-    if (board.any_see_each_other(coords, tag)) {
+    if (auto unit = board.any_see_each_other(coords)) {
        for (const Coord &coord : coords) {
-           std::cout << "[SC] " << coord << " x" << value << " [" << tag << color << "]" << std::endl;
+           std::cout << "[SC] " << coord << " x" << value << " [" << tag(*unit) << color << "]" << std::endl;
            board.clear_note_at(coord, value);
        }
        did_act = true;
