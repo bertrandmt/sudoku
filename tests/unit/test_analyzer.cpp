@@ -332,6 +332,31 @@ void test_valuelist_equality() {
     check(!(a == d), "unequal: differing length");
 }
 
+// The naked-pair pair-match check leans on notes().values() returning
+// candidates ascending (so a positional ValueList::== suffices). values() walks
+// value_range() ascending and emits the present candidates, so its order is
+// independent of how the candidates were set. Pin that down directly: a comment
+// at the call site cannot, and if the fill order ever changes this is the test
+// that catches it before the silent miscompare reaches the solver.
+void test_notes_values_ascending() {
+    std::cout << "[notes] values() returns candidates ascending, regardless of set order\n";
+    Notes n;
+    n.clear();
+    n.set(kSeven, true);   // set in deliberately scrambled order...
+    n.set(kTwo, true);
+    n.set(kFive, true);
+
+    ValueList got = n.values();
+
+    // Independent of operator==: walk the result and assert it strictly ascends.
+    bool ascending = got.size() == 3;
+    for (size_t i = 1; i < got.size(); ++i) if (!(got[i - 1] < got[i])) ascending = false;
+    check(ascending, "scrambled-insertion {7,2,5} comes back strictly ascending");
+
+    ValueList want; want.push_back(kTwo); want.push_back(kFive); want.push_back(kSeven);
+    check(got == want, "...and equals the expected [2,5,7]");
+}
+
 // ===========================================================================
 // Naked Pair
 // ===========================================================================
@@ -564,6 +589,7 @@ int main() {
     test_ywing_detect_and_act();
     test_ywing_rejects_non_patterns();
     test_valuelist_equality();
+    test_notes_values_ascending();
     test_naked_pair_accept_and_reject();
     test_xwing_row_based();
     test_xwing_column_based();
