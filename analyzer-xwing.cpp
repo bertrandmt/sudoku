@@ -44,7 +44,12 @@ bool Analyzer::test_xwing(const Value &value, const CandidateSet &cset1,   const
     // yes, but are there more than two candidates in eset1 or eset 2?
     if (eliminates1.size() <= 2 && eliminates2.size() <= 2) return false;
 
-    // yes, but does eliminates1 contain the first cell in candidates1?
+    // yes -- so the four corners must line up: both base lines' first candidate
+    // in eset1, both their second in eset2. This relies on candidates() yielding
+    // each line's cells in a consistent cross-line order, so index [0] names the
+    // eset1 side and [1] the eset2 side for both base lines.
+
+    // does eliminates1 contain the first cell in candidates1?
     if (std::find(eliminates1.begin(), eliminates1.end(), candidates1[0]) == eliminates1.end()) return false;
 
     // yes, but does eliminates2 contain the second cell in candidates1?
