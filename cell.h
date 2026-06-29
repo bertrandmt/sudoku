@@ -82,6 +82,13 @@ public:
     bool operator==(const Notes &other) const { return mNotes == other.mNotes; }
 
     size_t count() const { return std::popcount(mNotes); }
+
+    // Enumerate the candidates, ascending. The ascending order is an
+    // enumeration-order contract (stable board display; canonical NakedPair
+    // value tuples so dedup compares like with like), NOT a correctness
+    // invariant for comparing two sets: candidate-set questions go through the
+    // bitmask directly (operator==, shared_value, other_value), so no consumer's
+    // correctness depends on the order here. Reserve values() for iteration.
     ValueList values() const;
 
     // For a two-candidate cell, the candidate that isn't v. Clearing v's bit
@@ -90,6 +97,14 @@ public:
         assert(count() == 2);
         assert(check(v));
         return static_cast<Value>(std::countr_zero<uint16_t>(mNotes & ~bit(v)) + 1);
+    }
+
+    // The single candidate this set shares with other. Mirror of other_value on
+    // the intersection: AND the masks, require exactly one bit, read its value.
+    Value shared_value(const Notes &other) const {
+        uint16_t both = mNotes & other.mNotes;
+        assert(std::popcount(both) == 1);
+        return static_cast<Value>(std::countr_zero(both) + 1);
     }
 
 private:
