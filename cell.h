@@ -108,7 +108,7 @@ public:
     Value shared_value(const Notes &other) const {
         uint16_t both = mNotes & other.mNotes;
         assert(std::popcount(both) == 1);
-        return static_cast<Value>(std::countr_zero(both) + 1);
+        return static_cast<Value>(std::countr_zero<uint16_t>(both) + 1);
     }
 
 private:
