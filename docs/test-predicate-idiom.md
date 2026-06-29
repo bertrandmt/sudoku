@@ -70,16 +70,15 @@ call `find_`, inspect the recorded pattern).
 ## Current state vs. the rule
 
 The partition the rule predicts is 7 with `test_` (5 given-tuple + 2
-materialized-object) and 3 inline (the 3 scan-fused). The codebase very nearly
-matches, with one exception:
+materialized-object) and 3 inline (the 3 scan-fused). The codebase matches:
 
-- **Hidden pair is mis-classified.** It is given-tuple shaped (identity is
+- **Hidden pair is correctly factored.** It is given-tuple shaped (identity is
   `(c1, c2, v1, v2)`; the "no other cell in the unit carries v1 or v2" condition
   is just validation of a given tuple, exactly like naked pair's would-act
-  check), yet it currently validates inline with hand-rolled
-  `condition_met` / `ppair_cell` single-pass bookkeeping. It should be extracted
-  to a `test_hidden_pair` mirroring `test_naked_pair`. Tracked as a separate
-  issue.
+  check), and it is extracted to a `test_hidden_pair` mirroring `test_naked_pair`
+  (the old hand-rolled `condition_met` / `ppair_cell` single-pass bookkeeping is
+  gone). Like naked pair, the templated predicate is tested directly via a friend
+  hook plus an explicit `Row` instantiation (see "A note on templates" below).
 
 - **X-Wing correctly has no `test_`.** It is scan-fused; PR #24 removed the dead
   predicate and kept `find_xwing` inline, tested through `find_` like its fish
@@ -114,7 +113,7 @@ PR #27 for `test_naked_pair`:
 
 - **The decision.** When extracting a templated predicate, choose up front: test
   it through `find_` (cheap, coarser, no link tax), or pay the friend-hook +
-  explicit-instantiation tax for direct per-branch predicate tests. The hidden
-  pair extraction (above) will face exactly this choice; `test_naked_pair` in
-  `tests/unit/test_analyzer.cpp` and `analyzer-nakedpairs.cpp` is the worked
-  example to copy.
+  explicit-instantiation tax for direct per-branch predicate tests.
+  `test_naked_pair` and `test_hidden_pair` (in `tests/unit/test_analyzer.cpp`,
+  `analyzer-nakedpairs.cpp`, and `analyzer-hiddenpairs.cpp`) both took the second
+  route and are the worked examples to copy.

@@ -148,6 +148,8 @@ private:
 
     // find
     template<class Set>
+    bool test_hidden_pair(const Cell &, const Cell &, const Value &, const Value &, const Set &) const;
+    template<class Set>
     bool find_hidden_pair(const Cell &, const Value &v1, const Value &v2, const Set &);
     bool find_hidden_pairs();
 
