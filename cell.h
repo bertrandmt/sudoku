@@ -40,9 +40,9 @@ class Cell;
 // holds at most nine candidates, so a fixed nine-slot array plus a count covers
 // every case while staying trivially copyable. This is a drop-in for the
 // std::vector<Value> that Notes::values() used to return, exposing exactly what
-// the analyzer call sites need: range iteration, indexing, size, and equality.
-// Values are stored ascending (values() fills it in value_range order), so
-// equality between two lists is a positional candidate-set comparison.
+// the analyzer call sites need: range iteration, indexing, and size. (Set
+// equality of two cells' candidates goes through Notes::operator== on the
+// bitmask, so ValueList itself needs no equality.)
 class ValueList {
 public:
     using const_iterator = const Value *;
@@ -56,12 +56,6 @@ public:
 
     const_iterator begin() const { return mData.data(); }
     const_iterator end() const { return mData.data() + mCount; }
-
-    bool operator==(const ValueList &other) const {
-        if (mCount != other.mCount) return false;
-        for (size_t i = 0; i < mCount; ++i) if (mData[i] != other.mData[i]) return false;
-        return true;
-    }
 
 private:
     std::array<Value, 9> mData {};
@@ -81,6 +75,11 @@ public:
     bool check(const Value &v) const { return (mNotes & bit(v)) != 0; }
     bool set(const Value &v, bool set);
     bool set_all(bool set) { mNotes = set ? kAllCandidates : 0; return true; }
+
+    // Two note sets are equal iff they hold the same candidates. The bitmask is
+    // the canonical set representation, so this is one integer compare -- order-
+    // blind and independent of how the candidates were set.
+    bool operator==(const Notes &other) const { return mNotes == other.mNotes; }
 
     size_t count() const { return std::popcount(mNotes); }
     ValueList values() const;

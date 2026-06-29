@@ -47,11 +47,11 @@ bool Analyzer::test_naked_pair(const Cell &c1, const Cell &c2, const Set &set) c
     if (c1.notes().count() != 2) return false;
     if (c2.notes().count() != 2) return false;
 
-    // yes! but are they the same pairs of candidates?
-    // values() returns candidates ascending, so equal lists means equal pairs.
-    auto c1v = c1.notes().values();
-    if (c1v != c2.notes().values()) return false;
+    // yes! but are they the same pairs of candidates? Both cells are bivalue
+    // (checked above), so identical candidate sets is one bitmask compare.
+    if (c1.notes() != c2.notes()) return false;
 
+    auto c1v = c1.notes().values();
     auto v11 = c1v.at(0);
     auto v12 = c1v.at(1);
 

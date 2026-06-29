@@ -314,50 +314,6 @@ void test_ywing_rejects_non_patterns() {
 }
 
 // ===========================================================================
-// ValueList
-// ===========================================================================
-
-// ValueList::operator== underpins the naked-pair pair-match check but otherwise
-// ships untested. It is positional (notes().values() always fills ascending),
-// so it is equality of same-length, same-order candidate lists.
-void test_valuelist_equality() {
-    std::cout << "[value list] positional equality of candidate lists\n";
-    ValueList a; a.push_back(kThree); a.push_back(kFive);
-    ValueList b; b.push_back(kThree); b.push_back(kFive);
-    ValueList c; c.push_back(kThree); c.push_back(kSix);
-    ValueList d; d.push_back(kThree);
-
-    check(a == b, "equal: same values in the same order");
-    check(!(a == c), "unequal: a differing element");
-    check(!(a == d), "unequal: differing length");
-}
-
-// The naked-pair pair-match check leans on notes().values() returning
-// candidates ascending (so a positional ValueList::== suffices). values() walks
-// value_range() ascending and emits the present candidates, so its order is
-// independent of how the candidates were set. Pin that down directly: a comment
-// at the call site cannot, and if the fill order ever changes this is the test
-// that catches it before the silent miscompare reaches the solver.
-void test_notes_values_ascending() {
-    std::cout << "[notes] values() returns candidates ascending, regardless of set order\n";
-    Notes n;
-    n.clear();
-    n.set(kSeven, true);   // set in deliberately scrambled order...
-    n.set(kTwo, true);
-    n.set(kFive, true);
-
-    ValueList got = n.values();
-
-    // Independent of operator==: walk the result and assert it strictly ascends.
-    bool ascending = got.size() == 3;
-    for (size_t i = 1; i < got.size(); ++i) if (!(got[i - 1] < got[i])) ascending = false;
-    check(ascending, "scrambled-insertion {7,2,5} comes back strictly ascending");
-
-    ValueList want; want.push_back(kTwo); want.push_back(kFive); want.push_back(kSeven);
-    check(got == want, "...and equals the expected [2,5,7]");
-}
-
-// ===========================================================================
 // Naked Pair
 // ===========================================================================
 
@@ -367,9 +323,8 @@ void test_notes_values_ascending() {
 // to route through a naked pair; these whitebox cases hand it crafted tuples to
 // pin down the accept and reject branches directly.
 //
-// The accept case also locks the invariant the pair-match check now leans on:
-// notes().values() returns candidates ascending and ValueList::operator== is
-// positional, so two cells holding the same two candidates compare equal.
+// The accept/reject split also exercises the pair-match check: two bivalue
+// cells are a pair iff their note bitmasks are equal (Notes::operator==).
 void test_naked_pair_accept_and_reject() {
     std::cout << "[naked pair] the predicate accepts a real pair and rejects a mismatch\n";
     Board board = empty_board();
@@ -588,8 +543,6 @@ int main() {
     test_xychain_best_selection();
     test_ywing_detect_and_act();
     test_ywing_rejects_non_patterns();
-    test_valuelist_equality();
-    test_notes_values_ascending();
     test_naked_pair_accept_and_reject();
     test_xwing_row_based();
     test_xwing_column_based();

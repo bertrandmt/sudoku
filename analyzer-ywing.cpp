@@ -94,8 +94,6 @@ namespace {
     void select_wing_candidates(const Cell &pivot, const Set &set, std::unordered_set<Cell> &wing_candidates) {
         assert(set.contains(pivot));
 
-        const auto pivot_values = pivot.notes().values();
-
         for (auto const &cell : set) {
             // is this another cell than the pivot?
             if (cell == pivot) continue;
@@ -110,8 +108,9 @@ namespace {
             const auto cell_values = cell.notes().values();
             if (!pivot.check(cell_values[0]) && !pivot.check(cell_values[1])) continue;
 
-            // yes! but are both candidates not candidates for pivot?
-            if (pivot_values == cell_values) continue;
+            // yes! but are both candidates not candidates for pivot? Both cells
+            // are bivalue, so identical candidate sets is one bitmask compare.
+            if (pivot.notes() == cell.notes()) continue;
 
             // yes! ok, this is a bona fide wing candidate; record it
             // unordered_set automatically handles duplicates
