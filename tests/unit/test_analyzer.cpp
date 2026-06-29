@@ -78,13 +78,21 @@ struct AnalyzerTest {
     static Value  ywing_value(const Analyzer &a)                                                   { return a.mYWings.at(0).value; }
 
     // --- x-wing ---
-    // Row-based instantiation of the rectangle predicate: the candidate sets are
-    // the two rows, the elimination sets the two columns. r1/r2 name any cell in
-    // each candidate row; c1/c2 name any cell in each elimination column.
-    static bool test_xwing(const Analyzer &a, const Value &v,
-                           const Cell &r1, const Cell &r2, const Cell &c1, const Cell &c2) {
+    // The rectangle predicate is templated on which lines hold the candidates and
+    // which hold the eliminations; find_xwing instantiates it both ways, so both
+    // are exercised here. r1/r2 and c1/c2 name any cell in each line.
+    //
+    // Row-based: candidate sets are the two rows, elimination sets the columns.
+    static bool test_xwing_rows(const Analyzer &a, const Value &v,
+                                const Cell &r1, const Cell &r2, const Cell &c1, const Cell &c2) {
         return a.test_xwing(v, a.mBoard.row(r1), a.mBoard.row(r2),
                                a.mBoard.column(c1), a.mBoard.column(c2));
+    }
+    // Column-based: candidate sets are the two columns, elimination sets the rows.
+    static bool test_xwing_cols(const Analyzer &a, const Value &v,
+                                const Cell &c1, const Cell &c2, const Cell &r1, const Cell &r2) {
+        return a.test_xwing(v, a.mBoard.column(c1), a.mBoard.column(c2),
+                               a.mBoard.row(r1), a.mBoard.row(r2));
     }
 
     // --- simple coloring ---
@@ -312,9 +320,14 @@ void test_ywing_rejects_non_patterns() {
 
 // test_xwing is the rectangle predicate find_xwing relies on. The black-box
 // suite only ever drives it down one happy-path board, so its rejection
-// branches -- candidate row not exactly two, corners not aligned in the same
-// columns, and no third candidate to eliminate -- go unverified there. One
-// distribution of value 7 supplies a real X-Wing plus three near-misses:
+// branches -- candidate line not exactly two, corners not aligned in the same
+// cross-lines, and no third candidate to eliminate -- go unverified there.
+//
+// find_xwing instantiates the predicate two ways (rows-hold-candidates and
+// columns-hold-candidates), so both are tested below on transposed boards.
+
+// Row-based: one distribution of value 7 supplies a real X-Wing plus three
+// near-misses:
 //
 //        c1 c2 c3 c4 c5 c6 c7 c8
 //   r0    7              7              <- top of the real X-Wing (cols 1,5)
@@ -324,8 +337,8 @@ void test_ywing_rejects_non_patterns() {
 //   r6    7                             <- stray in c1: what the real X-Wing clears
 //   r7          7  7                    <- aligned pair on cols 3,4 ...
 //   r8          7  7                    <- ... but c3/c4 hold nothing else to clear
-void test_xwing_detect_and_reject() {
-    std::cout << "[x-wing] the rectangle predicate accepts a real X-Wing and rejects near-misses\n";
+void test_xwing_rows_detect_and_reject() {
+    std::cout << "[x-wing] row-based: the predicate accepts a real X-Wing and rejects near-misses\n";
     Board board = empty_board();
     const Value V = kSeven;
     confine_value(board, V, {
@@ -342,28 +355,83 @@ void test_xwing_detect_and_reject() {
 
     // Positive control: rows 0 and 3 share columns 1 and 5, and column 1 carries
     // the row-6 stray, so the rectangle is real and actionable.
-    check(AnalyzerTest::test_xwing(analyzer, V,
+    check(AnalyzerTest::test_xwing_rows(analyzer, V,
               cell_at(board, 0, 0), cell_at(board, 3, 0),    // candidate rows 0, 3
               cell_at(board, 0, 1), cell_at(board, 0, 5)),   // elimination cols 1, 5
           "accepted: aligned rows with a third candidate to eliminate");
 
     // Reject: row 2's second 7 is in column 8, so the fourth corner is absent.
-    check(!AnalyzerTest::test_xwing(analyzer, V,
+    check(!AnalyzerTest::test_xwing_rows(analyzer, V,
               cell_at(board, 0, 0), cell_at(board, 2, 0),
               cell_at(board, 0, 1), cell_at(board, 0, 5)),
           "rejected: the two rows' candidates lie in different columns");
 
     // Reject: row 4 holds three 7s, so it cannot be a base of the rectangle.
-    check(!AnalyzerTest::test_xwing(analyzer, V,
+    check(!AnalyzerTest::test_xwing_rows(analyzer, V,
               cell_at(board, 0, 0), cell_at(board, 4, 0),
               cell_at(board, 0, 1), cell_at(board, 0, 5)),
           "rejected: a candidate row has three candidates, not two");
 
     // Reject: rows 7 and 8 align perfectly on columns 3 and 4, but neither
     // column carries a third 7, so there is nothing to eliminate.
-    check(!AnalyzerTest::test_xwing(analyzer, V,
+    check(!AnalyzerTest::test_xwing_rows(analyzer, V,
               cell_at(board, 7, 0), cell_at(board, 8, 0),
               cell_at(board, 0, 3), cell_at(board, 0, 4)),
+          "rejected: a perfect rectangle with no third candidate to eliminate");
+}
+
+// Column-based: the transpose of the row-based board, so the candidate sets are
+// columns and the elimination sets are rows. Same four cases, mirrored:
+//
+//        c0 c2 c3 c4 c6 c7 c8
+//   r1    7  7  7     7              <- top of the real X-Wing (cols 0,3); c6 stray
+//   r2             7                 <- col 4: one of three 7s -> cannot anchor
+//   r3                   7  7        <- aligned pair on cols 7,8 ...
+//   r4                   7  7        <- ... but rows 3,4 hold nothing else to clear
+//   r5    7     7                    <- bottom of the real X-Wing (cols 0,3)
+//   r6             7                 <- col 4: second of three 7s
+//   r7             7                 <- col 4: third of three 7s
+//   r8       7                       <- misaligned: shares r1's col 2, not col 3
+void test_xwing_cols_detect_and_reject() {
+    std::cout << "[x-wing] column-based: the predicate accepts a real X-Wing and rejects near-misses\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, {
+        {1,0},{5,0},        // col 0   real X-Wing left
+        {1,3},{5,3},        // col 3   real X-Wing right (aligned on rows 1,5)
+        {1,6},              // col 6   stray in row 1 -> the eliminable candidate
+        {1,2},{8,2},        // col 2   misaligned partner (row 8, not row 5)
+        {2,4},{6,4},{7,4},  // col 4   three candidates -> cannot anchor
+        {3,7},{4,7},        // col 7   aligned pair on rows 3,4 ...
+        {3,8},{4,8},        // col 8   ... with no stray in either row
+    });
+
+    Analyzer analyzer(board);
+
+    // Positive control: columns 0 and 3 share rows 1 and 5, and row 1 carries
+    // the col-6 stray, so the rectangle is real and actionable.
+    check(AnalyzerTest::test_xwing_cols(analyzer, V,
+              cell_at(board, 0, 0), cell_at(board, 0, 3),    // candidate cols 0, 3
+              cell_at(board, 1, 0), cell_at(board, 5, 0)),   // elimination rows 1, 5
+          "accepted: aligned columns with a third candidate to eliminate");
+
+    // Reject: col 2's second 7 is in row 8, so the fourth corner is absent.
+    check(!AnalyzerTest::test_xwing_cols(analyzer, V,
+              cell_at(board, 0, 0), cell_at(board, 0, 2),
+              cell_at(board, 1, 0), cell_at(board, 5, 0)),
+          "rejected: the two columns' candidates lie in different rows");
+
+    // Reject: col 4 holds three 7s, so it cannot be a base of the rectangle.
+    check(!AnalyzerTest::test_xwing_cols(analyzer, V,
+              cell_at(board, 0, 0), cell_at(board, 0, 4),
+              cell_at(board, 1, 0), cell_at(board, 5, 0)),
+          "rejected: a candidate column has three candidates, not two");
+
+    // Reject: cols 7 and 8 align perfectly on rows 3 and 4, but neither row
+    // carries a third 7, so there is nothing to eliminate.
+    check(!AnalyzerTest::test_xwing_cols(analyzer, V,
+              cell_at(board, 0, 7), cell_at(board, 0, 8),
+              cell_at(board, 3, 0), cell_at(board, 4, 0)),
           "rejected: a perfect rectangle with no third candidate to eliminate");
 }
 
@@ -426,7 +494,8 @@ int main() {
     test_xychain_best_selection();
     test_ywing_detect_and_act();
     test_ywing_rejects_non_patterns();
-    test_xwing_detect_and_reject();
+    test_xwing_rows_detect_and_reject();
+    test_xwing_cols_detect_and_reject();
     test_colorchain_rule2_contradiction();
     test_colorchain_benign_not_actionable();
 
