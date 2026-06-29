@@ -166,7 +166,7 @@ std::ostream& operator<<(std::ostream& outs, const Analyzer::LockedCandidates &l
     outs << "{";
     bool is_first = true;
     for (auto const &coord : lc.coords) {
-        if (!is_first) { std::cout << ","; }
+        if (!is_first) { outs << ","; }
         is_first = false;
         outs << coord;
     }
