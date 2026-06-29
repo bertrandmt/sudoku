@@ -11,7 +11,7 @@ template<class Set>
 std::optional<Unit> Analyzer::test_hidden_single(const Cell &cell, const Value &value, const Set &set) const {
     if (!cell.isNote()) return std::nullopt;
     if (cell.notes().count() <= 1) return std::nullopt; // either a naked single, or an impossibility
-    if (!cell.check(value)) return std::nullopt;        // note a candidate for value any longer
+    if (!cell.check(value)) return std::nullopt;        // not a candidate for value any longer
 
     for (auto const &other_cell : set) {
         if (other_cell == cell) continue;               // do not consider the current cell
