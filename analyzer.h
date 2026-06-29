@@ -170,9 +170,6 @@ private:
 
     // find
     template<class CandidateSet, class EliminationSet>
-    bool test_xwing(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2,
-                                        const EliminationSet &eset1, const EliminationSet &eset2);
-    template<class CandidateSet, class EliminationSet>
     bool find_xwing(const Cell &, const Value &, const CandidateSet &, const EliminationSet &, const std::vector<CandidateSet> &, bool by_row);
     bool find_xwing(const Cell &, const Value &);
     bool find_xwings();

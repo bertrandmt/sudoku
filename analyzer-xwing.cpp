@@ -26,40 +26,6 @@ namespace {
 }
 
 template<class CandidateSet, class EliminationSet>
-bool Analyzer::test_xwing(const Value &value, const CandidateSet &cset1,   const CandidateSet &cset2,
-                                              const EliminationSet &eset1, const EliminationSet &eset2) {
-    // are there exactly two candidates for value in cset1?
-    auto candidates1 = candidates(cset1, value);
-    if (candidates1.size() != 2) return false;
-
-    // yes, but are there exactly two candidates for value in cset2?
-    auto candidates2 = candidates(cset2, value);
-    if (candidates2.size() != 2) return false;
-
-    // yes, but are there at least two candidates in both eset1 and eset2?
-    auto eliminates1 = candidates(eset1, value);
-    auto eliminates2 = candidates(eset2, value);
-    if (eliminates1.size() < 2 || eliminates2.size() < 2) return false;
-
-    // yes, but are there more than two candidates in eset1 or eset 2?
-    if (eliminates1.size() <= 2 && eliminates2.size() <= 2) return false;
-
-    // yes, but does eliminates1 contain the first cell in candidates1?
-    if (std::find(eliminates1.begin(), eliminates1.end(), candidates1[0]) == eliminates1.end()) return false;
-
-    // yes, but does eliminates2 contain the second cell in candidates1?
-    if (std::find(eliminates2.begin(), eliminates2.end(), candidates1[1]) == eliminates2.end()) return false;
-
-    // yes, but does eliminates1 contain the first cell in candidates2?
-    if (std::find(eliminates1.begin(), eliminates1.end(), candidates2[0]) == eliminates1.end()) return false;
-
-    // yes, but does eliminates2 contain the second cell in candidates2?
-    if (std::find(eliminates2.begin(), eliminates2.end(), candidates2[1]) == eliminates2.end()) return false;
-
-    return true;
-}
-
-template<class CandidateSet, class EliminationSet>
 bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateSet &cset, const EliminationSet &eset, const std::vector<CandidateSet> &csets, bool by_row) {
     assert(cell.isNote());
     assert(cell.check(value));
