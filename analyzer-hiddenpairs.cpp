@@ -81,7 +81,7 @@ bool Analyzer::find_hidden_pairs() {
 
         // yes! but does it have at least two candidate values?
         auto values = cell.notes().values();
-        if (!(values.size() >= 2)) continue;
+        if (values.size() < 2) continue;
 
         // for each pair of candidates for this cell...
         for (auto pv1 = values.begin(); pv1 != values.end(); ++pv1) {
