@@ -66,12 +66,14 @@ template<class Set>
 bool Analyzer::find_naked_pair(const Cell &cell, const Set &set) {
     bool did_find = false;
 
+    // cell is fixed across the loop, so its candidate pair is too; enumerate once.
+    auto cellv = cell.notes().values();
+
     for (auto const &pair_cell : set) {
         // is this candidate pair cell good?
         if (!test_naked_pair(cell, pair_cell, set)) continue;
 
         // yes! but is it already recorded?
-        auto cellv = cell.notes().values();
         NakedPair np({cell.coord(), pair_cell.coord()}, {cellv.at(0), cellv.at(1)});
         if (std::find(mNakedPairs.begin(), mNakedPairs.end(), np) != mNakedPairs.end()) continue;
 
