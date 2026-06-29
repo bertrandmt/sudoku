@@ -375,8 +375,11 @@ void test_xwing_rows_detect_and_reject() {
           "rejected: the two rows' candidates lie in different columns");
 
     // Reject: row 4 holds three 7s, so it cannot be a base of the rectangle.
+    // Pass it in the FIRST candidate slot so this exercises the candidates1 size
+    // guard; the column test below keeps its three-candidate line second, so the
+    // two guards are each covered once.
     check(!AnalyzerTest::test_xwing_rows(analyzer, V,
-              cell_at(board, 0, 0), cell_at(board, 4, 0),
+              cell_at(board, 4, 0), cell_at(board, 0, 0),   // three-candidate row first
               cell_at(board, 0, 1), cell_at(board, 0, 5)),
           "rejected: a candidate row has three candidates, not two");
 
@@ -430,6 +433,8 @@ void test_xwing_cols_detect_and_reject() {
           "rejected: the two columns' candidates lie in different rows");
 
     // Reject: col 4 holds three 7s, so it cannot be a base of the rectangle.
+    // Kept in the SECOND candidate slot, exercising the candidates2 size guard
+    // (the row test above covers candidates1).
     check(!AnalyzerTest::test_xwing_cols(analyzer, V,
               cell_at(board, 0, 0), cell_at(board, 0, 4),
               cell_at(board, 1, 0), cell_at(board, 5, 0)),
