@@ -36,12 +36,13 @@ bool Analyzer::test_xwing(const Value &value, const CandidateSet &cset1,   const
     auto candidates2 = candidates(cset2, value);
     if (candidates2.size() != 2) return false;
 
-    // yes, but are there at least two candidates in both eset1 and eset2?
+    // yes, but is the rectangle actionable -- does either cross line hold more
+    // than its two corners, so there is a third candidate to eliminate? (A lower
+    // bound of two needs no separate check: the containment tests below require
+    // each cross line to hold both its corners, which are distinct cells whenever
+    // cset1 != cset2 -- the only way find_xwing calls this.)
     auto eliminates1 = candidates(eset1, value);
     auto eliminates2 = candidates(eset2, value);
-    if (eliminates1.size() < 2 || eliminates2.size() < 2) return false;
-
-    // yes, but are there more than two candidates in eset1 or eset 2?
     if (eliminates1.size() <= 2 && eliminates2.size() <= 2) return false;
 
     // yes -- so the four corners must line up: both base lines' first candidate
