@@ -388,14 +388,14 @@ void test_xwing_rows_detect_and_reject() {
 // columns and the elimination sets are rows. Same four cases, mirrored:
 //
 //        c0 c2 c3 c4 c6 c7 c8
-//   r1    7  7  7     7              <- top of the real X-Wing (cols 0,3); c6 stray
+//   r1    7  7  7     7              <- real X-Wing top (cols 0,3); c2 and c6 are strays it clears
 //   r2             7                 <- col 4: one of three 7s -> cannot anchor
 //   r3                   7  7        <- aligned pair on cols 7,8 ...
 //   r4                   7  7        <- ... but rows 3,4 hold nothing else to clear
 //   r5    7     7                    <- bottom of the real X-Wing (cols 0,3)
 //   r6             7                 <- col 4: second of three 7s
 //   r7             7                 <- col 4: third of three 7s
-//   r8       7                       <- misaligned: shares r1's col 2, not col 3
+//   r8       7                       <- misaligned: shares r1's col 2, not col 3 (its (1,2) is the second r1 stray)
 void test_xwing_cols_detect_and_reject() {
     std::cout << "[x-wing] column-based: the predicate accepts a real X-Wing and rejects near-misses\n";
     Board board = empty_board();
@@ -403,8 +403,8 @@ void test_xwing_cols_detect_and_reject() {
     confine_value(board, V, {
         {1,0},{5,0},        // col 0   real X-Wing left
         {1,3},{5,3},        // col 3   real X-Wing right (aligned on rows 1,5)
-        {1,6},              // col 6   stray in row 1 -> the eliminable candidate
-        {1,2},{8,2},        // col 2   misaligned partner (row 8, not row 5)
+        {1,6},              // col 6   stray in row 1 -> an eliminable candidate
+        {1,2},{8,2},        // col 2   misaligned partner (row 8, not row 5); (1,2) is a second row-1 stray
         {2,4},{6,4},{7,4},  // col 4   three candidates -> cannot anchor
         {3,7},{4,7},        // col 7   aligned pair on rows 3,4 ...
         {3,8},{4,8},        // col 8   ... with no stray in either row
@@ -413,7 +413,8 @@ void test_xwing_cols_detect_and_reject() {
     Analyzer analyzer(board);
 
     // Positive control: columns 0 and 3 share rows 1 and 5, and row 1 carries
-    // the col-6 stray, so the rectangle is real and actionable.
+    // two further candidates outside the rectangle (cols 2 and 6), so it is real
+    // and actionable -- both would be eliminated.
     check(AnalyzerTest::test_xwing_cols(analyzer, V,
               cell_at(board, 0, 0), cell_at(board, 0, 3),    // candidate cols 0, 3
               cell_at(board, 1, 0), cell_at(board, 5, 0)),   // elimination rows 1, 5
