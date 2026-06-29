@@ -22,6 +22,15 @@ namespace {
 
         return candidates;
     }
+
+    // Map a cell (or coordinate) to the Row or Column it lies on, selecting
+    // which by the Line type parameter. Board exposes both row()/column()
+    // overloads, so one helper serves both find and act, for cells and coords.
+    template<class Line, class CellOrCoord>
+    const Line &line_of(const Board &board, const CellOrCoord &x) {
+        if constexpr (std::is_same_v<Line, Column>) return board.column(x);
+        else                                        return board.row(x);
+    }
 }
 
 template<class CandidateSet, class EliminationSet>
@@ -34,6 +43,14 @@ bool Analyzer::find_swordfish(const Cell &cell, const Value &value, const Candid
 
     bool did_find = false;
 
+    // Map a set of candidate cells to the elimination lines they fall on.
+    auto esets_of = [&](const std::vector<Cell> &cells) {
+        std::set<const EliminationSet*> s;
+        for (const auto &c : cells)
+            s.insert(&line_of<EliminationSet>(mBoard, c));
+        return s;
+    };
+
     // Check if the current candidate set has 2-3 candidates for this value
     auto cset_candidates = candidates(cset, value);
     if (cset_candidates.size() < 2 || cset_candidates.size() > 3) return did_find;
@@ -42,14 +59,7 @@ bool Analyzer::find_swordfish(const Cell &cell, const Value &value, const Candid
     if (cell != cset_candidates[0]) return did_find;
 
     // Collect elimination sets for the first candidate set
-    std::set<const EliminationSet*> eset_set1;
-    for (const auto &c : cset_candidates) {
-        if constexpr (std::is_same_v<EliminationSet, Column>) {
-            eset_set1.insert(&mBoard.column(c));
-        } else {
-            eset_set1.insert(&mBoard.row(c));
-        }
-    }
+    std::set<const EliminationSet*> eset_set1 = esets_of(cset_candidates);
 
     // Search for second and third candidate sets
     for (auto const &cset2 : csets) {
@@ -61,14 +71,7 @@ bool Analyzer::find_swordfish(const Cell &cell, const Value &value, const Candid
         if (cset2_candidates.size() < 2 || cset2_candidates.size() > 3) continue;
 
         // Collect elimination sets for second candidate set
-        std::set<const EliminationSet*> eset_set2;
-        for (const auto &c : cset2_candidates) {
-            if constexpr (std::is_same_v<EliminationSet, Column>) {
-                eset_set2.insert(&mBoard.column(c));
-            } else {
-                eset_set2.insert(&mBoard.row(c));
-            }
-        }
+        std::set<const EliminationSet*> eset_set2 = esets_of(cset2_candidates);
 
         // Union of elimination sets from first two candidate sets
         std::set<const EliminationSet*> eset_union = eset_set1;
@@ -87,14 +90,7 @@ bool Analyzer::find_swordfish(const Cell &cell, const Value &value, const Candid
             if (cset3_candidates.size() < 2 || cset3_candidates.size() > 3) continue;
 
             // Collect elimination sets for third candidate set
-            std::set<const EliminationSet*> eset_set3;
-            for (const auto &c : cset3_candidates) {
-                if constexpr (std::is_same_v<EliminationSet, Column>) {
-                    eset_set3.insert(&mBoard.column(c));
-                } else {
-                    eset_set3.insert(&mBoard.row(c));
-                }
-            }
+            std::set<const EliminationSet*> eset_set3 = esets_of(cset3_candidates);
 
             // Union of all elimination sets
             std::set<const EliminationSet*> eset_total = eset_union;
@@ -210,74 +206,45 @@ bool Analyzer::act_on_swordfish(const Value &value, const CandidateSet &cset1, c
     return did_act;
 }
 
-bool Analyzer::act_on_swordfish() {
+template<class EliminationSet>
+bool Analyzer::act_on_swordfish(const Swordfish &entry) {
+    // The base lines and the elimination lines are always opposite kinds, so
+    // derive one from the other rather than letting a caller pass a mismatched
+    // pair (e.g. <Row, Row>) that would compile and silently misbehave.
+    using CandidateSet = std::conditional_t<std::is_same_v<EliminationSet, Column>, Row, Column>;
+
+    // The three base lines, addressed by their anchor coordinates
+    const CandidateSet &l1 = line_of<CandidateSet>(mBoard, entry.anchors[0]);
+    const CandidateSet &l2 = line_of<CandidateSet>(mBoard, entry.anchors[1]);
+    const CandidateSet &l3 = line_of<CandidateSet>(mBoard, entry.anchors[2]);
+
+    // Collect all elimination lines where candidates appear in the three base lines
+    std::set<const EliminationSet*> elims;
+    for (const auto *line : {&l1, &l2, &l3})
+        for (const auto &c : candidates(*line, entry.value))
+            elims.insert(&line_of<EliminationSet>(mBoard, c));
+
+    // `unit` is fully determined by EliminationSet -- derive it, don't thread it
+    // through as a second source of truth a caller could get wrong.
+    constexpr Unit unit = std::is_same_v<EliminationSet, Column> ? Unit::Column : Unit::Row;
+
     bool did_act = false;
+    for (const auto *e : elims)
+        did_act |= act_on_swordfish(entry.value, l1, l2, l3, *e, unit);
+    return did_act;
+}
 
-    if (mSwordfish.empty()) return did_act;
+bool Analyzer::act_on_swordfish() {
+    if (mSwordfish.empty()) return false;
     assert(mSwordfish.size() == 1);
-
     auto const entry = mSwordfish.back();
 
-    if (entry.is_row_based) {
-        // Row-based Swordfish: the pattern is in three rows, eliminate from columns
-        auto const &row1 = mBoard.row(entry.anchors[0]);
-        auto const &row2 = mBoard.row(entry.anchors[1]);
-        auto const &row3 = mBoard.row(entry.anchors[2]);
-
-        // Collect all columns where candidates appear in these three rows
-        std::set<const Column*> elimination_columns;
-        for (const auto &cell : row1) {
-            if (cell.isNote() && cell.check(entry.value)) {
-                elimination_columns.insert(&mBoard.column(cell));
-            }
-        }
-        for (const auto &cell : row2) {
-            if (cell.isNote() && cell.check(entry.value)) {
-                elimination_columns.insert(&mBoard.column(cell));
-            }
-        }
-        for (const auto &cell : row3) {
-            if (cell.isNote() && cell.check(entry.value)) {
-                elimination_columns.insert(&mBoard.column(cell));
-            }
-        }
-
-        // Eliminate from each column
-        for (const auto* col_ptr : elimination_columns) {
-            did_act |= act_on_swordfish(entry.value, row1, row2, row3, *col_ptr, Unit::Column);
-        }
-    } else {
-        // Column-based Swordfish: the pattern is in three columns, eliminate from rows
-        auto const &col1 = mBoard.column(entry.anchors[0]);
-        auto const &col2 = mBoard.column(entry.anchors[1]);
-        auto const &col3 = mBoard.column(entry.anchors[2]);
-
-        // Collect all rows where candidates appear in these three columns
-        std::set<const Row*> elimination_rows;
-        for (const auto &cell : col1) {
-            if (cell.isNote() && cell.check(entry.value)) {
-                elimination_rows.insert(&mBoard.row(cell));
-            }
-        }
-        for (const auto &cell : col2) {
-            if (cell.isNote() && cell.check(entry.value)) {
-                elimination_rows.insert(&mBoard.row(cell));
-            }
-        }
-        for (const auto &cell : col3) {
-            if (cell.isNote() && cell.check(entry.value)) {
-                elimination_rows.insert(&mBoard.row(cell));
-            }
-        }
-
-        // Eliminate from each row
-        for (const auto* row_ptr : elimination_rows) {
-            did_act |= act_on_swordfish(entry.value, col1, col2, col3, *row_ptr, Unit::Row);
-        }
-    }
+    // Row-based pattern eliminates from columns; column-based, from rows.
+    bool did_act = entry.is_row_based
+        ? act_on_swordfish<Column>(entry)
+        : act_on_swordfish<Row>(entry);
 
     mSwordfish.clear();
-
     assert(did_act);
     return did_act;
 }

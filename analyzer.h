@@ -204,6 +204,8 @@ private:
     template<class CandidateSet, class EliminationSet>
     bool act_on_swordfish(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2, const CandidateSet &cset3,
                                               const EliminationSet &eset, Unit unit);
+    template<class EliminationSet>
+    bool act_on_swordfish(const Swordfish &entry);
     bool act_on_swordfish();
 
 private:
