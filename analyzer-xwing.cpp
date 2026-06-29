@@ -55,6 +55,12 @@ bool Analyzer::test_xwing(const Value &value, const std::vector<Cell> &candidate
     return true;
 }
 
+// Explicit instantiations: test_xwing's only in-TU callers are find_xwing, where
+// it is inlined, so without these GCC emits no standalone symbol and the unit
+// test (which calls it across translation units via AnalyzerTest) fails to link.
+template bool Analyzer::test_xwing<Row>(const Value &, const std::vector<Cell> &, const std::vector<Cell> &, const Row &, const Row &) const;
+template bool Analyzer::test_xwing<Column>(const Value &, const std::vector<Cell> &, const std::vector<Cell> &, const Column &, const Column &) const;
+
 template<class CandidateSet, class EliminationSet>
 bool Analyzer::find_xwing(const Cell &cell, const Value &value, const CandidateSet &cset, const EliminationSet &eset, const std::vector<CandidateSet> &csets, bool by_row) {
     assert(cell.isNote());
