@@ -33,7 +33,7 @@ bool NakedSingleTechnique::find(const Board &board, FindingList &out) const {
         // yes! let's record it. (No duplicate-coord assert: the bucket is
         // cleared each analyze() and every cell has a distinct coord.)
         auto finding = std::make_shared<NakedSingleFinding>(cell.coord(), cell.notes().values().at(0));
-        if (sVerbose) std::cout << "  [fNS] " << finding->coord << "#" << finding->value << std::endl;
+        if (sVerbose) { std::cout << "  [fNS] "; finding->print(std::cout); std::cout << std::endl; }
         out.push_back(std::move(finding));
         did_find = true;
     }
