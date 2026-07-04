@@ -10,15 +10,32 @@
 #include "cell.h"
 #include "verbose.h"
 
+#include <cassert>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
+#include <string_view>
 
 // The stateless techniques, built once and shared by every Analyzer. Grows one
 // entry per port (cascade order); PR 1 holds only Naked Singles.
 const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
+    // Canonical cascade order for the whole issue-#7 series. The registry must
+    // always be a strict in-order PREFIX of this list: analyze()/act() run the
+    // registry ahead of the hand-written suffix, so a technique ported out of
+    // order would silently reorder application and change solver behavior. That
+    // makes cascade order a correctness *precondition* for every PR in the
+    // series, not a style convention -- the guard below makes it executable.
+    // (It checks the registry side; the suffix stays hand-ordered source that
+    // each port shortens by one, and remains a reviewer obligation.)
+    [[maybe_unused]] static constexpr const char *kCascade[] = {
+        "NS", "HS", "NP", "LC", "HP", "XW", "SC", "YW", "SF", "XY",
+    };
     static const std::vector<std::unique_ptr<Technique>> reg = [] {
         std::vector<std::unique_ptr<Technique>> r;
         r.push_back(std::make_unique<NakedSingleTechnique>());
+        assert(r.size() <= std::size(kCascade));
+        for (size_t i = 0; i < r.size(); ++i)
+            assert(std::string_view(r[i]->tag()) == kCascade[i]);
         return r;
     }();
     return reg;
@@ -78,7 +95,9 @@ void Analyzer::analyze() {
     mXYChains.clear();
 
     bool did_find = false;
-    // Registry prefix (cascade order): each technique finds into its own bucket.
+    // Registry prefix, then the hand-written suffix below: the two must together
+    // reproduce the exact cascade order (a correctness precondition -- see the
+    // guard in registry()). Each technique finds into its own bucket.
     const auto &reg = registry();
     for (size_t i = 0; i < reg.size() && !did_find; ++i)
         did_find = reg[i]->find(mBoard, mFindings[i]);
