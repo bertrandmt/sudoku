@@ -4,6 +4,7 @@
 
 #include "cell.h"
 #include "board.h"
+#include "technique.h"
 
 #include <unordered_set>
 #include <set>
@@ -13,10 +14,10 @@
 
 class Analyzer {
 public:
-    Analyzer(Board &board) : mBoard(board) { }
+    Analyzer(Board &board) : mFindings(registry().size()), mBoard(board) { }
 
     Analyzer(Board &board, Analyzer const &other)
-        : mNakedSingles(other.mNakedSingles)
+        : mFindings(other.mFindings)
         , mHiddenSingles(other.mHiddenSingles)
         , mNakedPairs(other.mNakedPairs)
         , mLockedCandidates(other.mLockedCandidates)
@@ -57,20 +58,21 @@ private:
     void filter_notes();
 
 private:
-    //** naked singles
-    struct NakedSingle {
-        Coord coord;
-        Value value;
-    };
-    friend std::ostream& operator<<(std::ostream& outs, const NakedSingle &);
-    std::vector<NakedSingle> mNakedSingles;
+    //** technique registry
+    // The solving techniques, constructed once and shared by every Analyzer.
+    // Function-local static (defined in analyzer.cpp): built on first use, and
+    // -- crucially -- never copied per state, so forgetting to copy a technique
+    // in the rebinding ctor is no longer possible (issue #7). Private: analyze()/
+    // act()/operator<</AnalyzerTest all reach it via membership or friendship.
+    static const std::vector<std::unique_ptr<Technique>> &registry();
 
-    // find
-    bool test_naked_single(const Cell &) const;
-    bool find_naked_singles();
-
-    // act
-    bool act_on_naked_single();
+    // Per-state findings, one bucket per registry() technique, indexed parallel
+    // to it. The sole member still carried forward across the state copy (see
+    // issue #7 lifecycle decision). Declared before every other technique member
+    // and before mBoard so the rebinding ctor's init list is legal under
+    // -Wreorder; the rebinding-ctor regression test guards the one hand-written
+    // mFindings(other.mFindings) copy.
+    std::vector<FindingList> mFindings;
 
 private:
     //** hidden singles
