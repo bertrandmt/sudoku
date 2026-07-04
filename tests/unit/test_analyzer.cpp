@@ -23,6 +23,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <set>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -44,6 +45,24 @@ struct XYSpec {
 
 // Friend hook: the only thing allowed to read/construct Analyzer internals.
 struct AnalyzerTest {
+    // --- rebinding ctor / carried findings (issue #7) ---
+    // These reach the single per-state member that survives the state copy, so
+    // the regression test can prove the rebinding ctor carries it forward
+    // without naming any (file-local) concrete Finding subtype: it downcasts
+    // nothing and compares via Finding::print instead.
+    static size_t findings_bucket_count(const Analyzer &a) { return a.mFindings.size(); }
+    static size_t findings_total(const Analyzer &a) {
+        size_t n = 0;
+        for (auto const &bucket : a.mFindings) n += bucket.size();
+        return n;
+    }
+    static std::string findings_render(const Analyzer &a) {
+        std::ostringstream os;
+        for (auto const &bucket : a.mFindings)
+            for (auto const &f : bucket) { f->print(os); os << ";"; }
+        return os.str();
+    }
+
     // --- swordfish ---
     static bool   find_swordfish(Analyzer &a, const Cell &c, const Value &v) { return a.find_swordfish(c, v); }
     static bool   act_on_swordfish(Analyzer &a)                              { return a.act_on_swordfish(); }
@@ -710,6 +729,44 @@ void test_colorchain_benign_not_actionable() {
           "test_color_chain reports a benign chain as not actionable");
 }
 
+// ===========================================================================
+// Rebinding ctor (issue #7)
+// ===========================================================================
+//
+// The migration to the technique registry collapses the ten hand-copied result
+// vectors into one carried member, mFindings, initialized by a single
+// hand-written line in the rebinding ctor (`mFindings(other.mFindings)`). Drop
+// that line and *every* ported technique silently stops carrying forward. This
+// test isolates exactly that line: it builds an analyzer with a known finding,
+// then constructs a second analyzer through the rebinding ctor ONLY (never
+// calling analyze() on it), so the copied member is the sole possible source of
+// its findings. Removing the initializer turns this into a named failure rather
+// than a mysterious integration hang.
+void test_rebinding_ctor_carries_findings() {
+    std::cout << "[rebinding ctor] carries mFindings forward across the state copy (issue #7)\n";
+
+    // A single note cell pinned to one candidate is a naked single; every other
+    // cell still carries all nine, so analyze() records exactly one finding.
+    Board board = empty_board();
+    set_candidates(board, 0, 0, {5});
+
+    Analyzer a(board);
+    a.analyze();
+    check(AnalyzerTest::findings_bucket_count(a) == 1, "one registry bucket (NS only, PR 1)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket");
+
+    // Copy the candidate grid and rebind onto it -- this is the ONLY operation
+    // under test. b.analyze() is deliberately never called.
+    Board board2(board);
+    Analyzer b(board2, a);
+    check(AnalyzerTest::findings_bucket_count(b) == AnalyzerTest::findings_bucket_count(a),
+          "rebinding ctor preserves the bucket count");
+    check(AnalyzerTest::findings_total(b) == AnalyzerTest::findings_total(a),
+          "rebinding ctor carries the findings forward (drop mFindings(other.mFindings) => this fails)");
+    check(AnalyzerTest::findings_render(b) == AnalyzerTest::findings_render(a),
+          "the carried findings are byte-identical to the source's");
+}
+
 } // namespace
 
 int main() {
@@ -730,6 +787,7 @@ int main() {
     test_xwing_anchor_not_first();
     test_colorchain_rule2_contradiction();
     test_colorchain_benign_not_actionable();
+    test_rebinding_ctor_carries_findings();
 
     std::cout << "----------------------------------------\n";
     if (failures == 0) { std::cout << "unit: all checks passed\n"; return 0; }

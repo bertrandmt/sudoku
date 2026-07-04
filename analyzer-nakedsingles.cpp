@@ -1,56 +1,55 @@
 // Copyright (c) 2025, Bertrand Mollinier Toublet
 // See LICENSE for details of BSD 3-Clause License
 
-#include "analyzer.h"
+#include "analyzer-nakedsingles.h"
 #include "board.h"
+#include "cell.h"
+#include "coord.h"
 #include "verbose.h"
 
-#include <algorithm>
+#include <memory>
 
-bool Analyzer::test_naked_single(const Cell &cell) const {
-    return cell.isNote()
-        && cell.notes().count() == 1;
-}
+namespace {
+// File-local: Naked Singles has no whitebox hooks, so nothing outside this TU
+// needs to name or downcast the finding. print() emits the same bytes the old
+// free operator<<(ostream, Analyzer::NakedSingle) did: "coord#value".
+struct NakedSingleFinding : Finding {
+    Coord coord;
+    Value value;
+    NakedSingleFinding(const Coord &c, const Value &v) : coord(c), value(v) { }
+    void print(std::ostream &o) const override { o << coord << "#" << value; }
+};
+} // namespace
 
-bool Analyzer::find_naked_singles() {
-    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
-    // A naked single arises when there is only one possible candidate for a cell
+// A naked single arises when there is only one possible candidate for a cell.
+// https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
+bool NakedSingleTechnique::find(const Board &board, FindingList &out) const {
     bool did_find = false;
 
-    for (auto const &cell: mBoard.cells()) {
+    for (auto const &cell : board.cells()) {
         // is this a naked single?
-        if (!test_naked_single(cell)) continue;
+        if (!cell.isNote() || cell.notes().count() != 1) continue;
 
-        assert(std::find_if(mNakedSingles.begin(), mNakedSingles.end(),
-                   [cell](const auto &entry) { return cell.coord() == entry.coord; }) == mNakedSingles.end());
-
-        // yes! let's record it
-        NakedSingle ns(cell.coord(), cell.notes().values().at(0));
-        mNakedSingles.push_back(ns);
-        if (sVerbose) std::cout << "  [fNS] " << ns << std::endl;
+        // yes! let's record it. (No duplicate-coord assert: the bucket is
+        // cleared each analyze() and every cell has a distinct coord.)
+        auto finding = std::make_shared<NakedSingleFinding>(cell.coord(), cell.notes().values().at(0));
+        if (sVerbose) std::cout << "  [fNS] " << finding->coord << "#" << finding->value << std::endl;
+        out.push_back(std::move(finding));
         did_find = true;
     }
 
     return did_find;
 }
 
-bool Analyzer::act_on_naked_single() {
-    bool did_act = false;
-
-    if (mNakedSingles.empty()) return did_act;
+bool NakedSingleTechnique::apply(Board &board, FindingList &mine) const {
+    if (mine.empty()) return false;
 
     // singles can be acted on all at once
-    for (auto const &entry: mNakedSingles) {
-        std::cout << "[NS] " << entry.coord << " =" << entry.value << std::endl;
-        mBoard.set_value_at(entry.coord, entry.value);
-        did_act = true;
+    for (auto const &f : mine) {
+        auto const *ns = static_cast<const NakedSingleFinding *>(f.get());
+        std::cout << "[NS] " << ns->coord << " =" << ns->value << std::endl;
+        board.set_value_at(ns->coord, ns->value);
     }
-    mNakedSingles.clear();
-
-    assert(did_act);
-    return did_act;
-}
-
-std::ostream& operator<<(std::ostream& outs, const Analyzer::NakedSingle &ns) {
-    return outs << ns.coord << "#" << ns.value;
+    mine.clear();
+    return true;
 }
