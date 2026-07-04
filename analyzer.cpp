@@ -99,6 +99,11 @@ void Analyzer::analyze() {
     // reproduce the exact cascade order (a correctness precondition -- see the
     // guard in registry()). Each technique finds into its own bucket.
     const auto &reg = registry();
+    // mFindings is indexed in lockstep with reg (bucket i belongs to reg[i]);
+    // the two are sized together at construction. Assert it here rather than
+    // trust it: this positional coupling is the invariant that replaced the ten
+    // hand-synchronized init sites, so it gets the same executable guard.
+    assert(mFindings.size() == reg.size());
     for (size_t i = 0; i < reg.size() && !did_find; ++i)
         did_find = reg[i]->find(mBoard, mFindings[i]);
     if (!did_find) did_find = find_hidden_singles();
@@ -118,6 +123,7 @@ bool Analyzer::act(const bool singles_only) {
     // Registry prefix (cascade order). Single-tier techniques always run;
     // Advanced ones are skipped under singles_only, mirroring the suffix gate.
     const auto &reg = registry();
+    assert(mFindings.size() == reg.size());  // lockstep index; see analyze()
     for (size_t i = 0; i < reg.size() && !did_act; ++i) {
         if (reg[i]->tier() == Tier::Advanced && singles_only) continue;
         did_act = reg[i]->apply(mBoard, mFindings[i]);
@@ -180,6 +186,7 @@ std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
     // is shared via print_section_core. Safe to always trail with endl while
     // the suffix below is non-empty; the final port must reshape this.
     const auto &reg = Analyzer::registry();
+    assert(a.mFindings.size() == reg.size());  // lockstep index; see analyze()
     for (size_t i = 0; i < reg.size(); ++i) {
         print_section(outs, *reg[i], a.mFindings[i]); outs << std::endl;
     }
