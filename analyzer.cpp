@@ -2,6 +2,7 @@
 // See LICENSE for details of BSD 3-Clause License
 
 #include "analyzer.h"
+#include "techniques.h"
 #include "board.h"
 #include "row.h"
 #include "column.h"
@@ -9,7 +10,36 @@
 #include "cell.h"
 #include "verbose.h"
 
+#include <cassert>
+#include <iterator>
+#include <memory>
 #include <stdexcept>
+#include <string_view>
+
+// The stateless techniques, built once and shared by every Analyzer. Grows one
+// entry per port (cascade order); PR 1 holds only Naked Singles.
+const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
+    // Canonical cascade order for the whole issue-#7 series. The registry must
+    // always be a strict in-order PREFIX of this list: analyze()/act() run the
+    // registry ahead of the hand-written suffix, so a technique ported out of
+    // order would silently reorder application and change solver behavior. That
+    // makes cascade order a correctness *precondition* for every PR in the
+    // series, not a style convention -- the guard below makes it executable.
+    // (It checks the registry side; the suffix stays hand-ordered source that
+    // each port shortens by one, and remains a reviewer obligation.)
+    [[maybe_unused]] static constexpr const char *kCascade[] = {
+        "NS", "HS", "NP", "LC", "HP", "XW", "SC", "YW", "SF", "XY",
+    };
+    static const std::vector<std::unique_ptr<Technique>> reg = [] {
+        std::vector<std::unique_ptr<Technique>> r;
+        r.push_back(std::make_unique<NakedSingleTechnique>());
+        assert(r.size() <= std::size(kCascade));
+        for (size_t i = 0; i < r.size(); ++i)
+            assert(std::string_view(r[i]->tag()) == kCascade[i]);
+        return r;
+    }();
+    return reg;
+}
 
 template<class Set>
 void Analyzer::filter_notes(Cell &cell, const Set &set) {
@@ -53,7 +83,7 @@ void Analyzer::filter_notes() {
 void Analyzer::analyze() {
     filter_notes();
 
-    mNakedSingles.clear();
+    for (auto &b : mFindings) b.clear();
     mHiddenSingles.clear();
     mNakedPairs.clear();
     mLockedCandidates.clear();
@@ -65,7 +95,17 @@ void Analyzer::analyze() {
     mXYChains.clear();
 
     bool did_find = false;
-    did_find = find_naked_singles();
+    // Registry prefix, then the hand-written suffix below: the two must together
+    // reproduce the exact cascade order (a correctness precondition -- see the
+    // guard in registry()). Each technique finds into its own bucket.
+    const auto &reg = registry();
+    // mFindings is indexed in lockstep with reg (bucket i belongs to reg[i]);
+    // the two are sized together at construction. Assert it here rather than
+    // trust it: this positional coupling is the invariant that replaced the ten
+    // hand-synchronized init sites, so it gets the same executable guard.
+    assert(mFindings.size() == reg.size());
+    for (size_t i = 0; i < reg.size() && !did_find; ++i)
+        did_find = reg[i]->find(mBoard, mFindings[i]);
     if (!did_find) did_find = find_hidden_singles();
     if (!did_find) did_find = find_naked_pairs();
     if (!did_find) did_find = find_locked_candidates();
@@ -80,7 +120,14 @@ void Analyzer::analyze() {
 bool Analyzer::act(const bool singles_only) {
     bool did_act = false;
 
-    did_act = act_on_naked_single();
+    // Registry prefix (cascade order). Single-tier techniques always run;
+    // Advanced ones are skipped under singles_only, mirroring the suffix gate.
+    const auto &reg = registry();
+    assert(mFindings.size() == reg.size());  // lockstep index; see analyze()
+    for (size_t i = 0; i < reg.size() && !did_act; ++i) {
+        if (reg[i]->tier() == Tier::Advanced && singles_only) continue;
+        did_act = reg[i]->apply(mBoard, mFindings[i]);
+    }
     if (!did_act) did_act = act_on_hidden_single();
 
     if (!singles_only) {
@@ -100,24 +147,49 @@ bool Analyzer::act(const bool singles_only) {
 namespace {
 // Render one "[TAG](count) {e1, e2, ...}" line of the analyzer dump. The
 // singles print their elements bare; every other technique wraps each element
-// in its own braces. Factored out of operator<< so the nine sections share a
-// single definition instead of nine copies of the is_first comma dance.
-template<class Container>
-void print_section(std::ostream &outs, const char *tag, const Container &items, bool brace_each) {
+// in its own braces. All framing (tag, count, separators, per-item braces)
+// lives here so the registry-prefix and hand-written-suffix sections share
+// every byte; each caller supplies only how to render one item.
+template<class Container, class Render>
+void print_section_core(std::ostream &outs, const char *tag, const Container &items,
+                        bool brace_each, Render render) {
     outs << "[" << tag << "](" << items.size() << ") {";
     bool is_first = true;
     for (auto const &item : items) {
         if (!is_first) { outs << ", "; }
         is_first = false;
-        if (brace_each) { outs << "{" << item << "}"; }
-        else            { outs << item; }
+        if (brace_each) { outs << "{"; render(outs, item); outs << "}"; }
+        else            {              render(outs, item);              }
     }
     outs << "}";
+}
+
+// Suffix path (not-yet-ported techniques): render each element via its own
+// operator<<.
+template<class Container>
+void print_section(std::ostream &outs, const char *tag, const Container &items, bool brace_each) {
+    print_section_core(outs, tag, items, brace_each,
+        [](std::ostream &o, auto const &item) { o << item; });
+}
+
+// Registry path (ported techniques): render each type-erased finding via
+// Finding::print. Tag and brace flag come from the technique itself.
+void print_section(std::ostream &outs, const Technique &tech, const FindingList &findings) {
+    print_section_core(outs, tech.tag(), findings, tech.brace_each(),
+        [](std::ostream &o, auto const &f) { f->print(o); });
 }
 } // namespace
 
 std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
-    print_section(outs, "NS", a.mNakedSingles,     false); outs << std::endl;
+    // Registry prefix (cascade order), each line followed by endl -- byte-for-
+    // byte identical to the hand-written lines it replaces because all framing
+    // is shared via print_section_core. Safe to always trail with endl while
+    // the suffix below is non-empty; the final port must reshape this.
+    const auto &reg = Analyzer::registry();
+    assert(a.mFindings.size() == reg.size());  // lockstep index; see analyze()
+    for (size_t i = 0; i < reg.size(); ++i) {
+        print_section(outs, *reg[i], a.mFindings[i]); outs << std::endl;
+    }
     print_section(outs, "HS", a.mHiddenSingles,    false); outs << std::endl;
     print_section(outs, "NP", a.mNakedPairs,       true);  outs << std::endl;
     print_section(outs, "LC", a.mLockedCandidates, true);  outs << std::endl;
