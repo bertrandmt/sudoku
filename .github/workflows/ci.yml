@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+  # issue-7 is the technique-registry integration branch: nine more ports land
+  # on it one PR at a time before it merges to main. Gate each of those PRs so a
+  # Linux gcc/libstdc++ break is caught per-port, not bisected across ten squash
+  # commits at series end. Remove this entry when issue-7 merges and is deleted.
   pull_request:
-    branches: [main]
+    branches: [main, issue-7]
 
 jobs:
   build:
