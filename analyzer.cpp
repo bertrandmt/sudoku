@@ -36,7 +36,7 @@ const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
         r.push_back(std::make_unique<HiddenSingleTechnique>());
         assert(r.size() <= std::size(kCascade));
         for (size_t i = 0; i < r.size(); ++i)
-            assert(std::string_view(r[i]->tag()) == kCascade[i]);
+            assert(std::string_view(r[i]->name()) == kCascade[i]);
         return r;
     }();
     return reg;
@@ -173,7 +173,7 @@ void print_section(std::ostream &outs, const char *tag, const Container &items, 
 // Registry path (ported techniques): render each type-erased finding via
 // Finding::print. Tag and brace flag come from the technique itself.
 void print_section(std::ostream &outs, const Technique &tech, const FindingList &findings) {
-    print_section_core(outs, tech.tag(), findings, tech.brace_each(),
+    print_section_core(outs, tech.name(), findings, tech.brace_each(),
         [](std::ostream &o, auto const &f) { f->print(o); });
 }
 } // namespace

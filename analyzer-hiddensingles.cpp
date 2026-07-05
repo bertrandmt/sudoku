@@ -86,9 +86,7 @@ bool HiddenSingleTechnique::apply(Board &board, FindingList &mine) const {
         // The assert turns a wrong-bucket wiring bug into a caught error, not UB.
         assert(dynamic_cast<const HiddenSingleFinding *>(f.get()));
         auto const *hs = static_cast<const HiddenSingleFinding *>(f.get());
-        // ::tag -- the free tag(Unit) from board.h; the inherited Technique::tag()
-        // member (0 args) would otherwise shadow it inside this member function.
-        std::cout << "[HS] " << hs->coord << " =" << hs->value << " [" << ::tag(hs->unit) << "]" << std::endl;
+        std::cout << "[HS] " << hs->coord << " =" << hs->value << " [" << tag(hs->unit) << "]" << std::endl;
         board.set_value_at(hs->coord, hs->value);
     }
     mine.clear();

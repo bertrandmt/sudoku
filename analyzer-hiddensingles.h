@@ -10,7 +10,7 @@
 // class needs to be nameable here (registry() constructs it directly).
 class HiddenSingleTechnique : public Technique {
 public:
-    const char *tag()  const override { return "HS"; }
+    const char *name() const override { return "HS"; }
     Tier        tier() const override { return Tier::Single; }
     bool  brace_each() const override { return false; }
 
