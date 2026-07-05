@@ -7,3 +7,4 @@
 // One #include is added here per technique as it ports (cascade order).
 
 #include "analyzer-nakedsingles.h"
+#include "analyzer-hiddensingles.h"
