@@ -82,11 +82,8 @@ bool HiddenSingleTechnique::apply(Board &board, FindingList &mine) const {
 
     // singles can be acted on all at once
     for (auto const &f : mine) {
-        // Bucket invariant (see NakedSingleTechnique::apply): analyze() routes
-        // reg[i]->find() into mFindings[i], so this bucket only ever holds this
-        // technique's own findings -- which is what makes the static_cast sound.
-        // Assert the contract to turn a wrong-bucket wiring bug into a caught
-        // error instead of UB.
+        // Bucket invariant: see NakedSingleTechnique::apply for the rationale.
+        // The assert turns a wrong-bucket wiring bug into a caught error, not UB.
         assert(dynamic_cast<const HiddenSingleFinding *>(f.get()));
         auto const *hs = static_cast<const HiddenSingleFinding *>(f.get());
         // ::tag -- the free tag(Unit) from board.h; the inherited Technique::tag()
