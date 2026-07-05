@@ -10,7 +10,7 @@
 // constructs it directly).
 class NakedSingleTechnique : public Technique {
 public:
-    const char *tag()  const override { return "NS"; }
+    const char *name() const override { return "NS"; }
     Tier        tier() const override { return Tier::Single; }
     bool  brace_each() const override { return false; }
 

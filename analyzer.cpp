@@ -33,9 +33,10 @@ const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
     static const std::vector<std::unique_ptr<Technique>> reg = [] {
         std::vector<std::unique_ptr<Technique>> r;
         r.push_back(std::make_unique<NakedSingleTechnique>());
+        r.push_back(std::make_unique<HiddenSingleTechnique>());
         assert(r.size() <= std::size(kCascade));
         for (size_t i = 0; i < r.size(); ++i)
-            assert(std::string_view(r[i]->tag()) == kCascade[i]);
+            assert(std::string_view(r[i]->name()) == kCascade[i]);
         return r;
     }();
     return reg;
@@ -84,7 +85,6 @@ void Analyzer::analyze() {
     filter_notes();
 
     for (auto &b : mFindings) b.clear();
-    mHiddenSingles.clear();
     mNakedPairs.clear();
     mLockedCandidates.clear();
     mHiddenPairs.clear();
@@ -106,7 +106,6 @@ void Analyzer::analyze() {
     assert(mFindings.size() == reg.size());
     for (size_t i = 0; i < reg.size() && !did_find; ++i)
         did_find = reg[i]->find(mBoard, mFindings[i]);
-    if (!did_find) did_find = find_hidden_singles();
     if (!did_find) did_find = find_naked_pairs();
     if (!did_find) did_find = find_locked_candidates();
     if (!did_find) did_find = find_hidden_pairs();
@@ -128,7 +127,6 @@ bool Analyzer::act(const bool singles_only) {
         if (reg[i]->tier() == Tier::Advanced && singles_only) continue;
         did_act = reg[i]->apply(mBoard, mFindings[i]);
     }
-    if (!did_act) did_act = act_on_hidden_single();
 
     if (!singles_only) {
         if (!did_act) did_act = act_on_naked_pair();
@@ -175,7 +173,7 @@ void print_section(std::ostream &outs, const char *tag, const Container &items, 
 // Registry path (ported techniques): render each type-erased finding via
 // Finding::print. Tag and brace flag come from the technique itself.
 void print_section(std::ostream &outs, const Technique &tech, const FindingList &findings) {
-    print_section_core(outs, tech.tag(), findings, tech.brace_each(),
+    print_section_core(outs, tech.name(), findings, tech.brace_each(),
         [](std::ostream &o, auto const &f) { f->print(o); });
 }
 } // namespace
@@ -190,7 +188,6 @@ std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
     for (size_t i = 0; i < reg.size(); ++i) {
         print_section(outs, *reg[i], a.mFindings[i]); outs << std::endl;
     }
-    print_section(outs, "HS", a.mHiddenSingles,    false); outs << std::endl;
     print_section(outs, "NP", a.mNakedPairs,       true);  outs << std::endl;
     print_section(outs, "LC", a.mLockedCandidates, true);  outs << std::endl;
     print_section(outs, "HP", a.mHiddenPairs,      true);  outs << std::endl;
