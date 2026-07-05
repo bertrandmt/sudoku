@@ -27,7 +27,11 @@ using FindingList = std::vector<std::shared_ptr<const Finding>>;
 class Technique {
 public:
     virtual ~Technique() = default;
-    virtual const char *tag()  const = 0;   // "NS", "HS", ...
+    // Abstraction tag, e.g. "NS", "HS". Named name() rather than tag() on
+    // purpose: board.h has a free tag(Unit), and a member named tag() would
+    // shadow it inside every technique's find/apply/dump that prints a Unit,
+    // forcing a ::tag qualifier at each such call. name() sidesteps that.
+    virtual const char *name() const = 0;
     virtual Tier        tier() const = 0;
     virtual bool        brace_each() const = 0;  // print_section wrap flag
 

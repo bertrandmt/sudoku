@@ -752,8 +752,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 1, "one registry bucket (NS only, PR 1)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket");
+    check(AnalyzerTest::findings_bucket_count(a) == 2, "two registry buckets (NS, HS)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.

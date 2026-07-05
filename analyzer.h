@@ -18,7 +18,6 @@ public:
 
     Analyzer(Board &board, Analyzer const &other)
         : mFindings(other.mFindings)
-        , mHiddenSingles(other.mHiddenSingles)
         , mNakedPairs(other.mNakedPairs)
         , mLockedCandidates(other.mLockedCandidates)
         , mHiddenPairs(other.mHiddenPairs)
@@ -73,24 +72,6 @@ private:
     // -Wreorder; the rebinding-ctor regression test guards the one hand-written
     // mFindings(other.mFindings) copy.
     std::vector<FindingList> mFindings;
-
-private:
-    //** hidden singles
-    struct HiddenSingle {
-        Coord coord;
-        Value value;
-        Unit unit;
-    };
-    friend std::ostream& operator<<(std::ostream& outs, const HiddenSingle &);
-    std::vector<HiddenSingle> mHiddenSingles;
-
-    // find
-    template<class Set>
-    std::optional<Unit> test_hidden_single(const Cell &, const Value &, const Set &) const;
-    bool find_hidden_singles();
-
-    // act
-    bool act_on_hidden_single();
 
 private:
     //** naked pairs
