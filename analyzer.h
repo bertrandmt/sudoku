@@ -6,9 +6,7 @@
 #include "board.h"
 #include "technique.h"
 
-#include <unordered_set>
 #include <set>
-#include <unordered_map>
 #include <memory>
 #include <optional>
 
@@ -19,7 +17,6 @@ public:
     Analyzer(Board &board, Analyzer const &other)
         : mFindings(other.mFindings)
         , mSwordfish(other.mSwordfish)
-        , mColorChains(other.mColorChains)
         , mYWings(other.mYWings)
         , mXYChains(other.mXYChains)
         , mBoard(board) { }
@@ -94,34 +91,6 @@ private:
     template<class EliminationSet>
     bool act_on_swordfish(const Swordfish &entry);
     bool act_on_swordfish();
-
-private:
-    //** simple coloring
-    struct ColorChain {
-        Value value;
-        std::unordered_map<Coord, bool> cells;  // coord -> color mapping (true=green, false=red)
-
-        std::pair<std::vector<Coord>, std::vector<Coord>> group_cells_by_color() const {
-            std::vector<Coord> green_cells, red_cells;
-            for (const auto &[coord, color] : cells) {
-                if (color) { green_cells.push_back(coord); } // true = green
-                else       { red_cells.push_back(coord); }   // false = red
-            }
-            return {green_cells, red_cells};
-        }
-
-        bool cell_sees_both_colors(const Cell &, const Board &) const;
-    };
-    friend std::ostream& operator<<(std::ostream& outs, const ColorChain &);
-    std::vector<ColorChain> mColorChains;
-
-    // find
-    bool test_color_chain(const ColorChain &chain) const;
-    bool find_color_chains(const Value &value);
-    bool find_color_chains();
-
-    // act
-    bool act_on_color_chain();
 
 private:
     //** y-wing
