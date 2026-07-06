@@ -36,6 +36,7 @@ const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
         r.push_back(std::make_unique<HiddenSingleTechnique>());
         r.push_back(std::make_unique<NakedPairTechnique>());
         r.push_back(std::make_unique<LockedCandidatesTechnique>());
+        r.push_back(std::make_unique<HiddenPairTechnique>());
         assert(r.size() <= std::size(kCascade));
         for (size_t i = 0; i < r.size(); ++i)
             assert(std::string_view(r[i]->name()) == kCascade[i]);
@@ -87,7 +88,6 @@ void Analyzer::analyze() {
     filter_notes();
 
     for (auto &b : mFindings) b.clear();
-    mHiddenPairs.clear();
     mXWings.clear();
     mSwordfish.clear();
     mColorChains.clear();
@@ -106,7 +106,6 @@ void Analyzer::analyze() {
     assert(mFindings.size() == reg.size());
     for (size_t i = 0; i < reg.size() && !did_find; ++i)
         did_find = reg[i]->find(mBoard, mFindings[i]);
-    if (!did_find) did_find = find_hidden_pairs();
     if (!did_find) did_find = find_xwings();
     if (!did_find) did_find = find_color_chains();
     if (!did_find) did_find = find_ywings();
@@ -127,7 +126,6 @@ bool Analyzer::act(const bool singles_only) {
     }
 
     if (!singles_only) {
-        if (!did_act) did_act = act_on_hidden_pair();
         if (!did_act) did_act = act_on_xwing();
         if (!did_act) did_act = act_on_color_chain();
         if (!did_act) did_act = act_on_ywing();
@@ -184,7 +182,6 @@ std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
     for (size_t i = 0; i < reg.size(); ++i) {
         print_section(outs, *reg[i], a.mFindings[i]); outs << std::endl;
     }
-    print_section(outs, "HP", a.mHiddenPairs,      true);  outs << std::endl;
     print_section(outs, "XW", a.mXWings,           true);  outs << std::endl;
     print_section(outs, "SC", a.mColorChains,      true);  outs << std::endl; // a.k.a. single's chains
     print_section(outs, "YW", a.mYWings,           true);  outs << std::endl;

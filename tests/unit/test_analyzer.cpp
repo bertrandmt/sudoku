@@ -18,6 +18,7 @@
 #include "board.h"
 #include "analyzer.h"
 #include "analyzer-nakedpairs.h"
+#include "analyzer-hiddenpairs.h"
 #include "cell.h"
 #include "coord.h"
 
@@ -106,18 +107,10 @@ struct AnalyzerTest {
     static bool   xwing_row_based(const Analyzer &a)                     { return a.mXWings.at(0).is_row_based; }
     static Value  xwing_value(const Analyzer &a)                         { return a.mXWings.at(0).value; }
 
-    // --- naked pair ---
-    // No hook: NP is ported to a standalone NakedPairTechnique (issue #7), whose
-    // test_naked_pair is a promoted public static -- the whitebox case calls it
-    // directly, without friendship. (HP below still needs a hook until it ports.)
-
-    // --- hidden pair ---
-    // test_hidden_pair is given-tuple shaped too (identity is (c1,c2,v1,v2)):
-    // find_ enumerates the partner, the predicate judges each. Drive it directly
-    // on a crafted Row, the same way as naked pair.
-    static bool test_hidden_pair_row(const Analyzer &a, const Cell &c1, const Cell &c2, const Value &v1, const Value &v2) {
-        return a.test_hidden_pair(c1, c2, v1, v2, a.mBoard.row(c1));
-    }
+    // --- naked pair / hidden pair ---
+    // No hooks: both are ported to standalone Techniques (issue #7), whose
+    // test_naked_pair / test_hidden_pair are promoted public statics -- the
+    // whitebox cases call them directly, without friendship.
 
     // --- simple coloring ---
     static bool test_color_chain(const Analyzer &a, const Analyzer::ColorChain &ch) { return a.test_color_chain(ch); }
@@ -464,7 +457,9 @@ void test_naked_pair_accept_and_reject() {
 
 // test_hidden_pair is given-tuple shaped like test_naked_pair (see
 // docs/test-predicate-idiom.md): find_ enumerates the partner cell, the
-// predicate judges each (c1,c2,v1,v2). These cases pin down its substantive
+// predicate judges each (c1,c2,v1,v2). Now that HP is ported to a standalone
+// HiddenPairTechnique (issue #7), the predicate is a promoted public static, so
+// these cases call it directly -- no friend hook. They pin down its substantive
 // branches -- value ordering, cell ordering, the hidden loop, actionability,
 // and partner incompleteness -- and leave the trivial distinctness/shape guards
 // (c1 == c2, v1 == v2, set membership, isNote, c1 failing to carry the pair)
@@ -485,18 +480,16 @@ void test_hidden_pair_accept_and_reject() {
     Board board = empty_board();
     confine_value(board, kThree, { {0, 0}, {0, 1} });
     confine_value(board, kFive,  { {0, 0}, {0, 1} });
-    Analyzer analyzer(board);
 
-    check(AnalyzerTest::test_hidden_pair_row(analyzer, cell_at(board, 0, 0), cell_at(board, 0, 1), kThree, kFive),
+    check(HiddenPairTechnique::test_hidden_pair(cell_at(board, 0, 0), cell_at(board, 0, 1), kThree, kFive, board.row(cell_at(board, 0, 0))),
           "accepted: {3,5} confined to two cells, each with more to strip");
 
     // A third cell in the row carrying just one of the values breaks "hidden".
     Board stray = empty_board();
     confine_value(stray, kThree, { {0, 0}, {0, 1}, {0, 2} });
     confine_value(stray, kFive,  { {0, 0}, {0, 1} });
-    Analyzer stray_analyzer(stray);
 
-    check(!AnalyzerTest::test_hidden_pair_row(stray_analyzer, cell_at(stray, 0, 0), cell_at(stray, 0, 1), kThree, kFive),
+    check(!HiddenPairTechnique::test_hidden_pair(cell_at(stray, 0, 0), cell_at(stray, 0, 1), kThree, kFive, stray.row(cell_at(stray, 0, 0))),
           "rejected: a third cell carries 3, so {3,5} is not hidden");
 
     // --- actionability gate ---
@@ -507,19 +500,18 @@ void test_hidden_pair_accept_and_reject() {
     set_candidates(naked, 0, 1, {3, 5});
     confine_value(naked, kThree, { {0, 0}, {0, 1} });
     confine_value(naked, kFive,  { {0, 0}, {0, 1} });
-    Analyzer naked_analyzer(naked);
 
-    check(!AnalyzerTest::test_hidden_pair_row(naked_analyzer, cell_at(naked, 0, 0), cell_at(naked, 0, 1), kThree, kFive),
+    check(!HiddenPairTechnique::test_hidden_pair(cell_at(naked, 0, 0), cell_at(naked, 0, 1), kThree, kFive, naked.row(cell_at(naked, 0, 0))),
           "rejected: both cells bivalue {3,5} -- a naked pair, nothing to strip");
 
     // --- ordering and partner gates (reuse the accepting board) ---
     // Cell ordering: c2 must come after c1.
-    check(!AnalyzerTest::test_hidden_pair_row(analyzer, cell_at(board, 0, 1), cell_at(board, 0, 0), kThree, kFive),
+    check(!HiddenPairTechnique::test_hidden_pair(cell_at(board, 0, 1), cell_at(board, 0, 0), kThree, kFive, board.row(cell_at(board, 0, 0))),
           "rejected: cells passed out of order (c2 before c1)");
 
-    // Value ordering: v2 must come after v1. find_ guarantees this; the friend
-    // hook can violate it, so the guard must be tested through the hook.
-    check(!AnalyzerTest::test_hidden_pair_row(analyzer, cell_at(board, 0, 0), cell_at(board, 0, 1), kFive, kThree),
+    // Value ordering: v2 must come after v1. find_ guarantees this; a direct
+    // test caller can violate it, so the guard must be tested by the direct call.
+    check(!HiddenPairTechnique::test_hidden_pair(cell_at(board, 0, 0), cell_at(board, 0, 1), kFive, kThree, board.row(cell_at(board, 0, 0))),
           "rejected: values passed out of order (v2 < v1)");
 
     // Partner incompleteness: c2 carries only one of the two values. find_ does
@@ -532,9 +524,8 @@ void test_hidden_pair_accept_and_reject() {
     confine_value(partial, kThree, { {0, 0}, {0, 1} });
     confine_value(partial, kFive,  { {0, 0} });   // 5 lives only in (0,0)
     set_candidates(partial, 0, 1, {3});           // partner carries 3 but not 5
-    Analyzer partial_analyzer(partial);
 
-    check(!AnalyzerTest::test_hidden_pair_row(partial_analyzer, cell_at(partial, 0, 0), cell_at(partial, 0, 1), kThree, kFive),
+    check(!HiddenPairTechnique::test_hidden_pair(cell_at(partial, 0, 0), cell_at(partial, 0, 1), kThree, kFive, partial.row(cell_at(partial, 0, 0))),
           "rejected: partner carries 3 but not 5");
 }
 
@@ -750,8 +741,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 4, "four registry buckets (NS, HS, NP, LC)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC short-circuited)");
+    check(AnalyzerTest::findings_bucket_count(a) == 5, "five registry buckets (NS, HS, NP, LC, HP)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.

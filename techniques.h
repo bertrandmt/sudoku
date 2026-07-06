@@ -10,3 +10,4 @@
 #include "analyzer-hiddensingles.h"
 #include "analyzer-nakedpairs.h"
 #include "analyzer-lockedcandidates.h"
+#include "analyzer-hiddenpairs.h"
