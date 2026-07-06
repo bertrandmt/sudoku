@@ -85,7 +85,19 @@ materialized-object) and 3 inline (the 3 scan-fused). The codebase matches:
 
 - **X-Wing correctly has no `test_`.** It is scan-fused; PR #24 removed the dead
   predicate and kept `find_xwing` inline, tested through `find_` like its fish
-  sibling Swordfish. This is the rule working as intended, not a coverage gap.
+  sibling Swordfish. This is the rule working as intended, not a coverage gap. It
+  has now ported behind the registry (issue #7). Because it is scan-fused there
+  is no predicate to promote, so its whitebox seam differs from the given-tuple
+  techniques: instead of a promoted `test_` predicate, the per-anchor entry
+  `XWingTechnique::find_xwing` is promoted to a public `static` the test drives
+  directly (static because the technique is stateless and the entry touches no
+  instance data -- the same reason the given-tuple predicates are static), and the
+  concrete `XWingFinding` is declared in `analyzer-xwing.h` rather than file-local
+  so the test can inspect the recorded pattern's orientation and value. This is
+  the *scan-fused* seam shape (finding-in-header + public `find_`), distinct from
+  the *given-tuple* seam (promoted `test_` predicate, finding stays file-local);
+  the finding is exposed exactly when the test must read its fields, not merely
+  because the technique is hooked. Either way the friend hook is gone.
 
 - **Locked candidates and Swordfish correctly inline.** Both are scan-fused; a
   `test_` for either would hit the out-param / re-derivation smell above.
