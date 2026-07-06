@@ -169,20 +169,19 @@ bool find_color_chains(const Board &board, const Value &value, FindingList &out)
         // yes! but is it actionable?
         if (!ColorChainTechnique::test_color_chain(board, chain)) continue;
 
-        // yes! let's record it -- move the chain into the finding, so the dumped
-        // and acted-on cell order is exactly the order the chain was built in.
-        //
-        // This *intentionally* changes the pre-#7 print order for SC. Before the
-        // registry, act() consumed a chain the rebinding copy ctor had deep-copied
-        // once more than the one the dump printed; libc++'s unordered_map copy ctor
-        // prepends per bucket, so the extra copy reversed the order and the old dump
-        // and Rule-2 blocks printed the same chain in opposite orders (see README).
-        // #7 carries findings by a shallow shared_ptr<const> instead of deep-copying
-        // them per state, so dump and act now read one shared object and necessarily
-        // print one consistent order. Reproducing both old orders would require
-        // re-copying the map inside apply() purely to mimic that STL quirk; we don't.
-        // The elimination *set* is unchanged, and the black-box suite sorts before
-        // comparing, so this is print-order-only.
+        // yes! let's record it -- move (not copy) the chain into the finding. cells
+        // is an unordered_map: std::move transfers its buckets intact, so dump and
+        // act iterate the as-built map's own (hash/bucket) order -- NOT insertion
+        // order (the green seed inserted first at [to_process.push] need not print
+        // first). libc++'s copy ctor instead prepends per bucket, reversing that
+        // order; that reversal is why the pre-#7 dump and act printed the same chain
+        // in opposite orders (see README): act consumed a chain the rebinding copy
+        // ctor had deep-copied once MORE than the dump's, and two reversals cancel.
+        // #7 carries findings by a shallow shared_ptr<const>, so dump and act now
+        // read one shared object and print one consistent order. Reproducing both
+        // old orders would require re-copying the map inside apply() purely to mimic
+        // that STL quirk; we don't. The elimination *set* is unchanged and the
+        // black-box suite sorts before comparing: print-order-only.
         assert(out.empty());
         if (sVerbose) { std::cout << "  [fSC] "; chain.print(std::cout); std::cout << std::endl; }
         out.push_back(std::make_shared<ColorChainFinding>(std::move(chain)));
