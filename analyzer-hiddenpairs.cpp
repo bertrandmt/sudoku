@@ -27,16 +27,6 @@ struct HiddenPairFinding : Finding {
     }
 };
 
-// Resolve a coord to its cell without Board::at (friends-only, dropped when the
-// technique left Analyzer -- see the roadmap note). The cell's own row is the
-// cheapest public unit that contains it; scan it for the matching coord.
-const Cell &cell_at(const Board &board, const Coord &coord) {
-    for (auto const &cell : board.row(coord))
-        if (cell.coord() == coord) return cell;
-    assert(false);  // a coord always lies in its own row
-    return board.cells().front();
-}
-
 // Find a hidden pair for (cell, v1, v2) within `set`, if any, appending it to
 // `out`. Was Analyzer::find_hidden_pair; the member vector dedup is now a scan of
 // `out` (this technique's own bucket, so every entry downcasts to HiddenPairFinding).
@@ -64,21 +54,24 @@ bool find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const 
     return false;
 }
 
-// Strip every candidate other than the hidden pair's two values from `cell`. Was
-// Analyzer::act_on_hidden_pair(cell, entry); the board is now the passed reference
-// (the member reached it through Analyzer's mBoard).
-bool act_on_hidden_pair(Board &board, const Cell &cell, const HiddenPairFinding &entry) {
+// Strip every candidate other than the hidden pair's two values from the cell at
+// `coord`. Was Analyzer::act_on_hidden_pair(cell, entry); coord-native like Naked
+// Pairs (no coord->Cell resolution). clear_note_at is a no-op returning false for
+// an absent note (board.cpp), so enumerating value_range() and acting on its
+// return strips exactly the candidates the old cell.notes().values() loop did, in
+// the same ascending order (values() is value_range() filtered) -- byte-identical.
+bool act_on_hidden_pair(Board &board, const Coord &coord, const HiddenPairFinding &entry) {
     bool did_act = false;
 
     auto const &v1 = entry.values.first;
     auto const &v2 = entry.values.second;
 
-    for (auto const &value : cell.notes().values()) {
+    for (Value value : value_range()) {
         if (value == v1) continue;
         if (value == v2) continue;
 
-        board.clear_note_at(cell.coord(), value);
-        std::cout << "[HP] " << cell.coord() << " x" << value << " "; entry.print(std::cout); std::cout << std::endl;
+        if (!board.clear_note_at(coord, value)) continue;  // absent note -> no-op
+        std::cout << "[HP] " << coord << " x" << value << " "; entry.print(std::cout); std::cout << std::endl;
         did_act = true;
     }
 
@@ -174,8 +167,8 @@ bool HiddenPairTechnique::apply(Board &board, FindingList &mine) const {
         auto const *hp = static_cast<const HiddenPairFinding *>(f.get());
 
         // the pair's two cells, addressed by coord (findings carry coords)
-        did_act |= act_on_hidden_pair(board, cell_at(board, hp->coords.first), *hp);
-        did_act |= act_on_hidden_pair(board, cell_at(board, hp->coords.second), *hp);
+        did_act |= act_on_hidden_pair(board, hp->coords.first, *hp);
+        did_act |= act_on_hidden_pair(board, hp->coords.second, *hp);
     }
     mine.clear();
 

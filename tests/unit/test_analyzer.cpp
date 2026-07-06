@@ -467,7 +467,7 @@ void test_naked_pair_accept_and_reject() {
 // also hit incidentally by any black-box solve, since find_hidden_pair feeds
 // every unfiltered cell to the predicate; the one find_ genuinely cannot reach
 // is value ordering
-// (find_hidden_pairs enumerates pv2 = pv1 + 1, so v1 < v2 always holds), which
+// (HiddenPairTechnique::find enumerates pv2 = pv1 + 1, so v1 < v2 always holds), which
 // is the load-bearing reason to test the predicate directly rather than only
 // through find_.
 void test_hidden_pair_accept_and_reject() {
