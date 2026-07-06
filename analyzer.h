@@ -18,7 +18,6 @@ public:
 
     Analyzer(Board &board, Analyzer const &other)
         : mFindings(other.mFindings)
-        , mLockedCandidates(other.mLockedCandidates)
         , mHiddenPairs(other.mHiddenPairs)
         , mXWings(other.mXWings)
         , mSwordfish(other.mSwordfish)
@@ -71,28 +70,6 @@ private:
     // -Wreorder; the rebinding-ctor regression test guards the one hand-written
     // mFindings(other.mFindings) copy.
     std::vector<FindingList> mFindings;
-
-private:
-    //** locked candidates
-    struct LockedCandidates {
-        std::vector<Coord> coords;
-        Value value;
-        Unit unit;
-
-        bool operator==(const LockedCandidates &other) const;
-    };
-    friend std::ostream& operator<<(std::ostream& outs, const LockedCandidates &);
-    std::vector<LockedCandidates> mLockedCandidates;
-
-    // find
-    template<class Set1, class Set2>
-    bool find_locked_candidate(const Cell &, const Value &, Set1 &set_to_consider, Set2 &set_to_ignore);
-    bool find_locked_candidates();
-
-    // act
-    template<class Set>
-    bool act_on_locked_candidate(const LockedCandidates &, Set &);
-    bool act_on_locked_candidate();
 
 private:
     //** hidden pairs
