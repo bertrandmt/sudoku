@@ -20,11 +20,13 @@
 #include "analyzer-nakedpairs.h"
 #include "analyzer-hiddenpairs.h"
 #include "analyzer-xwing.h"
+#include "analyzer-colorchain.h"
 #include "cell.h"
 #include "coord.h"
 
 #include <initializer_list>
 #include <iostream>
+#include <memory>
 #include <set>
 #include <sstream>
 #include <string>
@@ -109,15 +111,12 @@ struct AnalyzerTest {
     // analyzer-xwing.h). Either way: no friendship.
 
     // --- simple coloring ---
-    static bool test_color_chain(const Analyzer &a, const Analyzer::ColorChain &ch) { return a.test_color_chain(ch); }
-    static bool act_on_color_chain(Analyzer &a)                                     { return a.act_on_color_chain(); }
-    static void set_color_chain(Analyzer &a, const Analyzer::ColorChain &ch)        { a.mColorChains.clear(); a.mColorChains.push_back(ch); }
-    static Analyzer::ColorChain make_color_chain(Value v, const std::vector<std::pair<Coord,bool>> &cells) {
-        Analyzer::ColorChain ch;
-        ch.value = v;
-        for (auto const &cc : cells) ch.cells[cc.first] = cc.second;
-        return ch;
-    }
+    // No hooks: SC is ported to a standalone Technique (issue #7). It is
+    // materialized-object shaped (see docs/test-predicate-idiom.md), so its
+    // validation predicate promotes to a public static
+    // ColorChainTechnique::test_color_chain(board, chain) the cases call
+    // directly, and ColorChainFinding is declared in analyzer-colorchain.h so a
+    // case can build a chain and drive apply() -- both without friendship.
 };
 
 namespace {
@@ -689,19 +688,19 @@ void test_colorchain_rule2_contradiction() {
     const Value V = kFive;
     confine_value(board, V, { {0,0}, {0,4}, {8,8} });
 
-    auto chain = AnalyzerTest::make_color_chain(V, {
-        { Coord(0,0), true  },   // green
-        { Coord(0,4), true  },   // green -- same row as the other green
-        { Coord(8,8), false },   // red
-    });
+    ColorChainFinding chain(V);
+    chain.cells[Coord(0,0)] = true;    // green
+    chain.cells[Coord(0,4)] = true;    // green -- same row as the other green
+    chain.cells[Coord(8,8)] = false;   // red
 
-    Analyzer analyzer(board);
-    check(AnalyzerTest::test_color_chain(analyzer, chain),
+    check(ColorChainTechnique::test_color_chain(board, chain),
           "test_color_chain reports a same-color-in-unit chain as actionable");
 
-    AnalyzerTest::set_color_chain(analyzer, chain);
-    bool acted = AnalyzerTest::act_on_color_chain(analyzer);
-    check(acted, "act_on_color_chain reports an elimination");
+    ColorChainTechnique sc;
+    FindingList found;
+    found.push_back(std::make_shared<ColorChainFinding>(chain));
+    bool acted = sc.apply(board, found);
+    check(acted, "apply reports an elimination");
     check(!has_candidate(board, 0, 0, V) && !has_candidate(board, 0, 4, V),
           "both green cells (the repeated color) dropped the value");
     check(has_candidate(board, 8, 8, V), "the lone red cell is untouched");
@@ -715,13 +714,11 @@ void test_colorchain_benign_not_actionable() {
     const Value V = kFive;
     confine_value(board, V, { {0,0}, {4,4} });   // value lives only on the chain
 
-    auto chain = AnalyzerTest::make_color_chain(V, {
-        { Coord(0,0), true  },   // green
-        { Coord(4,4), false },   // red -- shares no unit with the green
-    });
+    ColorChainFinding chain(V);
+    chain.cells[Coord(0,0)] = true;    // green
+    chain.cells[Coord(4,4)] = false;   // red -- shares no unit with the green
 
-    Analyzer analyzer(board);
-    check(!AnalyzerTest::test_color_chain(analyzer, chain),
+    check(!ColorChainTechnique::test_color_chain(board, chain),
           "test_color_chain reports a benign chain as not actionable");
 }
 
@@ -748,8 +745,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 6, "six registry buckets (NS, HS, NP, LC, HP, XW)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW short-circuited)");
+    check(AnalyzerTest::findings_bucket_count(a) == 7, "seven registry buckets (NS, HS, NP, LC, HP, XW, SC)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.
