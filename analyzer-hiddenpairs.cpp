@@ -1,21 +1,93 @@
 // Copyright (c) 2025, Bertrand Mollinier Toublet
 // See LICENSE for details of BSD 3-Clause License
 
-#include "analyzer.h"
+#include "analyzer-hiddenpairs.h"
 #include "board.h"
+#include "row.h"  // Row: the explicit test_hidden_pair instantiation at file end
+#include "cell.h"
+#include "coord.h"
 #include "verbose.h"
 
-#include <algorithm>
+#include <cassert>
+#include <memory>
+#include <utility>
+
+namespace {
+// File-local: HP's whitebox hook tests the predicate, not the finding, so nothing
+// outside this TU needs to name or downcast HiddenPairFinding. print() emits the
+// same bytes the old free operator<<(ostream, Analyzer::HiddenPair) did:
+// "{coord1,coord2}#{value1,value2}".
+struct HiddenPairFinding : Finding {
+    std::pair<Coord, Coord> coords;
+    std::pair<Value, Value> values;
+    HiddenPairFinding(std::pair<Coord, Coord> c, std::pair<Value, Value> v) : coords(c), values(v) { }
+    bool same(const HiddenPairFinding &o) const { return coords == o.coords && values == o.values; }
+    void print(std::ostream &o) const override {
+        o << "{" << coords.first << "," << coords.second << "}#{" << values.first << "," << values.second << "}";
+    }
+};
+
+// Find a hidden pair for (cell, v1, v2) within `set`, if any, appending it to
+// `out`. Was Analyzer::find_hidden_pair; the member vector dedup is now a scan of
+// `out` (this technique's own bucket, so every entry downcasts to HiddenPairFinding).
+template<class Set>
+bool find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set, FindingList &out) {
+    for (auto const &other_cell : set) {
+        // is this candidate hidden pair good?
+        if (!HiddenPairTechnique::test_hidden_pair(cell, other_cell, v1, v2, set)) continue;
+
+        // yes! but is it already recorded?
+        HiddenPairFinding hp({cell.coord(), other_cell.coord()}, {v1, v2});
+        bool already = false;
+        for (auto const &f : out) {
+            assert(dynamic_cast<const HiddenPairFinding *>(f.get()));
+            if (static_cast<const HiddenPairFinding *>(f.get())->same(hp)) { already = true; break; }
+        }
+        if (already) continue;
+
+        // no! let's record it
+        if (sVerbose) { std::cout << "  [fHP] "; hp.print(std::cout); std::cout << std::endl; }
+        out.push_back(std::make_shared<HiddenPairFinding>(hp));
+        return true;
+    }
+
+    return false;
+}
+
+// Strip every candidate other than the hidden pair's two values from the cell at
+// `coord`. Was Analyzer::act_on_hidden_pair(cell, entry); coord-native like Naked
+// Pairs (no coord->Cell resolution). clear_note_at is a no-op returning false for
+// an absent note (board.cpp), so enumerating value_range() and acting on its
+// return strips exactly the candidates the old cell.notes().values() loop did, in
+// the same ascending order (values() is value_range() filtered) -- byte-identical.
+bool act_on_hidden_pair(Board &board, const Coord &coord, const HiddenPairFinding &entry) {
+    bool did_act = false;
+
+    auto const &v1 = entry.values.first;
+    auto const &v2 = entry.values.second;
+
+    for (Value value : value_range()) {
+        if (value == v1) continue;
+        if (value == v2) continue;
+
+        if (!board.clear_note_at(coord, value)) continue;  // absent note -> no-op
+        std::cout << "[HP] " << coord << " x" << value << " "; entry.print(std::cout); std::cout << std::endl;
+        did_act = true;
+    }
+
+    return did_act;
+}
+} // namespace
 
 template<class Set>
-bool Analyzer::test_hidden_pair(const Cell &c1, const Cell &c2,
-                                const Value &v1, const Value &v2, const Set &set) const {
+bool HiddenPairTechnique::test_hidden_pair(const Cell &c1, const Cell &c2,
+                                           const Value &v1, const Value &v2, const Set &set) {
     // are these two different cells, carrying two different values?
     if (c1 == c2) return false;
     if (v1 == v2) return false;
 
-    // yes! but is v2 strictly "after" v1? (find_ enumerates v1<v2; the friend
-    // hook can pass them either way, so the predicate guards the precondition
+    // yes! but is v2 strictly "after" v1? (find_ enumerates v1<v2; a direct test
+    // caller can pass them either way, so the predicate guards the precondition
     // itself. The v1==v2 case above is the other half of that guard.)
     if (v2 < v1) return false;
 
@@ -51,35 +123,16 @@ bool Analyzer::test_hidden_pair(const Cell &c1, const Cell &c2,
     return true;
 }
 
-template<class Set>
-bool Analyzer::find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set) {
-    for (auto const &other_cell : set) {
-        // is this candidate hidden pair good?
-        if (!test_hidden_pair(cell, other_cell, v1, v2, set)) continue;
-
-        // yes! but is it already recorded?
-        HiddenPair hp({cell.coord(), other_cell.coord()}, {v1, v2});
-        if (std::find(mHiddenPairs.begin(), mHiddenPairs.end(), hp) != mHiddenPairs.end()) continue;
-
-        // no! let's record it
-        mHiddenPairs.push_back(hp);
-        if (sVerbose) std::cout << "  [fHP] " << hp << std::endl;
-        return true;
-    }
-
-    return false;
-}
-
-bool Analyzer::find_hidden_pairs() {
-    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#subsets
-    // When n candidates are possible in a certain set of n cells all in the same block, row, or column,
-    // and those n candidates are not possible elsewhere in that same block, row, or column, then no other
-    // candidates are possible in those cells.
-    // Applied for n = 2
-    assert(mHiddenPairs.empty());
+// https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#subsets
+// When n candidates are possible in a certain set of n cells all in the same block, row, or column,
+// and those n candidates are not possible elsewhere in that same block, row, or column, then no other
+// candidates are possible in those cells.
+// Applied for n = 2
+bool HiddenPairTechnique::find(const Board &board, FindingList &out) const {
+    assert(out.empty());
     bool did_find = false;
 
-    for (auto const &cell: mBoard.cells()) {
+    for (auto const &cell: board.cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
 
@@ -93,9 +146,9 @@ bool Analyzer::find_hidden_pairs() {
                 assert(*pv2 != *pv1);
 
                 // let's see if we can find a hidden pair in the three cell sets
-                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard.row(cell));
-                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard.column(cell));
-                did_find |= find_hidden_pair(cell, *pv1, *pv2, mBoard.nonet(cell));
+                did_find |= find_hidden_pair(cell, *pv1, *pv2, board.row(cell), out);
+                did_find |= find_hidden_pair(cell, *pv1, *pv2, board.column(cell), out);
+                did_find |= find_hidden_pair(cell, *pv1, *pv2, board.nonet(cell), out);
             }
         }
     }
@@ -103,49 +156,29 @@ bool Analyzer::find_hidden_pairs() {
     return did_find;
 }
 
-bool Analyzer::act_on_hidden_pair(Cell &cell, const HiddenPair &entry) {
+bool HiddenPairTechnique::apply(Board &board, FindingList &mine) const {
+    if (mine.empty()) return false;
+
     bool did_act = false;
+    for (auto const &f : mine) {
+        // Bucket invariant: see NakedSingleTechnique::apply for the rationale.
+        // The assert turns a wrong-bucket wiring bug into a caught error, not UB.
+        assert(dynamic_cast<const HiddenPairFinding *>(f.get()));
+        auto const *hp = static_cast<const HiddenPairFinding *>(f.get());
 
-    auto const &v1 = entry.values.first;
-    auto const &v2 = entry.values.second;
-
-    for (auto const &value : cell.notes().values()) {
-        if (value == v1) continue;
-        if (value == v2) continue;
-
-        mBoard.clear_note_at(cell.coord(), value);
-        std::cout << "[HP] " << cell.coord() << " x" << value << " " << entry << std::endl;
-        did_act = true;
+        // the pair's two cells, addressed by coord (findings carry coords)
+        did_act |= act_on_hidden_pair(board, hp->coords.first, *hp);
+        did_act |= act_on_hidden_pair(board, hp->coords.second, *hp);
     }
-
-    return did_act;
-}
-
-bool Analyzer::act_on_hidden_pair() {
-    bool did_act = false;
-
-    if (mHiddenPairs.empty()) return did_act;
-
-    for (auto const &entry : mHiddenPairs) {
-        auto &c1 = mBoard.at(entry.coords.first);
-        auto &c2 = mBoard.at(entry.coords.second);
-
-        did_act |= act_on_hidden_pair(c1, entry);
-        did_act |= act_on_hidden_pair(c2, entry);
-    }
-    mHiddenPairs.clear();
+    mine.clear();
 
     assert(did_act);
     return did_act;
 }
 
-// Explicit instantiation so the whitebox test (tests/unit/test_analyzer.cpp)
-// can link test_hidden_pair<Row> directly. Its only in-TU caller is
-// find_hidden_pair, which at -O3 g++ inlines, emitting no out-of-line copy of
-// the predicate; the external reference from the test TU then fails to link
-// (clang happens to keep a weak definition, so it only bit the gcc build).
-template bool Analyzer::test_hidden_pair<Row>(const Cell &, const Cell &, const Value &, const Value &, const Row &) const;
-
-std::ostream& operator<<(std::ostream& outs, const Analyzer::HiddenPair &hp) {
-    return outs << "{" << hp.coords.first << "," << hp.coords.second << "}#{" << hp.values.first << "," << hp.values.second << "}";
-}
+// Explicit instantiation so the whitebox test (tests/unit/test_analyzer.cpp) can
+// link test_hidden_pair<Row> directly. Its only in-TU caller is find_hidden_pair,
+// which at -O3 g++ inlines, emitting no out-of-line copy of the predicate; the
+// external reference from the test TU then fails to link (clang happens to keep a
+// weak definition, so it only bit the gcc build). See docs/test-predicate-idiom.md.
+template bool HiddenPairTechnique::test_hidden_pair<Row>(const Cell &, const Cell &, const Value &, const Value &, const Row &);

@@ -77,12 +77,11 @@ materialized-object) and 3 inline (the 3 scan-fused). The codebase matches:
   is just validation of a given tuple, exactly like naked pair's would-act
   check), and it is extracted to a `test_hidden_pair` mirroring `test_naked_pair`
   (the old hand-rolled `condition_met` / `ppair_cell` single-pass bookkeeping is
-  gone). It is still private to `Analyzer` (not yet ported behind the registry),
-  so its templated predicate is tested directly via a friend hook plus an
-  explicit `Row` instantiation. Naked pair used that same friend-hook route until
-  it ported (issue #7); porting let it promote the predicate to a public `static`
-  member and drop the hook, so hidden pair is now the remaining friend-hook
-  worked example (see "A note on templates" below).
+  gone). It has now ported behind the registry (issue #7), which -- exactly as it
+  did for naked pair -- let its templated predicate promote to a public `static`
+  member of `HiddenPairTechnique` and drop the friend hook; the whitebox suite
+  calls `HiddenPairTechnique::test_hidden_pair` directly, backed by an explicit
+  `Row` instantiation (see "A note on templates" below).
 
 - **X-Wing correctly has no `test_`.** It is scan-fused; PR #24 removed the dead
   predicate and kept `find_xwing` inline, tested through `find_` like its fish
@@ -113,15 +112,18 @@ PR #27 for `test_naked_pair`:
   the test *names* the predicate depends on whether the technique has ported
   behind the registry:
   - **Still private to `Analyzer` (not yet ported):** add a friend hook in
-    `AnalyzerTest` that instantiates the predicate on a concrete unit (e.g.
-    `test_hidden_pair_row` calls `a.test_hidden_pair(c1, c2, v1, v2, a.mBoard.row(c1))`),
-    with `template bool Analyzer::test_hidden_pair<Row>(...) const;` beside the
-    definition.
+    `AnalyzerTest` that instantiates the predicate on a concrete unit (e.g. a
+    `test_foo_row` wrapper calling `a.test_foo(..., a.mBoard.row(c1))`), with
+    `template bool Analyzer::test_foo<Row>(...) const;` beside the definition.
+    No ported technique still uses this route -- naked pair and hidden pair both
+    took it while private and shed it on porting -- but it remains the recipe for
+    any templated predicate that is tested directly before its technique ports.
   - **Ported behind the registry (standalone `Technique`):** the predicate has no
     `Analyzer` to be private to, so promote it to a public `static` member of the
     technique — a documented tested contract — and have the test call it directly,
     no friendship required. Naked pair took this route (issue #7): the test calls
     `NakedPairTechnique::test_naked_pair<Row>(...)` and the friend hook is deleted.
+    Hidden pair took the same route (`HiddenPairTechnique::test_hidden_pair<Row>(...)`).
     Because the member is `static` there is no trailing `const`, and the explicit
     instantiation is likewise unqualified by `Analyzer`:
     `template bool NakedPairTechnique::test_naked_pair<Row>(const Cell &, const Cell &, const Row &);`.
@@ -132,7 +134,8 @@ PR #27 for `test_naked_pair`:
   it through `find_` (cheap, coarser, no link tax), or pay the
   explicit-instantiation tax (plus a friend hook, if the technique is still
   private to `Analyzer`) for direct per-branch predicate tests. Both worked
-  examples, driven from `tests/unit/test_analyzer.cpp`, took the second route:
-  `test_hidden_pair` (`analyzer-hiddenpairs.cpp`) is the friend-hook variant, and
-  `test_naked_pair` (`analyzer-nakedpairs.h` / `analyzer-nakedpairs.cpp`) is the
-  promoted public-static-member variant.
+  examples, driven from `tests/unit/test_analyzer.cpp`, took the second route and
+  are now the promoted public-static-member variant: `test_naked_pair`
+  (`analyzer-nakedpairs.h` / `.cpp`) and `test_hidden_pair`
+  (`analyzer-hiddenpairs.h` / `.cpp`). Both used the friend-hook variant while
+  private to `Analyzer` and shed it on porting (issue #7).
