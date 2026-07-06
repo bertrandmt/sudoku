@@ -19,6 +19,7 @@
 #include "analyzer.h"
 #include "analyzer-nakedpairs.h"
 #include "analyzer-hiddenpairs.h"
+#include "analyzer-xwing.h"
 #include "cell.h"
 #include "coord.h"
 
@@ -98,19 +99,14 @@ struct AnalyzerTest {
     static size_t ywing_count(const Analyzer &a)                                                   { return a.mYWings.size(); }
     static Value  ywing_value(const Analyzer &a)                                                   { return a.mYWings.at(0).value; }
 
-    // --- x-wing ---
-    // find_xwing validates inline (like find_swordfish), so drive it on crafted
-    // boards through its anchor entry point and inspect the recorded result.
-    static bool   find_xwing(Analyzer &a, const Cell &c, const Value &v) { return a.find_xwing(c, v); }
-    static bool   act_on_xwing(Analyzer &a)                              { return a.act_on_xwing(); }
-    static size_t xwing_count(const Analyzer &a)                         { return a.mXWings.size(); }
-    static bool   xwing_row_based(const Analyzer &a)                     { return a.mXWings.at(0).is_row_based; }
-    static Value  xwing_value(const Analyzer &a)                         { return a.mXWings.at(0).value; }
-
-    // --- naked pair / hidden pair ---
-    // No hooks: both are ported to standalone Techniques (issue #7), whose
-    // test_naked_pair / test_hidden_pair are promoted public statics -- the
-    // whitebox cases call them directly, without friendship.
+    // --- x-wing / naked pair / hidden pair ---
+    // No hooks: all three are ported to standalone Techniques (issue #7). Naked
+    // pair and hidden pair are given-tuple shaped, so their test_naked_pair /
+    // test_hidden_pair are promoted public statics the whitebox cases call
+    // directly. X-Wing is scan-fused (no test_ predicate -- see
+    // docs/test-predicate-idiom.md); the cases drive XWingTechnique::find_xwing
+    // on crafted boards and inspect the recorded XWingFinding (visible via
+    // analyzer-xwing.h). Either way: no friendship.
 
     // --- simple coloring ---
     static bool test_color_chain(const Analyzer &a, const Analyzer::ColorChain &ch) { return a.test_color_chain(ch); }
@@ -533,11 +529,22 @@ void test_hidden_pair_accept_and_reject() {
 // X-Wing
 // ===========================================================================
 
-// find_xwing validates inline. The black-box suite drives it on real solves;
-// these whitebox cases craft small boards and drive find_xwing through its
-// anchor entry point -- the same way the Swordfish tests drive find_swordfish --
-// to cover both orientations and the rejection paths a happy-path solve does not
-// isolate.
+// X-Wing is scan-fused (no test_ predicate -- see docs/test-predicate-idiom.md).
+// The black-box suite drives it on real solves; these whitebox cases craft small
+// boards and drive XWingTechnique::find_xwing through its anchor entry point --
+// the same way the Swordfish tests drive find_swordfish -- to cover both
+// orientations and the rejection paths a happy-path solve does not isolate. Since
+// there is no predicate to inspect, they read the recorded XWingFinding's fields
+// directly (the finding type is visible via analyzer-xwing.h, the seam that
+// replaces the old AnalyzerTest hook -- no friendship needed, issue #7's payoff).
+
+// The lone XWingFinding recorded in `out`, or nullptr if the search recorded
+// something other than exactly one finding. Downcasts within the technique's own
+// bucket, so every entry is an XWingFinding by construction.
+const XWingFinding *only_xwing(const FindingList &out) {
+    if (out.size() != 1) return nullptr;
+    return dynamic_cast<const XWingFinding *>(out.front().get());
+}
 
 // A row-based X-Wing on value 7: rows 0 and 3 each hold 7 in exactly columns 1
 // and 5. Columns 1 and 5 carry one extra 7 apiece (rows 6 and 7), so the pattern
@@ -554,18 +561,18 @@ void test_xwing_row_based() {
     const Value V = kSeven;
     confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5}, {6,1}, {7,5} });
 
-    Analyzer analyzer(board);
+    XWingTechnique xw;
+    FindingList found;
     // Anchor on (0,1), the first 7 of row 0 -- find_xwing's top-left corner.
-    bool found = AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 1), V);
-    check(found, "row X-Wing detected with anchor (0,1)");
-    check(AnalyzerTest::xwing_count(analyzer) == 1, "exactly one X-Wing recorded");
-    if (AnalyzerTest::xwing_count(analyzer) == 1) {
-        check(AnalyzerTest::xwing_row_based(analyzer), "recorded X-Wing is row-based");
-        check(AnalyzerTest::xwing_value(analyzer) == V, "recorded X-Wing is for value 7");
+    check(xw.find_xwing(board, cell_at(board, 0, 1), V, found), "row X-Wing detected with anchor (0,1)");
+    check(found.size() == 1, "exactly one X-Wing recorded");
+    if (auto const *f = only_xwing(found)) {
+        check(f->is_row_based, "recorded X-Wing is row-based");
+        check(f->value == V, "recorded X-Wing is for value 7");
     }
 
-    bool acted = AnalyzerTest::act_on_xwing(analyzer);
-    check(acted, "act_on_xwing reports an elimination");
+    bool acted = xw.apply(board, found);
+    check(acted, "apply reports an elimination");
     check(!has_candidate(board, 6, 1, V), "stray 7 at (6,1) eliminated from column 1");
     check(!has_candidate(board, 7, 5, V), "stray 7 at (7,5) eliminated from column 5");
     check(has_candidate(board, 0, 1, V) && has_candidate(board, 0, 5, V)
@@ -587,17 +594,17 @@ void test_xwing_column_based() {
     const Value V = kSeven;
     confine_value(board, V, { {1,0},{5,0}, {1,3},{5,3}, {1,6}, {5,7} });
 
-    Analyzer analyzer(board);
-    bool found = AnalyzerTest::find_xwing(analyzer, cell_at(board, 1, 0), V);
-    check(found, "column X-Wing detected with anchor (1,0)");
-    check(AnalyzerTest::xwing_count(analyzer) == 1, "exactly one X-Wing recorded");
-    if (AnalyzerTest::xwing_count(analyzer) == 1) {
-        check(!AnalyzerTest::xwing_row_based(analyzer), "recorded X-Wing is column-based");
-        check(AnalyzerTest::xwing_value(analyzer) == V, "recorded X-Wing is for value 7");
+    XWingTechnique xw;
+    FindingList found;
+    check(xw.find_xwing(board, cell_at(board, 1, 0), V, found), "column X-Wing detected with anchor (1,0)");
+    check(found.size() == 1, "exactly one X-Wing recorded");
+    if (auto const *f = only_xwing(found)) {
+        check(!f->is_row_based, "recorded X-Wing is column-based");
+        check(f->value == V, "recorded X-Wing is for value 7");
     }
 
-    bool acted = AnalyzerTest::act_on_xwing(analyzer);
-    check(acted, "act_on_xwing reports an elimination");
+    bool acted = xw.apply(board, found);
+    check(acted, "apply reports an elimination");
     check(!has_candidate(board, 1, 6, V), "stray 7 at (1,6) eliminated from row 1");
     check(!has_candidate(board, 5, 7, V), "stray 7 at (5,7) eliminated from row 5");
     check(has_candidate(board, 1, 0, V) && has_candidate(board, 5, 0, V)
@@ -606,7 +613,7 @@ void test_xwing_column_based() {
 }
 
 // A perfect rectangle with nothing to eliminate must not be recorded (recording
-// it would assert in act). Rows 0 and 3 hold 7 in columns 1 and 5 and nowhere
+// it would assert in apply). Rows 0 and 3 hold 7 in columns 1 and 5 and nowhere
 // else, so neither column carries a third candidate.
 void test_xwing_no_elimination() {
     std::cout << "[x-wing] a rectangle with nothing to eliminate is not recorded\n";
@@ -614,10 +621,11 @@ void test_xwing_no_elimination() {
     const Value V = kSeven;
     confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5} });
 
-    Analyzer analyzer(board);
-    bool found = AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 1), V);
-    check(!found, "no X-Wing reported when there is nothing to eliminate");
-    check(AnalyzerTest::xwing_count(analyzer) == 0, "no X-Wing recorded");
+    XWingTechnique xw;
+    FindingList found;
+    check(!xw.find_xwing(board, cell_at(board, 0, 1), V, found),
+          "no X-Wing reported when there is nothing to eliminate");
+    check(found.empty(), "no X-Wing recorded");
 }
 
 // Near-misses: the partner row shares only one of the anchor's two columns, so
@@ -633,10 +641,11 @@ void test_xwing_misaligned_not_found() {
     {
         Board board = empty_board();
         confine_value(board, V, { {0,1},{0,5}, {3,1},{3,8}, {7,5} });
-        Analyzer analyzer(board);
-        check(!AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 1), V),
+        XWingTechnique xw;
+        FindingList found;
+        check(!xw.find_xwing(board, cell_at(board, 0, 1), V, found),
               "no X-Wing when the partner's second candidate is off the rectangle");
-        check(AnalyzerTest::xwing_count(analyzer) == 0, "nothing recorded");
+        check(found.empty(), "nothing recorded");
     }
 
     // Partner's FIRST candidate is off the rectangle: row 0 in cols 1,5; row 3 in
@@ -644,16 +653,17 @@ void test_xwing_misaligned_not_found() {
     {
         Board board = empty_board();
         confine_value(board, V, { {0,1},{0,5}, {3,2},{3,5} });
-        Analyzer analyzer(board);
-        check(!AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 1), V),
+        XWingTechnique xw;
+        FindingList found;
+        check(!xw.find_xwing(board, cell_at(board, 0, 1), V, found),
               "no X-Wing when the partner's first candidate is off the rectangle");
-        check(AnalyzerTest::xwing_count(analyzer) == 0, "nothing recorded");
+        check(found.empty(), "nothing recorded");
     }
 }
 
 // find_xwing canonicalises on the first candidate of the anchor's line: anchored
 // on a line's *second* candidate it bails at once (a row X-Wing is recorded only
-// when anchored on its first candidate, so find_xwings never double-records it).
+// when anchored on its first candidate, so find() never double-records it).
 // Same board as the row-based test, which finds the pattern from (0,1); from
 // (0,5) it must find nothing.
 void test_xwing_anchor_not_first() {
@@ -662,10 +672,11 @@ void test_xwing_anchor_not_first() {
     const Value V = kSeven;
     confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5}, {6,1}, {7,5} });
 
-    Analyzer analyzer(board);
-    check(!AnalyzerTest::find_xwing(analyzer, cell_at(board, 0, 5), V),
+    XWingTechnique xw;
+    FindingList found;
+    check(!xw.find_xwing(board, cell_at(board, 0, 5), V, found),
           "no X-Wing reported when anchored on the row's second candidate");
-    check(AnalyzerTest::xwing_count(analyzer) == 0, "nothing recorded from the non-first anchor");
+    check(found.empty(), "nothing recorded from the non-first anchor");
 }
 
 // ===========================================================================
@@ -741,8 +752,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 5, "five registry buckets (NS, HS, NP, LC, HP)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP short-circuited)");
+    check(AnalyzerTest::findings_bucket_count(a) == 6, "six registry buckets (NS, HS, NP, LC, HP, XW)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.

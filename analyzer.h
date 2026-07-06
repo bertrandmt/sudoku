@@ -18,7 +18,6 @@ public:
 
     Analyzer(Board &board, Analyzer const &other)
         : mFindings(other.mFindings)
-        , mXWings(other.mXWings)
         , mSwordfish(other.mSwordfish)
         , mColorChains(other.mColorChains)
         , mYWings(other.mYWings)
@@ -69,33 +68,6 @@ private:
     // -Wreorder; the rebinding-ctor regression test guards the one hand-written
     // mFindings(other.mFindings) copy.
     std::vector<FindingList> mFindings;
-
-private:
-    //** x-wing
-    struct XWing {
-        Value value;
-        Coord anchor;       // top-left corner of the XWing pattern
-        Coord diagonal;     // bottom-right corner of the XWing pattern
-        bool is_row_based;  // true if rows contain the pattern, false if columns contain the pattern
-
-        bool operator==(const XWing &other) const = default;
-    };
-    friend std::ostream& operator<<(std::ostream& outs, const XWing &);
-    std::vector<XWing> mXWings;
-
-    // find
-    template<class CandidateSet, class EliminationSet>
-    bool find_xwing(const Cell &, const Value &, const CandidateSet &, const EliminationSet &, const std::vector<CandidateSet> &, bool by_row);
-    bool find_xwing(const Cell &, const Value &);
-    bool find_xwings();
-
-    // act
-    template<class CandidateSet, class EliminationSet>
-    bool act_on_xwing(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2,
-                                          const EliminationSet &eset, Unit unit);
-    template<class EliminationSet>
-    bool act_on_xwing(const XWing &entry);
-    bool act_on_xwing();
 
 private:
     //** swordfish
