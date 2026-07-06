@@ -18,7 +18,6 @@ public:
 
     Analyzer(Board &board, Analyzer const &other)
         : mFindings(other.mFindings)
-        , mNakedPairs(other.mNakedPairs)
         , mLockedCandidates(other.mLockedCandidates)
         , mHiddenPairs(other.mHiddenPairs)
         , mXWings(other.mXWings)
@@ -72,29 +71,6 @@ private:
     // -Wreorder; the rebinding-ctor regression test guards the one hand-written
     // mFindings(other.mFindings) copy.
     std::vector<FindingList> mFindings;
-
-private:
-    //** naked pairs
-    struct NakedPair {
-        std::pair<Coord, Coord> coords;
-        std::pair<Value, Value> values;
-
-        bool operator==(const NakedPair &other) const = default;
-    };
-    friend std::ostream& operator<<(std::ostream& outs, const NakedPair &);
-    std::vector<NakedPair> mNakedPairs;
-
-    // find
-    template<class Set>
-    bool test_naked_pair(const Cell &, const Cell &, const Set &) const;
-    template<class Set>
-    bool find_naked_pair(const Cell &, const Set &);
-    bool find_naked_pairs();
-
-    // act
-    template<class Set>
-    bool act_on_naked_pair(const NakedPair &, Set &);
-    bool act_on_naked_pair();
 
 private:
     //** locked candidates
