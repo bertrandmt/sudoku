@@ -18,7 +18,6 @@ public:
 
     Analyzer(Board &board, Analyzer const &other)
         : mFindings(other.mFindings)
-        , mHiddenPairs(other.mHiddenPairs)
         , mXWings(other.mXWings)
         , mSwordfish(other.mSwordfish)
         , mColorChains(other.mColorChains)
@@ -70,28 +69,6 @@ private:
     // -Wreorder; the rebinding-ctor regression test guards the one hand-written
     // mFindings(other.mFindings) copy.
     std::vector<FindingList> mFindings;
-
-private:
-    //** hidden pairs
-    struct HiddenPair {
-        std::pair<Coord, Coord> coords;
-        std::pair<Value, Value> values;
-
-        bool operator==(const HiddenPair &other) const = default;
-    };
-    friend std::ostream& operator<<(std::ostream& outs, const HiddenPair &);
-    std::vector<HiddenPair> mHiddenPairs;
-
-    // find
-    template<class Set>
-    bool test_hidden_pair(const Cell &, const Cell &, const Value &, const Value &, const Set &) const;
-    template<class Set>
-    bool find_hidden_pair(const Cell &, const Value &v1, const Value &v2, const Set &);
-    bool find_hidden_pairs();
-
-    // act
-    bool act_on_hidden_pair(Cell &, const HiddenPair &);
-    bool act_on_hidden_pair();
 
 private:
     //** x-wing
