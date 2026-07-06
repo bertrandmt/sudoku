@@ -1,13 +1,22 @@
 // Copyright (c) 2025, Bertrand Mollinier Toublet
 // See LICENSE for details of BSD 3-Clause License
 
-#include "analyzer.h"
+#include "analyzer-colorchain.h"
 #include "board.h"
+#include "row.h"
+#include "column.h"
+#include "nonet.h"
+#include "cell.h"
+#include "coord.h"
 #include "verbose.h"
-#include <cassert>
-#include <queue>
 
-bool Analyzer::ColorChain::cell_sees_both_colors(const Cell &cell, const Board &board) const {
+#include <cassert>
+#include <memory>
+#include <queue>
+#include <string>
+#include <unordered_set>
+
+bool ColorChainFinding::cell_sees_both_colors(const Cell &cell, const Board &board) const {
     // is this cell a note?
     if (!cell.isNote()) return false;
 
@@ -31,21 +40,32 @@ bool Analyzer::ColorChain::cell_sees_both_colors(const Cell &cell, const Board &
     return did_see_green && did_see_red;
 }
 
-bool Analyzer::test_color_chain(const ColorChain &chain) const {
+void ColorChainFinding::print(std::ostream &outs) const {
+    outs << "{";
+    bool first = true;
+    for (const auto &[coord, color] : cells) {
+        if (!first) outs << ",";
+        first = false;
+        outs << coord << (color ? "🟩" : "🟥");
+    }
+    outs << "}#" << value;
+}
+
+bool ColorChainTechnique::test_color_chain(const Board &board, const ColorChainFinding &chain) {
     // A color chain is actionable if it can lead to eliminations via:
     // Rule 2: Two cells of the same color are in the same unit (conflict)
     // Rule 4: A cell can see cells of both colors
 
     // Check rule 2: cells of same color in the same unit
     auto [green_cells, red_cells] = chain.group_cells_by_color();
-    if (mBoard.any_see_each_other(green_cells)
-     || mBoard.any_see_each_other(red_cells)) {
+    if (board.any_see_each_other(green_cells)
+     || board.any_see_each_other(red_cells)) {
         return true;
     }
 
     // Check rule 4: cells that can see both colors
-    for (const auto &cell : mBoard.cells()) {
-        if (chain.cell_sees_both_colors(cell, mBoard)) {
+    for (const auto &cell : board.cells()) {
+        if (chain.cell_sees_both_colors(cell, board)) {
             return true;
         }
     }
@@ -54,15 +74,20 @@ bool Analyzer::test_color_chain(const ColorChain &chain) const {
 }
 
 namespace {
+    // Anchored on a coord (not a Cell): ported techniques are no longer friends
+    // of Board, and the self-skip below only needs the anchor's coord anyway, so
+    // there is no reason to round-trip Coord -> Cell -> Coord through the private
+    // Board::at. Callers pass the unit via the public row/column/nonet(Coord)
+    // overloads.
     template<class Set>
-    bool find_strong_link_candidates(const Cell &cell, const Value &value, const Set &set, const Cell *&out_candidate) {
+    bool find_strong_link_candidates(const Coord &coord, const Value &value, const Set &set, const Cell *&out_candidate) {
         bool did_find = false;
 
         const Cell *candidate;
         for (auto const &other_cell : set) {
             if (!other_cell.isNote()) continue;
             if (!other_cell.check(value)) continue;
-            if (cell == other_cell) continue;
+            if (coord == other_cell.coord()) continue;
 
             if (did_find) { did_find = false; break; } // this is disqualifying: we found more than one candidate
             else { candidate = &other_cell; did_find = true; }
@@ -73,14 +98,16 @@ namespace {
         return did_find;
     }
 
-}
-
-bool Analyzer::find_color_chains(const Value &value) {
+// Build and record the first actionable color chain for `value` on `board`, if
+// any. Was Analyzer::find_color_chains(const Value &); records into the
+// technique's own bucket `out` (at most one entry -- find() short-circuits)
+// instead of the member vector.
+bool find_color_chains(const Board &board, const Value &value, FindingList &out) {
     bool did_find = false;
 
     std::unordered_set<Coord> visited_global;
 
-    for (auto const &cell : mBoard.cells()) {
+    for (auto const &cell : board.cells()) {
         Coord coord = cell.coord();
 
         // is this a note cell?
@@ -93,8 +120,7 @@ bool Analyzer::find_color_chains(const Value &value) {
         if (visited_global.find(coord) != visited_global.end()) continue;
 
         // no! let's start building a new chain from this cell.
-        ColorChain chain;
-        chain.value = value;
+        ColorChainFinding chain(value);
 
         std::queue<std::pair<Coord, bool>> to_process;
         std::unordered_set<Coord> visited_local;
@@ -108,18 +134,17 @@ bool Analyzer::find_color_chains(const Value &value) {
             auto [current_coord, current_color] = to_process.front();
             to_process.pop();
 
-            const Cell &current_cell = mBoard.at(current_coord);
-
-            // Find all cells strongly linked to this cell
+            // Find all cells strongly linked to this cell, addressing its units
+            // by coord through Board's public overloads.
             std::vector<Cell> linked_cells;
             const Cell *other_cell = nullptr;
-            if (find_strong_link_candidates(current_cell, value, mBoard.row(current_cell), other_cell)) {
+            if (find_strong_link_candidates(current_coord, value, board.row(current_coord), other_cell)) {
                 linked_cells.push_back(*other_cell);
             }
-            if (find_strong_link_candidates(current_cell, value, mBoard.column(current_cell), other_cell)) {
+            if (find_strong_link_candidates(current_coord, value, board.column(current_coord), other_cell)) {
                 linked_cells.push_back(*other_cell);
             }
-            if (find_strong_link_candidates(current_cell, value, mBoard.nonet(current_cell), other_cell)) {
+            if (find_strong_link_candidates(current_coord, value, board.nonet(current_coord), other_cell)) {
                 linked_cells.push_back(*other_cell);
             }
 
@@ -142,48 +167,59 @@ bool Analyzer::find_color_chains(const Value &value) {
         if (chain.cells.size() < 2) continue;
 
         // yes! but is it actionable?
-        if (!test_color_chain(chain)) continue;
+        if (!ColorChainTechnique::test_color_chain(board, chain)) continue;
 
-        // yes! let's record it
-        assert(mColorChains.empty());
-        mColorChains.push_back(chain);
-        if (sVerbose) std::cout << "  [fSC] " << chain << std::endl;
+        // yes! let's record it -- move (not copy) the chain into the finding. cells
+        // is an unordered_map: std::move transfers its buckets intact, so dump and
+        // act iterate the as-built map's own (hash/bucket) order -- NOT insertion
+        // order (the green seed inserted first at [to_process.push] need not print
+        // first). libc++'s copy ctor instead prepends per bucket, reversing that
+        // order; that reversal is why the pre-#7 dump and act printed the same chain
+        // in opposite orders (see README): act consumed a chain the rebinding copy
+        // ctor had deep-copied once MORE than the dump's, and two reversals cancel.
+        // #7 carries findings by a shallow shared_ptr<const>, so dump and act now
+        // read one shared object and print one consistent order. Reproducing both
+        // old orders would require re-copying the map inside apply() purely to mimic
+        // that STL quirk; we don't. The elimination *set* is unchanged and the
+        // black-box suite sorts before comparing: print-order-only.
+        assert(out.empty());
+        if (sVerbose) { std::cout << "  [fSC] "; chain.print(std::cout); std::cout << std::endl; }
+        out.push_back(std::make_shared<ColorChainFinding>(std::move(chain)));
         did_find = true;
         break;
     }
 
     return did_find;
 }
+} // namespace
 
-bool Analyzer::find_color_chains() {
-    // https://www.sudokuwiki.org/Simple_Colouring
-    //
-    // Simple Coloring, also known as Single's Chains, is a chaining strategy.
-    //
-    // For a given candidate value, we are building a graph of candidate cells for this value,
-    // linked by 'bi-location' links, and sporting alternate 'green' and 'red' colors.
-    //
-    // A 'bi-location' link is a link between a candidate for a given value and another
-    // candidate for the same value in the same row, column or nonet, *if* there are no
-    // additional candidate for the same value in the same row, column or nonet.
-    //
-    // The resulting graph is a "color chain".
-    //
-    // Action is by applying two rules:
-    // Rule 2 - for a given color chain, if any row, column or nonet has the same color twice,
-    //          all candidates which share that color in the chain can be eliminated.
-    //
-    // Rule 4 - for a given color chain, if a candidate for the value that it *not* on the
-    //          chain can see two colors on the chain, then it can be eliminated.
-    bool did_find = false;
+// https://www.sudokuwiki.org/Simple_Colouring
+//
+// Simple Coloring, also known as Single's Chains, is a chaining strategy.
+//
+// For a given candidate value, we are building a graph of candidate cells for this value,
+// linked by 'bi-location' links, and sporting alternate 'green' and 'red' colors.
+//
+// A 'bi-location' link is a link between a candidate for a given value and another
+// candidate for the same value in the same row, column or nonet, *if* there are no
+// additional candidate for the same value in the same row, column or nonet.
+//
+// The resulting graph is a "color chain".
+//
+// Action is by applying two rules:
+// Rule 2 - for a given color chain, if any row, column or nonet has the same color twice,
+//          all candidates which share that color in the chain can be eliminated.
+//
+// Rule 4 - for a given color chain, if a candidate for the value that it *not* on the
+//          chain can see two colors on the chain, then it can be eliminated.
+bool ColorChainTechnique::find(const Board &board, FindingList &out) const {
+    assert(out.empty());
 
     for (Value val : value_range()) {
-        did_find = find_color_chains(val);
-        if (!did_find) continue;
-        break;
+        if (::find_color_chains(board, val, out)) return true;
     }
 
-    return did_find;
+    return false;
 }
 
 namespace {
@@ -201,48 +237,40 @@ bool act_on_color_chain_rule_2(Board &board, const std::vector<Coord> &coords, c
     }
     return did_act;
 }
-}
+} // namespace
 
-bool Analyzer::act_on_color_chain() {
+bool ColorChainTechnique::apply(Board &board, FindingList &mine) const {
+    if (mine.empty()) return false;
+    assert(mine.size() == 1);
+
+    // Bucket invariant: every entry in this technique's bucket is a
+    // ColorChainFinding (see NakedSingleTechnique::apply). The assert turns a
+    // wrong-bucket wiring bug into a caught error, not UB.
+    assert(dynamic_cast<const ColorChainFinding *>(mine.front().get()));
+    auto const *chain = static_cast<const ColorChainFinding *>(mine.front().get());
+
     bool did_act = false;
 
-    if (mColorChains.empty()) return did_act;
-    assert(mColorChains.size() == 1);
-
-    const auto &chain = mColorChains.back();
-
     // Check rule 2: cells of same color in the same unit
-    auto [green_cells, red_cells] = chain.group_cells_by_color();
-    bool eliminated_a = act_on_color_chain_rule_2(mBoard, green_cells, chain.value, "🟩");
-    bool eliminated_b = act_on_color_chain_rule_2(mBoard, red_cells, chain.value, "🟥");
+    auto [green_cells, red_cells] = chain->group_cells_by_color();
+    bool eliminated_a = act_on_color_chain_rule_2(board, green_cells, chain->value, "🟩");
+    bool eliminated_b = act_on_color_chain_rule_2(board, red_cells, chain->value, "🟥");
 
     if (eliminated_a || eliminated_b) {
         did_act = true;
     }
 
     // Check rule 4: cells that can see both colors
-    for (const auto &cell : mBoard.cells()) {
-        if (chain.cell_sees_both_colors(cell, mBoard)) {
-            std::cout << "[SC] " << cell.coord() << " x" << chain.value << " [👀🟩🟥]" << std::endl;
-            mBoard.clear_note_at(cell.coord(), chain.value);
+    for (const auto &cell : board.cells()) {
+        if (chain->cell_sees_both_colors(cell, board)) {
+            std::cout << "[SC] " << cell.coord() << " x" << chain->value << " [👀🟩🟥]" << std::endl;
+            board.clear_note_at(cell.coord(), chain->value);
             did_act = true;
         }
     }
 
-    mColorChains.clear();
+    mine.clear();
 
     assert(did_act);
     return did_act;
-}
-
-std::ostream& operator<<(std::ostream& outs, const Analyzer::ColorChain &chain) {
-    outs << "{";
-    bool first = true;
-    for (const auto &[coord, color] : chain.cells) {
-        if (!first) outs << ",";
-        first = false;
-        outs << coord << (color ? "🟩" : "🟥");
-    }
-    outs << "}#" << chain.value;
-    return outs;
 }
