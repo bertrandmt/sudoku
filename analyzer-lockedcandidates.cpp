@@ -1,26 +1,63 @@
 // Copyright (c) 2025, Bertrand Mollinier Toublet
 // See LICENSE for details of BSD 3-Clause License
 
-#include "analyzer.h"
+#include "analyzer-lockedcandidates.h"
 #include "board.h"
+#include "cell.h"
+#include "coord.h"
 #include "verbose.h"
 
 #include <algorithm>
+#include <cassert>
+#include <memory>
+#include <utility>
+#include <vector>
 
-bool Analyzer::LockedCandidates::operator==(const LockedCandidates &other) const {
-    if (unit != other.unit) return false;
-    if (value != other.value) return false;
-    if (coords.size() != other.coords.size()) return false;
-    for (const Coord &c : coords) {
-        if (std::find(other.coords.begin(), other.coords.end(), c) == other.coords.end()) {
-            return false;
-        }
+namespace {
+// File-local: LC has no whitebox hooks, so nothing outside this TU needs to name
+// or downcast the finding. print() emits the same bytes the old free
+// operator<<(ostream, Analyzer::LockedCandidates) did: "{c1,c2,...}#value[^unit]".
+struct LockedCandidatesFinding : Finding {
+    std::vector<Coord> coords;
+    Value value;
+    Unit  unit;
+    LockedCandidatesFinding(std::vector<Coord> c, Value v, Unit u)
+        : coords(std::move(c)), value(v), unit(u) { }
+
+    // Order-independent equality on the coord set, matching the old
+    // Analyzer::LockedCandidates::operator==: the two find forms enumerate the
+    // same locked group from different starting cells, so the coord vectors can
+    // differ in order while denoting the same finding.
+    bool same(const LockedCandidatesFinding &o) const {
+        if (unit != o.unit) return false;
+        if (value != o.value) return false;
+        if (coords.size() != o.coords.size()) return false;
+        for (const Coord &c : coords)
+            if (std::find(o.coords.begin(), o.coords.end(), c) == o.coords.end()) return false;
+        return true;
     }
-    return true;
-}
 
+    void print(std::ostream &o) const override {
+        o << "{";
+        bool is_first = true;
+        for (auto const &coord : coords) {
+            if (!is_first) { o << ","; }
+            is_first = false;
+            o << coord;
+        }
+        o << "}#" << value << "[^" << tag(unit) << "]";
+    }
+};
+
+// Find a locked candidate for (cell, value): all candidate cells for `value` in
+// set_to_consider must also lie in set_to_ignore, and acting must actually
+// eliminate something from the rest of set_to_ignore. Was
+// Analyzer::find_locked_candidate; the member vector dedup is now a scan of
+// `out` (this technique's own bucket, so every entry downcasts to
+// LockedCandidatesFinding).
 template<class Set1, class Set2>
-bool Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 &set_to_consider, Set2 &set_to_ignore) {
+bool find_locked_candidate(const Cell &cell, const Value &value,
+                           const Set1 &set_to_consider, const Set2 &set_to_ignore, FindingList &out) {
     bool did_find = false;
 
     std::vector<Coord> lc_coords;
@@ -70,55 +107,30 @@ bool Analyzer::find_locked_candidate(const Cell &cell, const Value &value, Set1 
 
     if (would_act) {
         // but is this entry already recorded?
-        LockedCandidates lc(lc_coords, value, set_to_ignore.kind());
-        if (std::find(mLockedCandidates.begin(), mLockedCandidates.end(), lc) != mLockedCandidates.end()) return did_find;
+        LockedCandidatesFinding lc(lc_coords, value, set_to_ignore.kind());
+        for (auto const &f : out) {
+            assert(dynamic_cast<const LockedCandidatesFinding *>(f.get()));
+            if (static_cast<const LockedCandidatesFinding *>(f.get())->same(lc)) return did_find;
+        }
 
         // no! let's record it
-        mLockedCandidates.push_back(lc);
-        if (sVerbose) std::cout << "  [fLC] " << lc << std::endl;
+        if (sVerbose) { std::cout << "  [fLC] "; lc.print(std::cout); std::cout << std::endl; }
+        out.push_back(std::make_shared<LockedCandidatesFinding>(std::move(lc)));
         did_find = true;
     }
 
     return did_find;
 }
 
-bool Analyzer::find_locked_candidates() {
-    // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#blocks
-    // Form 1:
-    // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same row/column,
-    // then it is also not possible anywhere else in the same nonet
-    // Form 2:
-    // When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same nonet,
-    // then it is also not possible anywhere else in the same row/column
-    assert(mLockedCandidates.empty());
-    bool did_find = false;
-
-    for (auto const &cell: mBoard.cells()) {
-        // is this a note cell?
-        if (!cell.isNote()) continue;
-
-
-        // yes! then for each candidate value in this note cell
-        for (auto const &value : cell.notes().values()) {
-
-            // form 1
-            did_find |= find_locked_candidate(cell, value, mBoard.row(cell), mBoard.nonet(cell));
-            did_find |= find_locked_candidate(cell, value, mBoard.column(cell), mBoard.nonet(cell));
-
-            // form 2
-            did_find |= find_locked_candidate(cell, value, mBoard.nonet(cell), mBoard.row(cell));
-            did_find |= find_locked_candidate(cell, value, mBoard.nonet(cell), mBoard.column(cell));
-        }
-    }
-
-    return did_find;
-}
-
+// Apply one recorded finding to one `set`, eliminating its value from every
+// cell of the set that is not itself a locked candidate. Was
+// Analyzer::act_on_locked_candidate(entry, set); the board is now the passed
+// reference (the member reached it through Analyzer's mBoard).
 template<class Set>
-bool Analyzer::act_on_locked_candidate(const LockedCandidates &entry, Set &set) {
+bool act_on_locked_candidate(Board &board, const LockedCandidatesFinding &entry, const Set &set) {
     bool did_act = false;
 
-    for (auto &other_cell : set) {
+    for (auto const &other_cell : set) {
         // is this a note cell?
         if (!other_cell.isNote()) continue;
 
@@ -131,45 +143,69 @@ bool Analyzer::act_on_locked_candidate(const LockedCandidates &entry, Set &set) 
 
         // yes! we'll act
         std::cout << "[LC] " << other_cell.coord() << " x" << entry.value << " [" << tag(entry.unit) << "]" << std::endl;
-        mBoard.clear_note_at(other_cell.coord(), entry.value);
+        board.clear_note_at(other_cell.coord(), entry.value);
         did_act = true;
     }
 
     return did_act;
 }
+} // namespace
 
-bool Analyzer::act_on_locked_candidate() {
+// https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#blocks
+// Form 1:
+// When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same row/column,
+// then it is also not possible anywhere else in the same nonet
+// Form 2:
+// When a candidate is possible in a certain nonet and row/column, and it is not possible anywhere else in the same nonet,
+// then it is also not possible anywhere else in the same row/column
+bool LockedCandidatesTechnique::find(const Board &board, FindingList &out) const {
+    assert(out.empty());
+    bool did_find = false;
+
+    for (auto const &cell: board.cells()) {
+        // is this a note cell?
+        if (!cell.isNote()) continue;
+
+        // yes! then for each candidate value in this note cell
+        for (auto const &value : cell.notes().values()) {
+
+            // form 1
+            did_find |= find_locked_candidate(cell, value, board.row(cell), board.nonet(cell), out);
+            did_find |= find_locked_candidate(cell, value, board.column(cell), board.nonet(cell), out);
+
+            // form 2
+            did_find |= find_locked_candidate(cell, value, board.nonet(cell), board.row(cell), out);
+            did_find |= find_locked_candidate(cell, value, board.nonet(cell), board.column(cell), out);
+        }
+    }
+
+    return did_find;
+}
+
+bool LockedCandidatesTechnique::apply(Board &board, FindingList &mine) const {
+    if (mine.empty()) return false;
+
     bool did_act = false;
+    for (auto const &f : mine) {
+        // Bucket invariant: see NakedSingleTechnique::apply for the rationale.
+        // The assert turns a wrong-bucket wiring bug into a caught error, not UB.
+        assert(dynamic_cast<const LockedCandidatesFinding *>(f.get()));
+        auto const *lc = static_cast<const LockedCandidatesFinding *>(f.get());
 
-    if (mLockedCandidates.empty()) return did_act;
-
-    for (auto const &entry : mLockedCandidates) {
-        switch (entry.unit) {
+        switch (lc->unit) {
         case Unit::Row:
-            did_act |= act_on_locked_candidate(entry, mBoard.row(entry.coords.at(0)));
+            did_act |= act_on_locked_candidate(board, *lc, board.row(lc->coords.at(0)));
             break;
         case Unit::Column:
-            did_act |= act_on_locked_candidate(entry, mBoard.column(entry.coords.at(0)));
+            did_act |= act_on_locked_candidate(board, *lc, board.column(lc->coords.at(0)));
             break;
         case Unit::Nonet:
-            did_act |= act_on_locked_candidate(entry, mBoard.nonet(entry.coords.at(0)));
+            did_act |= act_on_locked_candidate(board, *lc, board.nonet(lc->coords.at(0)));
             break;
         }
     }
-    mLockedCandidates.clear();
+    mine.clear();
 
     assert(did_act);
     return did_act;
-}
-
-std::ostream& operator<<(std::ostream& outs, const Analyzer::LockedCandidates &lc) {
-    outs << "{";
-    bool is_first = true;
-    for (auto const &coord : lc.coords) {
-        if (!is_first) { outs << ","; }
-        is_first = false;
-        outs << coord;
-    }
-    outs << "}#" << lc.value << "[^" << tag(lc.unit) << "]";
-    return outs;
 }
