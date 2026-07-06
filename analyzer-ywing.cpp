@@ -1,12 +1,19 @@
 // Copyright (c) 2025, Bertrand Mollinier Toublet
 // See LICENSE for details of BSD 3-Clause License
 
-#include "analyzer.h"
+#include "analyzer-ywing.h"
 #include "board.h"
+#include "row.h"
+#include "column.h"
+#include "nonet.h"
+#include "cell.h"
+#include "coord.h"
 #include "verbose.h"
-#include <algorithm>
+
 #include <iterator>
 #include <cassert>
+#include <memory>
+#include <optional>
 #include <unordered_set>
 
 namespace { // anon
@@ -40,51 +47,7 @@ namespace { // anon
 
         return would_act;
     }
-}
 
-bool Analyzer::test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing2, std::optional<Value> &out_value) const {
-    // by construct, all these assertions apply for input parameters
-    assert(pivot != wing1);
-    assert(pivot != wing2);
-    assert(wing1 != wing2);
-
-    assert(pivot.isNote());
-    assert(wing1.isNote());
-    assert(wing2.isNote());
-
-    assert(pivot.notes().count() == 2);
-    assert(wing1.notes().count() == 2);
-    assert(wing2.notes().count() == 2);
-
-    assert(mBoard.see_each_other(pivot, wing1));
-    assert(mBoard.see_each_other(pivot, wing2));
-
-    // by construct (select_wing_candidates), each wing shares exactly one value
-    // with the pivot: candidates with no value in common with the pivot are
-    // skipped (at least one shared), and candidates with the identical 2-value
-    // set as the pivot are skipped (no more than one shared).
-
-    // which value does each wing share with pivot? By construction exactly one,
-    // so this is the single bit in each wing's intersection with the pivot.
-    Value wing1_shared = wing1.notes().shared_value(pivot.notes());
-    Value wing2_shared = wing2.notes().shared_value(pivot.notes());
-
-    // yes! but do wing1 and wing2 share different values with pivot?
-    if (wing1_shared == wing2_shared) return false;
-
-    // Find the elimination candidate (the candidate that both wings have but pivot doesn't)
-    Value wing1_other = wing1.other_value(wing1_shared);
-    Value wing2_other = wing2.other_value(wing2_shared);
-    if (wing1_other != wing2_other) return false;
-
-    out_value = wing1_other;
-
-    if (!would_act(mBoard, pivot, wing1, wing2, wing1_other)) return false;
-
-    return true;
-}
-
-namespace {
     template<class Set>
     void select_wing_candidates(const Cell &pivot, const Set &set, std::unordered_set<Cell> &wing_candidates) {
         assert(set.contains(pivot));
@@ -111,9 +74,76 @@ namespace {
             wing_candidates.insert(cell);
         }
     }
+
+    // Apply one recorded Y-Wing to one `wing1_set`: clear `value` from every cell
+    // of that set that also sees wing2. Was Analyzer::act_on_ywing(entry, set); the
+    // board is now the passed reference, and cells are addressed by coord (findings
+    // carry coords) rather than resolved through the friends-only Board::at.
+    template <class Set>
+    bool act_on_ywing(Board &board, const YWingFinding &entry, const Set &wing1_set) {
+        bool did_act = false;
+
+        for (auto const &cell : wing1_set) {
+            if (cell.isValue()) continue;
+            if (cell.coord() == entry.pivot) continue;
+            if (cell.coord() == entry.wings.first) continue;
+            if (cell.coord() == entry.wings.second) continue;
+            if (!cell.check(entry.value)) continue;
+
+            if (board.see_each_other(cell.coord(), entry.wings.second)) {
+                std::cout << "[YW] " << cell.coord() << " x" << entry.value << std::endl;
+                board.clear_note_at(cell.coord(), entry.value);
+                did_act = true;
+            }
+        }
+
+        return did_act;
+    }
+} // namespace
+
+bool YWingTechnique::test_ywing(const Board &board, const Cell &pivot, const Cell &wing1, const Cell &wing2, std::optional<Value> &out_value) {
+    // by construct, all these assertions apply for input parameters
+    assert(pivot != wing1);
+    assert(pivot != wing2);
+    assert(wing1 != wing2);
+
+    assert(pivot.isNote());
+    assert(wing1.isNote());
+    assert(wing2.isNote());
+
+    assert(pivot.notes().count() == 2);
+    assert(wing1.notes().count() == 2);
+    assert(wing2.notes().count() == 2);
+
+    assert(board.see_each_other(pivot, wing1));
+    assert(board.see_each_other(pivot, wing2));
+
+    // by construct (select_wing_candidates), each wing shares exactly one value
+    // with the pivot: candidates with no value in common with the pivot are
+    // skipped (at least one shared), and candidates with the identical 2-value
+    // set as the pivot are skipped (no more than one shared).
+
+    // which value does each wing share with pivot? By construction exactly one,
+    // so this is the single bit in each wing's intersection with the pivot.
+    Value wing1_shared = wing1.notes().shared_value(pivot.notes());
+    Value wing2_shared = wing2.notes().shared_value(pivot.notes());
+
+    // yes! but do wing1 and wing2 share different values with pivot?
+    if (wing1_shared == wing2_shared) return false;
+
+    // Find the elimination candidate (the candidate that both wings have but pivot doesn't)
+    Value wing1_other = wing1.other_value(wing1_shared);
+    Value wing2_other = wing2.other_value(wing2_shared);
+    if (wing1_other != wing2_other) return false;
+
+    out_value = wing1_other;
+
+    if (!would_act(board, pivot, wing1, wing2, wing1_other)) return false;
+
+    return true;
 }
 
-bool Analyzer::find_ywing(const Cell &pivot) {
+bool YWingTechnique::find_ywing(const Board &board, const Cell &pivot, FindingList &out) {
     assert(pivot.isNote());
     assert(pivot.notes().count() == 2);
 
@@ -121,9 +151,9 @@ bool Analyzer::find_ywing(const Cell &pivot) {
 
     // Get all cells that the pivot can see
     std::unordered_set<Cell> wing_candidates;
-    select_wing_candidates(pivot, mBoard.row(pivot), wing_candidates);
-    select_wing_candidates(pivot, mBoard.column(pivot), wing_candidates);
-    select_wing_candidates(pivot, mBoard.nonet(pivot), wing_candidates);
+    select_wing_candidates(pivot, board.row(pivot), wing_candidates);
+    select_wing_candidates(pivot, board.column(pivot), wing_candidates);
+    select_wing_candidates(pivot, board.nonet(pivot), wing_candidates);
 
     // Try all pairs of visible cells as potential wings
     for (auto it1 = wing_candidates.begin(); it1 != wing_candidates.end(); ++it1) {
@@ -132,17 +162,24 @@ bool Analyzer::find_ywing(const Cell &pivot) {
             const Cell &wing2 = *it2;
 
             std::optional<Value> ywing_value;
-            if (!test_ywing(pivot, wing1, wing2, ywing_value)) continue;
+            if (!test_ywing(board, pivot, wing1, wing2, ywing_value)) continue;
             assert(ywing_value.has_value());
             assert(wing1.check(*ywing_value));
             assert(wing2.check(*ywing_value));
 
-            // Record the Y-Wing pattern
-            YWing yw{*ywing_value, pivot.coord(), {wing1.coord(), wing2.coord()}};
-            if (std::find(mYWings.begin(), mYWings.end(), yw) != mYWings.end()) continue;
+            // Record the Y-Wing pattern -- but is it already recorded? The member
+            // vector dedup (std::find over mYWings) is now a scan of `out` (this
+            // technique's own bucket, so every entry downcasts to YWingFinding).
+            YWingFinding yw{*ywing_value, pivot.coord(), {wing1.coord(), wing2.coord()}};
+            bool already = false;
+            for (auto const &f : out) {
+                assert(dynamic_cast<const YWingFinding *>(f.get()));
+                if (static_cast<const YWingFinding *>(f.get())->same(yw)) { already = true; break; }
+            }
+            if (already) continue;
 
-            mYWings.push_back(yw);
-            if (sVerbose) std::cout << "  [fYW] " << yw << std::endl;
+            if (sVerbose) { std::cout << "  [fYW] "; yw.print(std::cout); std::cout << std::endl; }
+            out.push_back(std::make_shared<YWingFinding>(yw));
             did_find = true;
         }
     }
@@ -150,71 +187,48 @@ bool Analyzer::find_ywing(const Cell &pivot) {
     return did_find;
 }
 
-bool Analyzer::find_ywings() {
-    // https://www.sudokuwiki.org/Y_Wing_Strategy
-    // A Y-Wing consists of three cells, each with exactly two candidates:
-    // - One pivot cell with candidates AB
-    // - One wing cell sharing A with pivot (has candidates AC)
-    // - One wing cell sharing B with pivot (has candidates BC)
-    // The pivot can see both wings, but wings don't need to see each other
-    // Any cell that can see both wings can have candidate C eliminated
-
-    assert(mYWings.empty());
+// https://www.sudokuwiki.org/Y_Wing_Strategy
+// A Y-Wing consists of three cells, each with exactly two candidates:
+// - One pivot cell with candidates AB
+// - One wing cell sharing A with pivot (has candidates AC)
+// - One wing cell sharing B with pivot (has candidates BC)
+// The pivot can see both wings, but wings don't need to see each other
+// Any cell that can see both wings can have candidate C eliminated
+bool YWingTechnique::find(const Board &board, FindingList &out) const {
+    assert(out.empty());
     bool did_find = false;
 
-    for (auto const &cell : mBoard.cells()) {
+    for (auto const &cell : board.cells()) {
         // Is this a note cell with exactly 2 candidates?
         if (!cell.isNote()) continue;
         if (cell.notes().count() != 2) continue;
 
         // Try this cell as a pivot
-        did_find |= find_ywing(cell);
+        did_find |= find_ywing(board, cell, out);
     }
 
     return did_find;
 }
 
-template <class Set>
-bool Analyzer::act_on_ywing(const YWing &entry, const Set &wing1_set) {
-    assert(wing1_set.contains(mBoard.at(entry.wings.first)));
+bool YWingTechnique::apply(Board &board, FindingList &mine) const {
+    if (mine.empty()) return false;
 
     bool did_act = false;
+    for (auto const &f : mine) {
+        // Bucket invariant: every entry in this technique's bucket is a YWingFinding
+        // (see NakedSingleTechnique::apply). The assert turns a wrong-bucket wiring
+        // bug into a caught error, not UB.
+        assert(dynamic_cast<const YWingFinding *>(f.get()));
+        auto const *yw = static_cast<const YWingFinding *>(f.get());
 
-    for (auto const &cell : wing1_set) {
-        if (cell.isValue()) continue;
-        if (cell.coord() == entry.pivot) continue;
-        if (cell.coord() == entry.wings.first) continue;
-        if (cell.coord() == entry.wings.second) continue;
-        if (!cell.check(entry.value)) continue;
-
-        if (mBoard.see_each_other(cell.coord(), entry.wings.second)) {
-            std::cout << "[YW] " << cell.coord() << " x" << entry.value << std::endl;
-            mBoard.clear_note_at(cell.coord(), entry.value);
-            did_act = true;
-        }
+        // for each entry, look for candidates for elimination within the first
+        // wing's row, column or nonet
+        did_act |= act_on_ywing(board, *yw, board.row(yw->wings.first));
+        did_act |= act_on_ywing(board, *yw, board.column(yw->wings.first));
+        did_act |= act_on_ywing(board, *yw, board.nonet(yw->wings.first));
     }
-
-    return did_act;
-}
-
-bool Analyzer::act_on_ywing() {
-    bool did_act = false;
-
-    if (mYWings.empty()) return did_act;
-
-    for (auto const &entry : mYWings) {
-        // for each entry, look for candidates for elimination within the first wing's row, column or nonet
-        did_act |= act_on_ywing(entry, mBoard.row(entry.wings.first));
-        did_act |= act_on_ywing(entry, mBoard.column(entry.wings.first));
-        did_act |= act_on_ywing(entry, mBoard.nonet(entry.wings.first));
-    }
-    mYWings.clear();
+    mine.clear();
 
     assert(did_act);
     return did_act;
-}
-
-std::ostream& operator<<(std::ostream& outs, const Analyzer::YWing &yw) {
-    outs << yw.pivot << "Y{" << yw.wings.first << "," << yw.wings.second << "}#" << yw.value;
-    return outs;
 }

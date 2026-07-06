@@ -17,7 +17,6 @@ public:
     Analyzer(Board &board, Analyzer const &other)
         : mFindings(other.mFindings)
         , mSwordfish(other.mSwordfish)
-        , mYWings(other.mYWings)
         , mXYChains(other.mXYChains)
         , mBoard(board) { }
 
@@ -91,28 +90,6 @@ private:
     template<class EliminationSet>
     bool act_on_swordfish(const Swordfish &entry);
     bool act_on_swordfish();
-
-private:
-    //** y-wing
-    struct YWing {
-        Value value;                   // candidate to eliminate from cells seeing both wings
-        Coord pivot;                   // pivot cell with 2 candidates (AB)
-        std::pair<Coord, Coord> wings; // wing cell sharing candidate A with pivot
-
-        bool operator==(const YWing &other) const = default;
-    };
-    friend std::ostream& operator<<(std::ostream& outs, const YWing &);
-    std::vector<YWing> mYWings;
-
-    // find
-    bool test_ywing(const Cell &pivot, const Cell &wing1, const Cell &wing2, std::optional<Value> &out_value) const;
-    bool find_ywing(const Cell &pivot);
-    bool find_ywings();
-
-    // act
-    template<class Set>
-    bool act_on_ywing(const YWing &entry, const Set &set);
-    bool act_on_ywing();
 
 private:
     //** xy-chain
