@@ -8,3 +8,4 @@
 
 #include "analyzer-nakedsingles.h"
 #include "analyzer-hiddensingles.h"
+#include "analyzer-nakedpairs.h"

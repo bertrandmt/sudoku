@@ -17,6 +17,7 @@
 
 #include "board.h"
 #include "analyzer.h"
+#include "analyzer-nakedpairs.h"
 #include "cell.h"
 #include "coord.h"
 
@@ -106,12 +107,9 @@ struct AnalyzerTest {
     static Value  xwing_value(const Analyzer &a)                         { return a.mXWings.at(0).value; }
 
     // --- naked pair ---
-    // test_naked_pair is given-tuple shaped: find_ enumerates cell pairs and the
-    // predicate judges each. Drive it directly on a crafted unit. It is a
-    // template on the set type; instantiate it on the cells' shared Row.
-    static bool test_naked_pair_row(const Analyzer &a, const Cell &c1, const Cell &c2) {
-        return a.test_naked_pair(c1, c2, a.mBoard.row(c1));
-    }
+    // No hook: NP is ported to a standalone NakedPairTechnique (issue #7), whose
+    // test_naked_pair is a promoted public static -- the whitebox case calls it
+    // directly, without friendship. (HP below still needs a hook until it ports.)
 
     // --- hidden pair ---
     // test_hidden_pair is given-tuple shaped too (identity is (c1,c2,v1,v2)):
@@ -436,13 +434,14 @@ void test_naked_pair_accept_and_reject() {
     set_candidates(board, 0, 0, {3, 5});   // the pair...
     set_candidates(board, 0, 1, {3, 5});   // ...its twin in the same row
     set_candidates(board, 0, 2, {3, 6});   // shares only one value -- not a pair
-    Analyzer analyzer(board);
 
-    check(AnalyzerTest::test_naked_pair_row(analyzer, cell_at(board, 0, 0), cell_at(board, 0, 1)),
+    // The predicate is a promoted public static (no friend hook): call it directly,
+    // instantiated on the cells' shared Row.
+    check(NakedPairTechnique::test_naked_pair(cell_at(board, 0, 0), cell_at(board, 0, 1), board.row(cell_at(board, 0, 0))),
           "accepted: two cells holding the same candidate pair {3,5}");
     // Reject short-circuits on the set compare, before would_act: a pure
     // pair-match check, immune to changes in actionability logic.
-    check(!AnalyzerTest::test_naked_pair_row(analyzer, cell_at(board, 0, 0), cell_at(board, 0, 2)),
+    check(!NakedPairTechnique::test_naked_pair(cell_at(board, 0, 0), cell_at(board, 0, 2), board.row(cell_at(board, 0, 0))),
           "rejected: candidate sets {3,5} and {3,6} differ");
 
     // --- actionability gate (would_act) ---
@@ -454,9 +453,8 @@ void test_naked_pair_accept_and_reject() {
     set_candidates(inert, 0, 1, {7, 8});
     confine_value(inert, kSeven, { {0, 0}, {0, 1} });
     confine_value(inert, kEight, { {0, 0}, {0, 1} });
-    Analyzer inert_analyzer(inert);
 
-    check(!AnalyzerTest::test_naked_pair_row(inert_analyzer, cell_at(inert, 0, 0), cell_at(inert, 0, 1)),
+    check(!NakedPairTechnique::test_naked_pair(cell_at(inert, 0, 0), cell_at(inert, 0, 1), inert.row(cell_at(inert, 0, 0))),
           "rejected: a real pair with nothing to act on (would_act gate)");
 }
 
@@ -752,8 +750,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 2, "two registry buckets (NS, HS)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS short-circuited)");
+    check(AnalyzerTest::findings_bucket_count(a) == 3, "three registry buckets (NS, HS, NP)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.
