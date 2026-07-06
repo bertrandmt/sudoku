@@ -26,10 +26,8 @@ struct XWingFinding : Finding {
 
     XWingFinding(Value v, Coord a, Coord d, bool row_based)
         : value(v), anchor(a), diagonal(d), is_row_based(row_based) { }
-    bool same(const XWingFinding &o) const {
-        return value == o.value && anchor == o.anchor
-            && diagonal == o.diagonal && is_row_based == o.is_row_based;
-    }
+    // No same()/dedup here (unlike NP/HP/LC): find() short-circuits at the first
+    // hit, so a bucket never holds two X-Wings to compare.
     // Byte-for-byte the old free operator<<(ostream, Analyzer::XWing):
     // "{anchor,diagonal}#value[^c]" (c if row-based, r if column-based).
     void print(std::ostream &o) const override {
@@ -52,8 +50,9 @@ public:
     // there is no test_ predicate to call directly (see docs/test-predicate-idiom.md);
     // the tests instead anchor find_xwing on a chosen cell -- exercising both
     // orientations, the canonical-first-candidate bail, and the rejection paths a
-    // happy-path solve never isolates. Public so the whitebox suite calls it
-    // without friendship (issue #7's stated payoff), mirroring how the promoted
-    // predicates work for the given-tuple techniques.
-    bool find_xwing(const Board &, const Cell &, const Value &, FindingList &out) const;
+    // happy-path solve never isolates. Public *static* so the whitebox suite calls
+    // it without friendship *and* without an instance (issue #7's stated payoff),
+    // matching the promoted-static shape of the given-tuple predicates: the
+    // technique is stateless and this touches no instance data.
+    static bool find_xwing(const Board &, const Cell &, const Value &, FindingList &out);
 };

@@ -129,7 +129,7 @@ bool act_on_xwing(Board &board, const XWingFinding &entry) {
 
 } // namespace
 
-bool XWingTechnique::find_xwing(const Board &board, const Cell &cell, const Value &value, FindingList &out) const {
+bool XWingTechnique::find_xwing(const Board &board, const Cell &cell, const Value &value, FindingList &out) {
     assert(cell.isNote());
     assert(cell.check(value));
 

@@ -561,10 +561,10 @@ void test_xwing_row_based() {
     const Value V = kSeven;
     confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5}, {6,1}, {7,5} });
 
-    XWingTechnique xw;
+    XWingTechnique xw;  // needed for apply() below; find_xwing is static
     FindingList found;
     // Anchor on (0,1), the first 7 of row 0 -- find_xwing's top-left corner.
-    check(xw.find_xwing(board, cell_at(board, 0, 1), V, found), "row X-Wing detected with anchor (0,1)");
+    check(XWingTechnique::find_xwing(board, cell_at(board, 0, 1), V, found), "row X-Wing detected with anchor (0,1)");
     check(found.size() == 1, "exactly one X-Wing recorded");
     if (auto const *f = only_xwing(found)) {
         check(f->is_row_based, "recorded X-Wing is row-based");
@@ -594,9 +594,9 @@ void test_xwing_column_based() {
     const Value V = kSeven;
     confine_value(board, V, { {1,0},{5,0}, {1,3},{5,3}, {1,6}, {5,7} });
 
-    XWingTechnique xw;
+    XWingTechnique xw;  // needed for apply() below; find_xwing is static
     FindingList found;
-    check(xw.find_xwing(board, cell_at(board, 1, 0), V, found), "column X-Wing detected with anchor (1,0)");
+    check(XWingTechnique::find_xwing(board, cell_at(board, 1, 0), V, found), "column X-Wing detected with anchor (1,0)");
     check(found.size() == 1, "exactly one X-Wing recorded");
     if (auto const *f = only_xwing(found)) {
         check(!f->is_row_based, "recorded X-Wing is column-based");
@@ -621,9 +621,8 @@ void test_xwing_no_elimination() {
     const Value V = kSeven;
     confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5} });
 
-    XWingTechnique xw;
     FindingList found;
-    check(!xw.find_xwing(board, cell_at(board, 0, 1), V, found),
+    check(!XWingTechnique::find_xwing(board, cell_at(board, 0, 1), V, found),
           "no X-Wing reported when there is nothing to eliminate");
     check(found.empty(), "no X-Wing recorded");
 }
@@ -641,9 +640,8 @@ void test_xwing_misaligned_not_found() {
     {
         Board board = empty_board();
         confine_value(board, V, { {0,1},{0,5}, {3,1},{3,8}, {7,5} });
-        XWingTechnique xw;
         FindingList found;
-        check(!xw.find_xwing(board, cell_at(board, 0, 1), V, found),
+        check(!XWingTechnique::find_xwing(board, cell_at(board, 0, 1), V, found),
               "no X-Wing when the partner's second candidate is off the rectangle");
         check(found.empty(), "nothing recorded");
     }
@@ -653,9 +651,8 @@ void test_xwing_misaligned_not_found() {
     {
         Board board = empty_board();
         confine_value(board, V, { {0,1},{0,5}, {3,2},{3,5} });
-        XWingTechnique xw;
         FindingList found;
-        check(!xw.find_xwing(board, cell_at(board, 0, 1), V, found),
+        check(!XWingTechnique::find_xwing(board, cell_at(board, 0, 1), V, found),
               "no X-Wing when the partner's first candidate is off the rectangle");
         check(found.empty(), "nothing recorded");
     }
@@ -672,9 +669,8 @@ void test_xwing_anchor_not_first() {
     const Value V = kSeven;
     confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5}, {6,1}, {7,5} });
 
-    XWingTechnique xw;
     FindingList found;
-    check(!xw.find_xwing(board, cell_at(board, 0, 5), V, found),
+    check(!XWingTechnique::find_xwing(board, cell_at(board, 0, 5), V, found),
           "no X-Wing reported when anchored on the row's second candidate");
     check(found.empty(), "nothing recorded from the non-first anchor");
 }
