@@ -74,22 +74,20 @@ bool ColorChainTechnique::test_color_chain(const Board &board, const ColorChainF
 }
 
 namespace {
-    // Ported techniques are no longer friends of Board, so the private Board::at
-    // is out of reach (see issue #7). Index the public cell vector instead --
-    // the same row-major addressing the whitebox suite uses.
-    const Cell &cell_at(const Board &board, const Coord &coord) {
-        return board.cells()[coord.row() * Board::width + coord.column()];
-    }
-
+    // Anchored on a coord (not a Cell): ported techniques are no longer friends
+    // of Board, and the self-skip below only needs the anchor's coord anyway, so
+    // there is no reason to round-trip Coord -> Cell -> Coord through the private
+    // Board::at. Callers pass the unit via the public row/column/nonet(Coord)
+    // overloads.
     template<class Set>
-    bool find_strong_link_candidates(const Cell &cell, const Value &value, const Set &set, const Cell *&out_candidate) {
+    bool find_strong_link_candidates(const Coord &coord, const Value &value, const Set &set, const Cell *&out_candidate) {
         bool did_find = false;
 
         const Cell *candidate;
         for (auto const &other_cell : set) {
             if (!other_cell.isNote()) continue;
             if (!other_cell.check(value)) continue;
-            if (cell == other_cell) continue;
+            if (coord == other_cell.coord()) continue;
 
             if (did_find) { did_find = false; break; } // this is disqualifying: we found more than one candidate
             else { candidate = &other_cell; did_find = true; }
@@ -136,18 +134,17 @@ bool find_color_chains(const Board &board, const Value &value, FindingList &out)
             auto [current_coord, current_color] = to_process.front();
             to_process.pop();
 
-            const Cell &current_cell = cell_at(board, current_coord);
-
-            // Find all cells strongly linked to this cell
+            // Find all cells strongly linked to this cell, addressing its units
+            // by coord through Board's public overloads.
             std::vector<Cell> linked_cells;
             const Cell *other_cell = nullptr;
-            if (find_strong_link_candidates(current_cell, value, board.row(current_cell), other_cell)) {
+            if (find_strong_link_candidates(current_coord, value, board.row(current_coord), other_cell)) {
                 linked_cells.push_back(*other_cell);
             }
-            if (find_strong_link_candidates(current_cell, value, board.column(current_cell), other_cell)) {
+            if (find_strong_link_candidates(current_coord, value, board.column(current_coord), other_cell)) {
                 linked_cells.push_back(*other_cell);
             }
-            if (find_strong_link_candidates(current_cell, value, board.nonet(current_cell), other_cell)) {
+            if (find_strong_link_candidates(current_coord, value, board.nonet(current_coord), other_cell)) {
                 linked_cells.push_back(*other_cell);
             }
 

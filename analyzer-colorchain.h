@@ -28,7 +28,6 @@ struct ColorChainFinding : Finding {
     Value value;
     std::unordered_map<Coord, bool> cells;  // coord -> color (true=green, false=red)
 
-    ColorChainFinding() = default;
     explicit ColorChainFinding(Value v) : value(v) { }
 
     std::pair<std::vector<Coord>, std::vector<Coord>> group_cells_by_color() const {
