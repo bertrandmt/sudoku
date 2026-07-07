@@ -10,6 +10,7 @@
 #include "coord.h"
 #include "verbose.h"
 
+#include <algorithm>
 #include <iterator>
 #include <cassert>
 #include <memory>
@@ -81,6 +82,13 @@ namespace { // anon
     // carry coords) rather than resolved through the friends-only Board::at.
     template <class Set>
     bool act_on_ywing(Board &board, const YWingFinding &entry, const Set &wing1_set) {
+        // Contract mirror of would_act_for_set's find-side assert: the set we were
+        // handed is wing1's own unit. wings.first is a Coord (findings carry coords,
+        // and the ported technique has no friend Board::at to resolve it to a Cell),
+        // so check membership by coord.
+        assert(std::any_of(wing1_set.begin(), wing1_set.end(),
+            [&](const Cell &c) { return c.coord() == entry.wings.first; }));
+
         bool did_act = false;
 
         for (auto const &cell : wing1_set) {
