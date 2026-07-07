@@ -13,3 +13,4 @@
 #include "analyzer-hiddenpairs.h"
 #include "analyzer-xwing.h"
 #include "analyzer-colorchain.h"
+#include "analyzer-ywing.h"

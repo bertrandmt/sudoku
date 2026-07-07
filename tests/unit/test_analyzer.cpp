@@ -21,6 +21,7 @@
 #include "analyzer-hiddenpairs.h"
 #include "analyzer-xwing.h"
 #include "analyzer-colorchain.h"
+#include "analyzer-ywing.h"
 #include "cell.h"
 #include "coord.h"
 
@@ -95,11 +96,13 @@ struct AnalyzerTest {
     }
 
     // --- y-wing ---
-    static bool   find_ywing(Analyzer &a, const Cell &pivot)                                       { return a.find_ywing(pivot); }
-    static bool   test_ywing(const Analyzer &a, const Cell &p, const Cell &w1, const Cell &w2, std::optional<Value> &out) { return a.test_ywing(p, w1, w2, out); }
-    static bool   act_on_ywing(Analyzer &a)                                                        { return a.act_on_ywing(); }
-    static size_t ywing_count(const Analyzer &a)                                                   { return a.mYWings.size(); }
-    static Value  ywing_value(const Analyzer &a)                                                   { return a.mYWings.at(0).value; }
+    // No hooks: YW is ported to a standalone Technique (issue #7). It is
+    // given-tuple shaped (see docs/test-predicate-idiom.md), so its validation
+    // predicate promotes to a public static YWingTechnique::test_ywing the cases
+    // call directly on crafted near-misses. Because those cases also drive
+    // find_ywing on a crafted pivot and read the recorded finding's value,
+    // find_ywing is likewise a public static and YWingFinding is declared in
+    // analyzer-ywing.h -- both without friendship.
 
     // --- x-wing / naked pair / hidden pair ---
     // No hooks: all three are ported to standalone Techniques (issue #7). Naked
@@ -337,15 +340,19 @@ void test_ywing_detect_and_act() {
     set_candidates(board, 1, 1, {3, 4});   // sees both wings; the target
     confine_value(board, kThree, { {0,1}, {1,0}, {1,1} });
 
-    Analyzer analyzer(board);
-    bool found = AnalyzerTest::find_ywing(analyzer, cell_at(board, 0, 0));
+    FindingList findings;
+    bool found = YWingTechnique::find_ywing(board, cell_at(board, 0, 0), findings);
     check(found, "Y-wing detected with pivot (0,0)");
-    check(AnalyzerTest::ywing_count(analyzer) == 1, "exactly one Y-wing recorded");
-    if (AnalyzerTest::ywing_count(analyzer) == 1)
-        check(AnalyzerTest::ywing_value(analyzer) == kThree, "elimination value is 3");
+    check(findings.size() == 1, "exactly one Y-wing recorded");
+    if (findings.size() == 1) {
+        assert(dynamic_cast<const YWingFinding *>(findings.front().get()));
+        auto const *yw = static_cast<const YWingFinding *>(findings.front().get());
+        check(yw->value == kThree, "elimination value is 3");
+    }
 
-    bool acted = AnalyzerTest::act_on_ywing(analyzer);
-    check(acted, "act_on_ywing reports an elimination");
+    YWingTechnique tech;
+    bool acted = tech.apply(board, findings);
+    check(acted, "apply reports an elimination");
     check(!has_candidate(board, 1, 1, kThree), "candidate 3 eliminated from (1,1)");
     check(has_candidate(board, 0, 1, kThree) && has_candidate(board, 1, 0, kThree),
           "wing cells kept candidate 3");
@@ -361,13 +368,12 @@ void test_ywing_rejects_non_patterns() {
     set_candidates(board, 1, 0, {1, 4});   // shares 1 too (same as the other wing)
     set_candidates(board, 2, 0, {2, 5});   // shares 2, other 5 (!= 3)
 
-    Analyzer analyzer(board);
     std::optional<Value> out;  // out-param; only engaged when test_ywing returns true
-    bool both_share_one = AnalyzerTest::test_ywing(analyzer,
+    bool both_share_one = YWingTechnique::test_ywing(board,
         cell_at(board, 0, 0), cell_at(board, 0, 1), cell_at(board, 1, 0), out);
     check(!both_share_one, "rejected: both wings share the same value with the pivot");
 
-    bool others_differ = AnalyzerTest::test_ywing(analyzer,
+    bool others_differ = YWingTechnique::test_ywing(board,
         cell_at(board, 0, 0), cell_at(board, 0, 1), cell_at(board, 2, 0), out);
     check(!others_differ, "rejected: the wings' non-shared values differ");
 }
@@ -745,8 +751,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 7, "seven registry buckets (NS, HS, NP, LC, HP, XW, SC)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC short-circuited)");
+    check(AnalyzerTest::findings_bucket_count(a) == 8, "eight registry buckets (NS, HS, NP, LC, HP, XW, SC, YW)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC/YW short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.
