@@ -5,10 +5,12 @@
 //
 // The black-box suite (tests/run.sh) drives the compiled REPL and can only
 // reach an analyzer technique when a real solve happens to route through it.
-// Several intricate paths are hard to provoke that way -- the Swordfish
-// no-eliminations rejection, the XY-chain "best chain" selection, simple
-// coloring's Rule 2 contradiction (black-box only ever exercises Rule 4) -- a
-// solve that routes through a technique only ever shows its accepting path.
+// Several intricate paths are hard to provoke that way: a solve exercises only
+// whichever path its position happens to take, leaving both a technique's
+// rejections and its less-travelled acceptances dark. The Swordfish
+// no-eliminations rejection is the first kind; the XY-chain "best chain"
+// selection and simple coloring's Rule 2 contradiction (black-box only ever
+// exercises Rule 4) are the second.
 // These tests construct a candidate grid (or an analyzer result) directly and
 // drive one technique's entry points (a public static seam for the ported
 // techniques, the AnalyzerTest friend for the rest) on a position designed for
@@ -161,11 +163,17 @@ const Cell &cell_at(const Board &board, size_t r, size_t c) {
 
 // The lone finding recorded in `out`, downcast to `F`; nullptr if the search
 // recorded something other than exactly one finding, or one of another type.
-// Every scan-fused technique's whitebox cases need this (X-Wing, Swordfish, and
-// the XY-chain port to come), and each one downcasts within that technique's own
-// bucket, so the entry is an `F` by construction -- the dynamic_cast is belt and
-// braces, and its result is check()ed at the call site so a wrong type fails
-// loudly rather than silently skipping the field assertions.
+// This is the scan-fused seam's helper, and only that: X-Wing and Swordfish
+// record at most one finding (find() short-circuits at the first hit) and their
+// cases must read the concrete finding's fields, because there is no test_
+// predicate to call instead. The materialized-object techniques need nothing
+// like it -- simple coloring drives the promoted test_color_chain static, and
+// the XY-chain port will do the same with test_xychain, whose bucket accumulates
+// every chain rather than settling on one. Each call downcasts within that
+// technique's own bucket, so the entry is an `F` by construction -- the
+// dynamic_cast is belt and braces, and its result is check()ed at the call site
+// so a wrong type fails loudly rather than silently skipping the field
+// assertions.
 template<class F>
 const F *only(const FindingList &out) {
     if (out.size() != 1) return nullptr;
