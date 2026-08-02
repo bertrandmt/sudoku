@@ -101,6 +101,13 @@ materialized-object) and 3 inline (the 3 scan-fused). The codebase matches:
 
 - **Locked candidates and Swordfish correctly inline.** Both are scan-fused; a
   `test_` for either would hit the out-param / re-derivation smell above.
+  Swordfish has now ported behind the registry (issue #7) and takes the same
+  *scan-fused* seam shape as its fish sibling X-Wing, for the same reason: no
+  predicate to promote, so `SwordfishTechnique::find_swordfish` is the public
+  `static` the test drives and `SwordfishFinding` is declared in
+  `analyzer-swordfish.h` so the test can read the recorded pattern's orientation
+  and value. Locked candidates ported too, but its whitebox coverage runs
+  through the black-box suite, so it needed no seam at all.
 
 ## A note on templates
 
