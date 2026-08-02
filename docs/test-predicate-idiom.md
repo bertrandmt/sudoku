@@ -38,6 +38,9 @@ Mapping all ten techniques:
   operations. `find_xychain` *builds* a chain by following links;
   `test_xychain` separately *scores* the eliminations that chain would make. The
   chain is a first-class value, so it is clean to pass to a predicate.
+  (`test_xychain` returns the elimination count rather than a `bool`, because
+  XY-chain also uses that count to rank competing chains. It is still a pure
+  predicate over a materialized object; "actionable" is just `> 0`.)
 
 - **Scan-fused**: the act of checking the pattern condition *is* the act of
   discovering which cells belong to it. A locked candidate is "every candidate
@@ -110,6 +113,25 @@ materialized-object) and 3 inline (the 3 scan-fused). The codebase matches:
   black-box (`tests/run.sh`); it has no whitebox cases, so it needed no seam at
   all.
 
+- **XY-chain has a `test_`, and keeps it private.** It is materialized-object
+  shaped like simple coloring, so `test_xychain` is the right factoring and
+  survives the port (issue #7) as a file-local function in
+  `analyzer-xychain.cpp`. It is *not* promoted, because no whitebox case calls
+  it: promoting it would advertise a tested contract nothing tests. What the
+  cases do drive is the per-anchor search `XYChainTechnique::find_xychain` and
+  the best-chain selection `XYChainTechnique::record_if_best`, so those are the
+  public statics, and `XYChainFinding` is in the header because a case reads the
+  recorded chain's fields. The seam shape follows what the tests reach for, not
+  the technique's class — the same "exposed exactly when the test must read it"
+  rule that governs the findings.
+
+  `record_if_best` is the one seam here with no analogue in the other nine.
+  XY-chain is the solver's only find-many/act-one technique: it ranks every chain
+  it discovers and applies just the most desirable one, so the ranking rule is a
+  contract in its own right, and one a crafted board cannot isolate (it takes
+  several competing chains, and which chains a board yields is not the case's to
+  dictate). The case offers them to the selector directly instead.
+
 ## A note on templates
 
 Most `test_` predicates are templated on the unit type (`test_naked_pair`, etc.);
@@ -128,27 +150,26 @@ PR #27 for `test_naked_pair`:
 - **The fix, when you want direct per-branch tests.** Whatever route the test
   uses to reach the predicate, add an explicit instantiation next to the
   definition so a standalone symbol is emitted regardless of inlining — this is
-  the part that fixes the gcc-only link failure, and it is needed either way. How
-  the test *names* the predicate depends on whether the technique has ported
-  behind the registry:
-  - **Still private to `Analyzer` (not yet ported):** add a friend hook in
-    `AnalyzerTest` that instantiates the predicate on a concrete unit (e.g. a
-    `test_foo_row` wrapper calling `a.test_foo(..., a.mBoard.row(c1))`), with
-    `template bool Analyzer::test_foo<Row>(...) const;` beside the definition.
-    No ported technique still uses this route -- naked pair and hidden pair both
-    took it while private and shed it on porting -- but it remains the recipe for
-    any templated predicate that is tested directly before its technique ports.
-  - **Ported behind the registry (standalone `Technique`):** the predicate has no
-    `Analyzer` to be private to, so promote it to a public `static` member of the
-    technique — a documented tested contract — and have the test call it directly,
-    no friendship required. Naked pair took this route (issue #7): the test calls
-    `NakedPairTechnique::test_naked_pair<Row>(...)` and the friend hook is deleted.
-    Hidden pair took the same route (`HiddenPairTechnique::test_hidden_pair<Row>(...)`).
-    Because the member is `static` there is no trailing `const`, and the explicit
-    instantiation is likewise unqualified by `Analyzer`:
-    `template bool NakedPairTechnique::test_naked_pair<Row>(const Cell &, const Cell &, const Row &);`.
+  the part that fixes the gcc-only link failure, and it is needed either way.
+  Then promote the predicate to a public `static` member of the technique — a
+  documented tested contract — and have the test call it directly, no friendship
+  required. Naked pair took this route (issue #7): the test calls
+  `NakedPairTechnique::test_naked_pair<Row>(...)` and the friend hook is deleted.
+  Hidden pair took the same route (`HiddenPairTechnique::test_hidden_pair<Row>(...)`).
+  Because the member is `static` there is no trailing `const`, and the explicit
+  instantiation is likewise unqualified by `Analyzer`:
+  `template bool NakedPairTechnique::test_naked_pair<Row>(const Cell &, const Cell &, const Row &);`.
   Confirm on CI, not locally: the Apple-clang `g++` shim cannot reproduce the
   gcc-only link failure.
+
+  Before the registry there was a second route, for a predicate still private to
+  `Analyzer`: a friend hook in `AnalyzerTest` instantiating it on a concrete unit
+  (a `test_foo_row` wrapper calling `a.test_foo(..., a.mBoard.row(c1))`), with
+  `template bool Analyzer::test_foo<Row>(...) const;` beside the definition. Both
+  naked pair and hidden pair took it while private and shed it on porting. It is
+  recorded here only so an old commit reads clearly: with all ten techniques
+  ported there is no longer a predicate that could need it, and a new technique
+  is a standalone `Technique` from its first line.
 
 - **The decision.** When extracting a templated predicate, choose up front: test
   it through `find_` (cheap, coarser, no link tax), or pay the

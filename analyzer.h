@@ -6,9 +6,8 @@
 #include "board.h"
 #include "technique.h"
 
-#include <set>
 #include <memory>
-#include <optional>
+#include <vector>
 
 class Analyzer {
 public:
@@ -16,7 +15,6 @@ public:
 
     Analyzer(Board &board, Analyzer const &other)
         : mFindings(other.mFindings)
-        , mXYChains(other.mXYChains)
         , mBoard(board) { }
 
     // The only sanctioned way to copy an Analyzer is the rebinding constructor
@@ -35,10 +33,12 @@ public:
 
     friend std::ostream& operator<< (std::ostream& outs, Analyzer const &);
 
-    // Whitebox unit tests reach the private find_*/act_* members and the result
-    // vectors through this friend, so individual techniques can be exercised on
-    // hand-built positions that a full REPL solve cannot easily reproduce.
-    // Defined in tests/unit/test_analyzer.cpp; no production code depends on it.
+    // Whitebox unit tests reach mFindings through this friend, so the
+    // rebinding-ctor regression test can prove the one remaining hand-written
+    // member copy carries the findings forward. That is all it is still for: the
+    // techniques themselves are standalone and expose their own public seams
+    // (issue #7). Defined in tests/unit/test_analyzer.cpp; no production code
+    // depends on it.
     friend struct AnalyzerTest;
 
 private:
@@ -57,45 +57,12 @@ private:
     static const std::vector<std::unique_ptr<Technique>> &registry();
 
     // Per-state findings, one bucket per registry() technique, indexed parallel
-    // to it. The sole member still carried forward across the state copy (see
-    // issue #7 lifecycle decision). Declared before every other technique member
-    // and before mBoard so the rebinding ctor's init list is legal under
-    // -Wreorder; the rebinding-ctor regression test guards the one hand-written
+    // to it. The only member carried forward across the state copy (see issue #7
+    // lifecycle decision), and the only one the rebinding ctor has to name.
+    // Declared before mBoard so that ctor's init list is legal under -Wreorder;
+    // the rebinding-ctor regression test guards the one hand-written
     // mFindings(other.mFindings) copy.
     std::vector<FindingList> mFindings;
-
-private:
-    //** xy-chain
-    struct XYChain {
-        Value value;                   // candidate to eliminate from cells seeing both chain ends
-        std::vector<Coord> chain;      // sequence of XY-cells forming the chain
-        size_t num_elim;
-
-        bool operator==(const XYChain &other) const {
-            // Two XY-chains are equivalent if they have the same elimination value
-            // and the same endpoints, regardless of the internal path
-            if (value != other.value) return false;
-            return (chain.front() == other.chain.front() && chain.back() == other.chain.back()) ||
-                   (chain.front() == other.chain.back() && chain.back() == other.chain.front());
-        }
-
-        bool operator<(const XYChain &other) const {
-            return (num_elim >  other.num_elim) ||
-                   (num_elim == other.num_elim && chain.size() < other.chain.size());
-        }
-    };
-    friend std::ostream& operator<<(std::ostream& outs, const XYChain &);
-    std::set<XYChain> mXYChains;
-
-    // find
-    size_t test_xychain(const Value &value, const std::vector<Coord> &chain) const;
-    bool find_xychain(const Cell &, const Value &);
-    bool find_xychains();
-
-    // act
-    template<class Set>
-    bool act_on_xychain(const XYChain &entry, const Set &chain_front_set);
-    bool act_on_xychain();
 
 private:
     Board &mBoard;
