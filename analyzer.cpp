@@ -16,8 +16,10 @@
 #include <string_view>
 
 // The stateless techniques, built once and shared by every Analyzer. This list
-// *is* the solver's cascade: analyze() and act() walk it in order, so adding a
-// technique means one new file and one push_back here.
+// *is* the solver's cascade: analyze() and act() walk it in order. Registering a
+// technique takes two edits in this function -- the push_back below AND the
+// kCascade literal above it, which the assert cross-checks -- and four more
+// elsewhere; techniques.h enumerates all six.
 const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
     // Canonical cascade order. Order is a correctness property, not a style
     // convention -- the cheapest technique that fires must fire first -- so it is

@@ -132,6 +132,14 @@ materialized-object) and 3 inline (the 3 scan-fused). The codebase matches:
   several competing chains, and which chains a board yields is not the case's to
   dictate). The case offers them to the selector directly instead.
 
+  That shape is described here, not endorsed. The design intent for the cascade
+  is that the cheapest firing technique is applied *as greedily as possible*, and
+  XY-chain is the one tier that isn't — **issue #36** is open to make it act on
+  every distinct elimination effect, which would delete `record_if_best`, the
+  finding's `operator==`/`operator<`, and `test_xychain`'s bare count. The port
+  preserved existing behavior byte-for-byte, so it promoted that behavior into a
+  named seam; that is a consequence of the port's terms, not a ruling on #36.
+
 ## A note on templates
 
 Most `test_` predicates are templated on the unit type (`test_naked_pair`, etc.);

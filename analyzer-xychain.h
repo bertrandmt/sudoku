@@ -80,5 +80,13 @@ public:
     // the one XY-chain invariant a crafted board cannot isolate: it takes several
     // competing chains to exercise, and which chains a board yields is not
     // controllable. The whitebox case offers them directly instead.
+    //
+    // Under review, not settled design: **issue #36** proposes dropping the
+    // trim-to-one entirely and acting greedily on every distinct elimination
+    // effect, which is what the rest of the cascade does. This port preserved the
+    // existing behavior byte-for-byte, so it necessarily promoted that behavior
+    // into a named seam with a test behind it -- read this as "here is what the
+    // solver does today", not as an endorsement. #36 would delete this function,
+    // XYChainFinding::operator==, operator<, and test_xychain's bare count.
     static bool record_if_best(FindingList &out, const XYChainFinding &candidate);
 };

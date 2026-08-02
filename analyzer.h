@@ -52,8 +52,9 @@ private:
     // The solving techniques, constructed once and shared by every Analyzer.
     // Function-local static (defined in analyzer.cpp): built on first use, and
     // -- crucially -- never copied per state, so forgetting to copy a technique
-    // in the rebinding ctor is no longer possible (issue #7). Private: analyze()/
-    // act()/operator<</AnalyzerTest all reach it via membership or friendship.
+    // in the rebinding ctor is no longer possible (issue #7). Private: analyze(),
+    // act() and operator<< all reach it via membership or friendship, and nothing
+    // else needs to (AnalyzerTest does not -- see the friend declaration above).
     static const std::vector<std::unique_ptr<Technique>> &registry();
 
     // Per-state findings, one bucket per registry() technique, indexed parallel

@@ -24,9 +24,18 @@ namespace {
 // Board::at to get each cell back, which a ported technique cannot do (issue #7);
 // rather than reintroduce that lookup through some other door, the search keeps
 // what it already had in hand and pays the Cell -> Coord conversion once, at the
-// point a chain is actually recorded. The pointers are to cells owned by the
-// board, or to entries of a candidate set that outlives the recursion below;
-// nothing mutates the board during find, so they stay valid and current.
+// point a chain is actually recorded.
+//
+// Only element 0 points at a cell the board owns (the anchor find_xychain was
+// handed). Every later element points into a `std::unordered_set<Cell>` of
+// selected candidates, so it is a *snapshot* of that cell taken when
+// select_chain_candidates copied it in -- not the live cell the old Board::at
+// lookup returned. That is equivalent here only because find is a pure query:
+// nothing mutates the board between the copy and the read.
+//
+// Lifetime: each frame's candidate set outlives the calls that frame makes, and
+// every push_back is popped before the frame exits, so a pointer is only ever
+// dereferenced while the set holding it is alive (see the loop below).
 using ChainCells = std::vector<const Cell *>;
 
 std::vector<Coord> coords_of(const ChainCells &chain) {
@@ -177,12 +186,20 @@ bool XYChainTechnique::record_if_best(FindingList &out, const XYChainFinding &ca
         // length), which the old std::set, ordering and equivalence being the
         // same relation for it, likewise refused to insert.
         if (!(candidate < best)) return false;
-
-        out.clear();
     }
 
+    // Copy `candidate` before dropping the incumbent, and clear only on the path
+    // that immediately refills (clearing an empty vector is a no-op, so the
+    // first-recording path pays nothing). Were `candidate` ever to alias the
+    // incumbent, clearing first would drop the last reference to it and leave
+    // the copy below reading a destroyed object. No caller can reach that today
+    // -- an alias trips the `best == candidate` gate above, operator== being
+    // reflexive -- but that makes this function's safety rest on a property of a
+    // gate two lines up, which is not where a reader would look for it, and
+    // which issue #36 proposes to replace.
     auto finding = std::make_shared<const XYChainFinding>(candidate);
     if (sVerbose) { std::cout << "  [fXY] "; finding->print(std::cout); std::cout << std::endl; }
+    out.clear();
     out.push_back(finding);
     return true;
 }
