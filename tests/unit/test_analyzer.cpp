@@ -12,9 +12,11 @@
 // selection and simple coloring's Rule 2 contradiction (black-box only ever
 // exercises Rule 4) are the second.
 // These tests construct a candidate grid (or an analyzer result) directly and
-// drive one technique's entry points (a public static seam for the ported
-// techniques, the AnalyzerTest friend for the rest) on a position designed for
-// it.
+// drive one technique's entry points, on a position designed for it. Every
+// technique now reaches those entry points through a public static seam: the
+// last one ported (issue #7) took its friend hooks with it, so the AnalyzerTest
+// friend below survives only for the rebinding-ctor regression test, which is
+// about the Analyzer itself rather than any technique.
 //
 // Framework-free on purpose: this matches the project's no-dependency testing
 // style. Each CHECK records a line; a nonzero exit code means a failure.
@@ -27,16 +29,15 @@
 #include "analyzer-colorchain.h"
 #include "analyzer-ywing.h"
 #include "analyzer-swordfish.h"
+#include "analyzer-xychain.h"
 #include "cell.h"
 #include "coord.h"
 
 #include <initializer_list>
 #include <iostream>
 #include <memory>
-#include <set>
 #include <sstream>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -44,15 +45,6 @@
 // steps; it is normally defined in the REPL main (sudoku-solver.cpp), which this
 // test binary does not link, so we supply it here. The tests keep it false.
 bool sVerbose = false;
-
-// One candidate XY-chain for the selection test: a value, a path, and how many
-// cells it would eliminate. Declared here (Coord is public) so AnalyzerTest can
-// turn it into the private Analyzer::XYChain.
-struct XYSpec {
-    int value;
-    std::vector<Coord> chain;
-    size_t num_elim;
-};
 
 // Friend hook: the only thing allowed to read/construct Analyzer internals.
 struct AnalyzerTest {
@@ -75,23 +67,13 @@ struct AnalyzerTest {
     }
 
     // --- xy-chain ---
-    static bool   find_xychain(Analyzer &a, const Cell &c, const Value &v)   { return a.find_xychain(c, v); }
-    static bool   act_on_xychain(Analyzer &a)                               { return a.act_on_xychain(); }
-    static size_t xychain_count(const Analyzer &a)                          { return a.mXYChains.size(); }
-    static Value  xychain_value(const Analyzer &a)                          { return a.mXYChains.begin()->value; }
-    static size_t xychain_num_elim(const Analyzer &a)                       { return a.mXYChains.begin()->num_elim; }
-    static size_t xychain_length(const Analyzer &a)                         { return a.mXYChains.begin()->chain.size(); }
-    static Coord  xychain_front(const Analyzer &a)                          { return a.mXYChains.begin()->chain.front(); }
-    static Coord  xychain_back(const Analyzer &a)                           { return a.mXYChains.begin()->chain.back(); }
-    // Insert the candidate chains into a std::set<XYChain> exactly as
-    // find_xychains does, and report the winner's (num_elim, length, value).
-    static std::tuple<size_t,size_t,int> xychain_select_best(const std::vector<XYSpec> &specs) {
-        std::set<Analyzer::XYChain> chains;
-        for (auto const &sp : specs)
-            chains.insert(Analyzer::XYChain{static_cast<Value>(sp.value), sp.chain, sp.num_elim});
-        auto const &best = *chains.begin();
-        return {best.num_elim, best.chain.size(), static_cast<int>(best.value)};
-    }
+    // No hooks: XY is ported to a standalone Technique (issue #7), the last of
+    // the ten. It is materialized-object shaped (see
+    // docs/test-predicate-idiom.md), but unlike simple coloring its cases do not
+    // drive its scoring predicate; they drive the per-anchor search
+    // XYChainTechnique::find_xychain and the best-chain selection
+    // XYChainTechnique::record_if_best, both public statics, and read the
+    // recorded XYChainFinding (visible via analyzer-xychain.h). No friendship.
 
     // --- y-wing ---
     // No hooks: YW is ported to a standalone Technique (issue #7). It is
@@ -163,17 +145,15 @@ const Cell &cell_at(const Board &board, size_t r, size_t c) {
 
 // The lone finding recorded in `out`, downcast to `F`; nullptr if the search
 // recorded something other than exactly one finding, or one of another type.
-// This is the scan-fused seam's helper, and only that: X-Wing and Swordfish
-// record at most one finding (find() short-circuits at the first hit) and their
-// cases must read the concrete finding's fields, because there is no test_
-// predicate to call instead. The materialized-object techniques need nothing
-// like it -- simple coloring drives the promoted test_color_chain static, and
-// the XY-chain port will do the same with test_xychain, whose bucket accumulates
-// every chain rather than settling on one. Each call downcasts within that
-// technique's own bucket, so the entry is an `F` by construction -- the
-// dynamic_cast is belt and braces, and its result is check()ed at the call site
-// so a wrong type fails loudly rather than silently skipping the field
-// assertions.
+// Used by the cases whose technique records at most one finding and that must
+// read that finding's concrete fields: X-Wing and Swordfish (find() stops at the
+// first hit) and XY-chain (its bucket retains only the most desirable chain).
+// Not every hooked technique wants it -- simple coloring's cases judge chains
+// they build themselves through the promoted test_color_chain static, and never
+// downcast a bucket. Each call downcasts within that technique's own bucket, so
+// the entry is an `F` by construction -- the dynamic_cast is belt and braces, and
+// its result is check()ed at the call site so a wrong type fails loudly rather
+// than silently skipping the field assertions.
 template<class F>
 const F *only(const FindingList &out) {
     if (out.size() != 1) return nullptr;
@@ -316,44 +296,68 @@ void test_xychain_detect_and_act() {
     set_candidates(board, 0, 3, {1, 4});   // sees both ends via row 0; the target
     confine_value(board, kOne, { {0,0}, {0,2}, {0,3} });
 
-    Analyzer analyzer(board);
-    bool found = AnalyzerTest::find_xychain(analyzer, cell_at(board, 0, 0), kOne);
-    check(found, "XY-chain detected starting from (0,0) on value 1");
-    check(AnalyzerTest::xychain_count(analyzer) == 1, "exactly one chain retained");
-    if (AnalyzerTest::xychain_count(analyzer) == 1) {
-        check(AnalyzerTest::xychain_value(analyzer) == kOne, "chain value is 1");
-        check(AnalyzerTest::xychain_length(analyzer) == 3, "chain has length 3");
-        check(AnalyzerTest::xychain_num_elim(analyzer) == 1, "chain counts exactly one elimination");
-        check(AnalyzerTest::xychain_front(analyzer) == Coord(0,0)
-           && AnalyzerTest::xychain_back(analyzer) == Coord(0,2), "chain runs (0,0)..(0,2)");
+    XYChainTechnique xy;  // needed for apply() below; find_xychain is static
+    FindingList found;
+    check(XYChainTechnique::find_xychain(board, cell_at(board, 0, 0), kOne, found),
+          "XY-chain detected starting from (0,0) on value 1");
+    check(found.size() == 1, "exactly one chain retained");
+    auto const *f = only<XYChainFinding>(found);
+    check(f, "the recorded finding is an XYChainFinding");
+    if (f) {
+        check(f->value == kOne, "chain value is 1");
+        check(f->chain.size() == 3, "chain has length 3");
+        check(f->num_elim == 1, "chain counts exactly one elimination");
+        check(f->chain.front() == Coord(0,0) && f->chain.back() == Coord(0,2),
+              "chain runs (0,0)..(0,2)");
     }
 
-    bool acted = AnalyzerTest::act_on_xychain(analyzer);
-    check(acted, "act_on_xychain reports an elimination");
+    bool acted = xy.apply(board, found);
+    check(acted, "apply reports an elimination");
+    check(found.empty(), "the applied chain is consumed");
     check(!has_candidate(board, 0, 3, kOne), "candidate 1 eliminated from (0,3)");
     check(has_candidate(board, 0, 0, kOne) && has_candidate(board, 0, 2, kOne),
           "chain-end cells kept candidate 1");
 }
 
-// The selection invariant: among candidate chains, the kept one has the most
-// eliminations, ties broken by the shorter chain. This is the ordering the
-// analyzer relies on (std::set<XYChain> begin() == most desirable).
+// The selection invariant: of the chains offered to a bucket, the one retained
+// has the most eliminations, ties broken by the shorter chain, and a chain that
+// is merely as good as the incumbent does not displace it. Offered to
+// record_if_best directly rather than found on a board: it takes several
+// competing chains to exercise, and which chains a crafted board yields is not
+// something the case can dictate.
 void test_xychain_best_selection() {
-    std::cout << "[xy-chain] the most-eliminations / shortest chain is selected\n";
+    std::cout << "[xy-chain] the most-eliminations / shortest chain is retained\n";
     auto mkchain = [](std::initializer_list<std::pair<size_t,size_t>> cs) {
         std::vector<Coord> v;
         for (auto const &c : cs) v.emplace_back(c.first, c.second);
         return v;
     };
-    std::vector<XYSpec> specs = {
-        {1, mkchain({{0,0},{0,1},{0,2},{0,3}}), 2},  // 2 elim, length 4
-        {2, mkchain({{1,0},{1,1},{1,2}}),       1},  // 1 elim, length 3
-        {3, mkchain({{2,0},{2,1},{2,2}}),       2},  // 2 elim, length 3  <- best
-    };
-    auto [num_elim, length, value] = AnalyzerTest::xychain_select_best(specs);
-    check(num_elim == 2, "winner has the most eliminations");
-    check(length == 3,   "ties broken toward the shorter chain");
-    check(value == 3,    "winner is the 2-elim length-3 chain");
+
+    FindingList bucket;
+    check(XYChainTechnique::record_if_best(bucket, {kOne, mkchain({{0,0},{0,1},{0,2},{0,3}}), 2}),
+          "the first chain offered is recorded");                     // 2 elim, length 4
+    check(!XYChainTechnique::record_if_best(bucket, {kTwo, mkchain({{1,0},{1,1},{1,2}}), 1}),
+          "a chain with fewer eliminations is rejected");             // 1 elim, length 3
+    check(XYChainTechnique::record_if_best(bucket, {kThree, mkchain({{2,0},{2,1},{2,2}}), 2}),
+          "an equal-elimination shorter chain displaces it");         // 2 elim, length 3 <- best
+
+    // Isolate the two remaining rejection gates against that incumbent. The
+    // first would be strictly better on its own terms (three eliminations beats
+    // two), so only the same-value-same-endpoints dedup can reject it; the
+    // second is neither better nor worse, so only the strict-improvement rule
+    // can.
+    check(!XYChainTechnique::record_if_best(bucket, {kThree, mkchain({{2,0},{3,1},{2,2}}), 3}),
+          "a rediscovered chain -- same value and endpoints -- is rejected even with more eliminations");
+    check(!XYChainTechnique::record_if_best(bucket, {kFour, mkchain({{4,0},{4,1},{4,2}}), 2}),
+          "an equally desirable but distinct chain does not displace the incumbent");
+
+    auto const *best = only<XYChainFinding>(bucket);
+    check(best, "the bucket holds exactly one XYChainFinding");
+    if (best) {
+        check(best->num_elim == 2,     "winner has the most eliminations");
+        check(best->chain.size() == 3, "ties broken toward the shorter chain");
+        check(best->value == kThree,   "winner is the 2-elim length-3 chain");
+    }
 }
 
 // ===========================================================================
@@ -778,8 +782,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 9, "nine registry buckets (NS, HS, NP, LC, HP, XW, SC, YW, SF)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC/YW/SF short-circuited)");
+    check(AnalyzerTest::findings_bucket_count(a) == 10, "ten registry buckets (NS, HS, NP, LC, HP, XW, SC, YW, SF, XY)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC/YW/SF/XY short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.
