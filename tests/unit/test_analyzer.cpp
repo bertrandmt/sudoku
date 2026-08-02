@@ -5,12 +5,14 @@
 //
 // The black-box suite (tests/run.sh) drives the compiled REPL and can only
 // reach an analyzer technique when a real solve happens to route through it.
-// Several intricate paths are hard to provoke that way -- the column-based
-// Swordfish branch, the XY-chain "best chain" selection, simple coloring's
-// Rule 2 contradiction (black-box only ever exercises Rule 4). These tests
-// construct a candidate grid (or an analyzer result) directly and call the
-// private Analyzer entry points through the AnalyzerTest friend, so one
-// technique can be exercised on a position designed for it.
+// Several intricate paths are hard to provoke that way -- the Swordfish
+// no-eliminations rejection, the XY-chain "best chain" selection, simple
+// coloring's Rule 2 contradiction (black-box only ever exercises Rule 4) -- a
+// solve that routes through a technique only ever shows its accepting path.
+// These tests construct a candidate grid (or an analyzer result) directly and
+// drive one technique's entry points (a public static seam for the ported
+// techniques, the AnalyzerTest friend for the rest) on a position designed for
+// it.
 //
 // Framework-free on purpose: this matches the project's no-dependency testing
 // style. Each CHECK records a line; a nonzero exit code means a failure.
@@ -157,6 +159,19 @@ const Cell &cell_at(const Board &board, size_t r, size_t c) {
     return board.cells()[r * Board::width + c];
 }
 
+// The lone finding recorded in `out`, downcast to `F`; nullptr if the search
+// recorded something other than exactly one finding, or one of another type.
+// Every scan-fused technique's whitebox cases need this (X-Wing, Swordfish, and
+// the XY-chain port to come), and each one downcasts within that technique's own
+// bucket, so the entry is an `F` by construction -- the dynamic_cast is belt and
+// braces, and its result is check()ed at the call site so a wrong type fails
+// loudly rather than silently skipping the field assertions.
+template<class F>
+const F *only(const FindingList &out) {
+    if (out.size() != 1) return nullptr;
+    return dynamic_cast<const F *>(out.front().get());
+}
+
 // ===========================================================================
 // Swordfish
 // ===========================================================================
@@ -167,14 +182,6 @@ const Cell &cell_at(const Board &board, size_t r, size_t c) {
 // the recorded SwordfishFinding's fields directly (the finding type is visible
 // via analyzer-swordfish.h, the seam that replaces the old AnalyzerTest hook --
 // no friendship needed, issue #7's payoff).
-
-// The lone SwordfishFinding recorded in `out`, or nullptr if the search recorded
-// something other than exactly one finding. Downcasts within the technique's own
-// bucket, so every entry is a SwordfishFinding by construction.
-const SwordfishFinding *only_swordfish(const FindingList &out) {
-    if (out.size() != 1) return nullptr;
-    return dynamic_cast<const SwordfishFinding *>(out.front().get());
-}
 
 // A column-based Swordfish on value 8.
 //
@@ -204,7 +211,9 @@ void test_swordfish_column_based() {
     check(SwordfishTechnique::find_swordfish(board, cell_at(board, 0, 0), V, found),
           "column Swordfish detected on a position with only tight cover lines");
     check(found.size() == 1, "exactly one Swordfish recorded");
-    if (auto const *f = only_swordfish(found)) {
+    auto const *f = only<SwordfishFinding>(found);
+    check(f, "the recorded finding is a SwordfishFinding");
+    if (f) {
         check(!f->is_row_based, "recorded Swordfish is column-based");
         check(f->value == V, "recorded Swordfish is for value 8");
     }
@@ -251,7 +260,9 @@ void test_swordfish_row_based() {
     check(SwordfishTechnique::find_swordfish(board, cell_at(board, 0, 0), V, found),
           "row Swordfish detected on a position with only tight cover lines");
     check(found.size() == 1, "exactly one Swordfish recorded");
-    if (auto const *f = only_swordfish(found)) {
+    auto const *f = only<SwordfishFinding>(found);
+    check(f, "the recorded finding is a SwordfishFinding");
+    if (f) {
         check(f->is_row_based, "recorded Swordfish is row-based");
         check(f->value == V, "recorded Swordfish is for value 8");
     }
@@ -555,14 +566,6 @@ void test_hidden_pair_accept_and_reject() {
 // directly (the finding type is visible via analyzer-xwing.h, the seam that
 // replaces the old AnalyzerTest hook -- no friendship needed, issue #7's payoff).
 
-// The lone XWingFinding recorded in `out`, or nullptr if the search recorded
-// something other than exactly one finding. Downcasts within the technique's own
-// bucket, so every entry is an XWingFinding by construction.
-const XWingFinding *only_xwing(const FindingList &out) {
-    if (out.size() != 1) return nullptr;
-    return dynamic_cast<const XWingFinding *>(out.front().get());
-}
-
 // A row-based X-Wing on value 7: rows 0 and 3 each hold 7 in exactly columns 1
 // and 5. Columns 1 and 5 carry one extra 7 apiece (rows 6 and 7), so the pattern
 // is actionable and those strays are eliminated.
@@ -583,7 +586,9 @@ void test_xwing_row_based() {
     // Anchor on (0,1), the first 7 of row 0 -- find_xwing's top-left corner.
     check(XWingTechnique::find_xwing(board, cell_at(board, 0, 1), V, found), "row X-Wing detected with anchor (0,1)");
     check(found.size() == 1, "exactly one X-Wing recorded");
-    if (auto const *f = only_xwing(found)) {
+    auto const *f = only<XWingFinding>(found);
+    check(f, "the recorded finding is an XWingFinding");
+    if (f) {
         check(f->is_row_based, "recorded X-Wing is row-based");
         check(f->value == V, "recorded X-Wing is for value 7");
     }
@@ -615,7 +620,9 @@ void test_xwing_column_based() {
     FindingList found;
     check(XWingTechnique::find_xwing(board, cell_at(board, 1, 0), V, found), "column X-Wing detected with anchor (1,0)");
     check(found.size() == 1, "exactly one X-Wing recorded");
-    if (auto const *f = only_xwing(found)) {
+    auto const *f = only<XWingFinding>(found);
+    check(f, "the recorded finding is an XWingFinding");
+    if (f) {
         check(!f->is_row_based, "recorded X-Wing is column-based");
         check(f->value == V, "recorded X-Wing is for value 7");
     }

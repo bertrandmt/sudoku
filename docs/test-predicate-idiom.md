@@ -106,8 +106,9 @@ materialized-object) and 3 inline (the 3 scan-fused). The codebase matches:
   predicate to promote, so `SwordfishTechnique::find_swordfish` is the public
   `static` the test drives and `SwordfishFinding` is declared in
   `analyzer-swordfish.h` so the test can read the recorded pattern's orientation
-  and value. Locked candidates ported too, but its whitebox coverage runs
-  through the black-box suite, so it needed no seam at all.
+  and value. Locked candidates ported too, but its coverage is entirely
+  black-box (`tests/run.sh`); it has no whitebox cases, so it needed no seam at
+  all.
 
 ## A note on templates
 

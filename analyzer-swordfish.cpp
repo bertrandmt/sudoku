@@ -10,6 +10,7 @@
 #include "coord.h"
 #include "verbose.h"
 
+#include <array>
 #include <cassert>
 #include <memory>
 #include <set>
@@ -111,12 +112,14 @@ bool find_swordfish(const Board &board, const Cell &cell, const Value &value,
             }
             if (!has_eliminations) continue;
 
-            // Found a valid Swordfish! Record the three anchor coordinates
+            // Found a valid Swordfish! Record one anchor per base line: the
+            // first candidate cell in each, which is what apply() maps back to
+            // the base lines.
             auto finding = std::make_shared<SwordfishFinding>(
                 value,
-                std::vector<Coord>{ cset_candidates[0].coord(),
-                                    cset2_candidates[0].coord(),
-                                    cset3_candidates[0].coord() },
+                std::array<Coord, 3>{ cset_candidates[0].coord(),
+                                      cset2_candidates[0].coord(),
+                                      cset3_candidates[0].coord() },
                 by_row);
             assert(out.empty());
             if (sVerbose) { std::cout << "  [fSF] "; finding->print(std::cout); std::cout << std::endl; }

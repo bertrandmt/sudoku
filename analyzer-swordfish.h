@@ -6,8 +6,7 @@
 #include "coord.h"
 #include "cell.h"  // Value
 
-#include <utility>
-#include <vector>
+#include <array>
 
 // Swordfish: X-Wing widened from two base lines to three. For one value, three
 // base lines (all rows, or all columns) that each hold two or three candidates
@@ -23,11 +22,17 @@
 // .cpp (mirroring XWingFinding).
 struct SwordfishFinding : Finding {
     Value value;
-    std::vector<Coord> anchors;  // three corners defining the Swordfish pattern
-    bool is_row_based;           // true if rows hold the pattern, false if columns do
+    // One anchor per base line: the first candidate cell encountered in each.
+    // Not "corners" -- that is X-Wing's vocabulary, where the two recorded cells
+    // really are opposite corners of the rectangle. Here the anchors are how
+    // apply() recovers the pattern: it calls line_of<CandidateSet> on each one to
+    // reconstruct the three base lines. Fixed-size, so apply()'s [0]/[1]/[2] are
+    // safe by construction rather than by an invariant a reader has to trust.
+    std::array<Coord, 3> anchors;
+    bool is_row_based;  // true if rows hold the pattern, false if columns do
 
-    SwordfishFinding(Value v, std::vector<Coord> a, bool row_based)
-        : value(v), anchors(std::move(a)), is_row_based(row_based) { }
+    SwordfishFinding(Value v, const std::array<Coord, 3> &a, bool row_based)
+        : value(v), anchors(a), is_row_based(row_based) { }
     // No same()/dedup here (unlike NP/HP/LC): find() short-circuits at the first
     // hit, so a bucket never holds two Swordfish to compare.
     // Byte-for-byte the old free operator<<(ostream, Analyzer::Swordfish):
@@ -58,10 +63,12 @@ public:
     // crafted board and inspect the finding it records. Swordfish is scan-fused,
     // so there is no test_ predicate to call directly (see
     // docs/test-predicate-idiom.md); the tests instead anchor find_swordfish on a
-    // chosen cell -- reaching the column-based branch and the no-eliminations
-    // rejection that a happy-path solve does not isolate. Public *static* so the
-    // whitebox suite calls it without friendship *and* without an instance (issue
-    // #7's stated payoff): the technique is stateless and this touches no
+    // chosen cell -- reaching the no-eliminations rejection that a happy-path
+    // solve does not isolate, and pinning the tight-cover-line rule on a position
+    // built for it. (Both orientations are already covered black-box: P_hard
+    // fires a row-based Swordfish, P_sf a column-based one.) Public *static* so
+    // the whitebox suite calls it without friendship *and* without an instance
+    // (issue #7's stated payoff): the technique is stateless and this touches no
     // instance data. Same shape as XWingTechnique::find_xwing.
     static bool find_swordfish(const Board &, const Cell &, const Value &, FindingList &out);
 };
