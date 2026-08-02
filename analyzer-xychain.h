@@ -86,7 +86,12 @@ public:
     // effect, which is what the rest of the cascade does. This port preserved the
     // existing behavior byte-for-byte, so it necessarily promoted that behavior
     // into a named seam with a test behind it -- read this as "here is what the
-    // solver does today", not as an endorsement. #36 would delete this function,
-    // XYChainFinding::operator==, operator<, and test_xychain's bare count.
+    // solver does today", not as an endorsement. #36 would delete this function
+    // and XYChainFinding::operator== (endpoint equivalence is only a proxy for
+    // "same elimination set", and an inexact one), and would have test_xychain
+    // collect the eliminated coords instead of counting them. operator< is not
+    // settled either way: #36 leaves open whether to keep the coverage-maximal
+    // chain -- which is what this comparator already ranks first -- or the
+    // shortest chain per elimination.
     static bool record_if_best(FindingList &out, const XYChainFinding &candidate);
 };

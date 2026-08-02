@@ -135,10 +135,15 @@ materialized-object) and 3 inline (the 3 scan-fused). The codebase matches:
   That shape is described here, not endorsed. The design intent for the cascade
   is that the cheapest firing technique is applied *as greedily as possible*, and
   XY-chain is the one tier that isn't — **issue #36** is open to make it act on
-  every distinct elimination effect, which would delete `record_if_best`, the
-  finding's `operator==`/`operator<`, and `test_xychain`'s bare count. The port
-  preserved existing behavior byte-for-byte, so it promoted that behavior into a
-  named seam; that is a consequence of the port's terms, not a ruling on #36.
+  every distinct elimination effect. That would delete `record_if_best` and the
+  finding's `operator==` (endpoint equivalence being only an inexact proxy for
+  "same elimination set"), and would have `test_xychain` collect the eliminated
+  coords rather than count them. It would *not* necessarily touch `operator<`:
+  #36's open question is whether to keep the coverage-maximal chain, which is
+  what this comparator already ranks first, or the shortest chain per
+  elimination, and it is deliberately left undecided there. The port preserved
+  existing behavior byte-for-byte, so it promoted that behavior into a named
+  seam; that is a consequence of the port's terms, not a ruling on #36.
 
 ## A note on templates
 
