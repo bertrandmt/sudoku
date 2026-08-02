@@ -48,6 +48,7 @@ std::optional<Unit> test_hidden_single(const Cell &cell, const Value &value, con
 // A hidden single arises when there is only one possible cell for a candidate.
 // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
 bool HiddenSingleTechnique::find(const Board &board, FindingList &out) const {
+    assert(out.empty());
     bool did_find = false;
 
     for (auto const &cell : board.cells()) {

@@ -25,6 +25,7 @@ struct NakedSingleFinding : Finding {
 // A naked single arises when there is only one possible candidate for a cell.
 // https://www.stolaf.edu/people/hansonr/sudoku/explain.htm#scanning
 bool NakedSingleTechnique::find(const Board &board, FindingList &out) const {
+    assert(out.empty());
     bool did_find = false;
 
     for (auto const &cell : board.cells()) {
