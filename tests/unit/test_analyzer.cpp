@@ -5,12 +5,16 @@
 //
 // The black-box suite (tests/run.sh) drives the compiled REPL and can only
 // reach an analyzer technique when a real solve happens to route through it.
-// Several intricate paths are hard to provoke that way -- the column-based
-// Swordfish branch, the XY-chain "best chain" selection, simple coloring's
-// Rule 2 contradiction (black-box only ever exercises Rule 4). These tests
-// construct a candidate grid (or an analyzer result) directly and call the
-// private Analyzer entry points through the AnalyzerTest friend, so one
-// technique can be exercised on a position designed for it.
+// Several intricate paths are hard to provoke that way: a solve exercises only
+// whichever path its position happens to take, leaving both a technique's
+// rejections and its less-travelled acceptances dark. The Swordfish
+// no-eliminations rejection is the first kind; the XY-chain "best chain"
+// selection and simple coloring's Rule 2 contradiction (black-box only ever
+// exercises Rule 4) are the second.
+// These tests construct a candidate grid (or an analyzer result) directly and
+// drive one technique's entry points (a public static seam for the ported
+// techniques, the AnalyzerTest friend for the rest) on a position designed for
+// it.
 //
 // Framework-free on purpose: this matches the project's no-dependency testing
 // style. Each CHECK records a line; a nonzero exit code means a failure.
@@ -22,6 +26,7 @@
 #include "analyzer-xwing.h"
 #include "analyzer-colorchain.h"
 #include "analyzer-ywing.h"
+#include "analyzer-swordfish.h"
 #include "cell.h"
 #include "coord.h"
 
@@ -69,13 +74,6 @@ struct AnalyzerTest {
         return os.str();
     }
 
-    // --- swordfish ---
-    static bool   find_swordfish(Analyzer &a, const Cell &c, const Value &v) { return a.find_swordfish(c, v); }
-    static bool   act_on_swordfish(Analyzer &a)                              { return a.act_on_swordfish(); }
-    static size_t swordfish_count(const Analyzer &a)                         { return a.mSwordfish.size(); }
-    static bool   swordfish_row_based(const Analyzer &a)                     { return a.mSwordfish.at(0).is_row_based; }
-    static Value  swordfish_value(const Analyzer &a)                         { return a.mSwordfish.at(0).value; }
-
     // --- xy-chain ---
     static bool   find_xychain(Analyzer &a, const Cell &c, const Value &v)   { return a.find_xychain(c, v); }
     static bool   act_on_xychain(Analyzer &a)                               { return a.act_on_xychain(); }
@@ -104,14 +102,15 @@ struct AnalyzerTest {
     // find_ywing is likewise a public static and YWingFinding is declared in
     // analyzer-ywing.h -- both without friendship.
 
-    // --- x-wing / naked pair / hidden pair ---
-    // No hooks: all three are ported to standalone Techniques (issue #7). Naked
+    // --- x-wing / swordfish / naked pair / hidden pair ---
+    // No hooks: all four are ported to standalone Techniques (issue #7). Naked
     // pair and hidden pair are given-tuple shaped, so their test_naked_pair /
     // test_hidden_pair are promoted public statics the whitebox cases call
-    // directly. X-Wing is scan-fused (no test_ predicate -- see
-    // docs/test-predicate-idiom.md); the cases drive XWingTechnique::find_xwing
-    // on crafted boards and inspect the recorded XWingFinding (visible via
-    // analyzer-xwing.h). Either way: no friendship.
+    // directly. The two fish are scan-fused (no test_ predicate -- see
+    // docs/test-predicate-idiom.md); the cases drive XWingTechnique::find_xwing /
+    // SwordfishTechnique::find_swordfish on crafted boards and inspect the
+    // recorded XWingFinding / SwordfishFinding (visible via analyzer-xwing.h /
+    // analyzer-swordfish.h). Either way: no friendship.
 
     // --- simple coloring ---
     // No hooks: SC is ported to a standalone Technique (issue #7). It is
@@ -162,9 +161,35 @@ const Cell &cell_at(const Board &board, size_t r, size_t c) {
     return board.cells()[r * Board::width + c];
 }
 
+// The lone finding recorded in `out`, downcast to `F`; nullptr if the search
+// recorded something other than exactly one finding, or one of another type.
+// This is the scan-fused seam's helper, and only that: X-Wing and Swordfish
+// record at most one finding (find() short-circuits at the first hit) and their
+// cases must read the concrete finding's fields, because there is no test_
+// predicate to call instead. The materialized-object techniques need nothing
+// like it -- simple coloring drives the promoted test_color_chain static, and
+// the XY-chain port will do the same with test_xychain, whose bucket accumulates
+// every chain rather than settling on one. Each call downcasts within that
+// technique's own bucket, so the entry is an `F` by construction -- the
+// dynamic_cast is belt and braces, and its result is check()ed at the call site
+// so a wrong type fails loudly rather than silently skipping the field
+// assertions.
+template<class F>
+const F *only(const FindingList &out) {
+    if (out.size() != 1) return nullptr;
+    return dynamic_cast<const F *>(out.front().get());
+}
+
 // ===========================================================================
 // Swordfish
 // ===========================================================================
+
+// Swordfish is scan-fused (no test_ predicate -- see docs/test-predicate-idiom.md),
+// like its sibling X-Wing. These cases craft small boards and drive
+// SwordfishTechnique::find_swordfish through its anchor entry point, then read
+// the recorded SwordfishFinding's fields directly (the finding type is visible
+// via analyzer-swordfish.h, the seam that replaces the old AnalyzerTest hook --
+// no friendship needed, issue #7's payoff).
 
 // A column-based Swordfish on value 8.
 //
@@ -189,17 +214,20 @@ void test_swordfish_column_based() {
         {0,4},{1,5},        // strays to be eliminated
     });
 
-    Analyzer analyzer(board);
-    bool found = AnalyzerTest::find_swordfish(analyzer, cell_at(board, 0, 0), V);
-    check(found, "column Swordfish detected on a position with only tight cover lines");
-    check(AnalyzerTest::swordfish_count(analyzer) == 1, "exactly one Swordfish recorded");
-    if (AnalyzerTest::swordfish_count(analyzer) == 1) {
-        check(!AnalyzerTest::swordfish_row_based(analyzer), "recorded Swordfish is column-based");
-        check(AnalyzerTest::swordfish_value(analyzer) == V, "recorded Swordfish is for value 8");
+    SwordfishTechnique sf;  // needed for apply() below; find_swordfish is static
+    FindingList found;
+    check(SwordfishTechnique::find_swordfish(board, cell_at(board, 0, 0), V, found),
+          "column Swordfish detected on a position with only tight cover lines");
+    check(found.size() == 1, "exactly one Swordfish recorded");
+    auto const *f = only<SwordfishFinding>(found);
+    check(f, "the recorded finding is a SwordfishFinding");
+    if (f) {
+        check(!f->is_row_based, "recorded Swordfish is column-based");
+        check(f->value == V, "recorded Swordfish is for value 8");
     }
 
-    bool acted = AnalyzerTest::act_on_swordfish(analyzer);
-    check(acted, "act_on_swordfish reports an elimination");
+    bool acted = sf.apply(board, found);
+    check(acted, "apply reports an elimination");
     check(!has_candidate(board, 0, 4, V), "stray 8 at (0,4) eliminated");
     check(!has_candidate(board, 1, 5, V), "stray 8 at (1,5) eliminated");
     check(has_candidate(board, 0, 0, V) && has_candidate(board, 1, 0, V)
@@ -235,17 +263,20 @@ void test_swordfish_row_based() {
         {4,0},{5,1},        // strays to be eliminated
     });
 
-    Analyzer analyzer(board);
-    bool found = AnalyzerTest::find_swordfish(analyzer, cell_at(board, 0, 0), V);
-    check(found, "row Swordfish detected on a position with only tight cover lines");
-    check(AnalyzerTest::swordfish_count(analyzer) == 1, "exactly one Swordfish recorded");
-    if (AnalyzerTest::swordfish_count(analyzer) == 1) {
-        check(AnalyzerTest::swordfish_row_based(analyzer), "recorded Swordfish is row-based");
-        check(AnalyzerTest::swordfish_value(analyzer) == V, "recorded Swordfish is for value 8");
+    SwordfishTechnique sf;  // needed for apply() below; find_swordfish is static
+    FindingList found;
+    check(SwordfishTechnique::find_swordfish(board, cell_at(board, 0, 0), V, found),
+          "row Swordfish detected on a position with only tight cover lines");
+    check(found.size() == 1, "exactly one Swordfish recorded");
+    auto const *f = only<SwordfishFinding>(found);
+    check(f, "the recorded finding is a SwordfishFinding");
+    if (f) {
+        check(f->is_row_based, "recorded Swordfish is row-based");
+        check(f->value == V, "recorded Swordfish is for value 8");
     }
 
-    bool acted = AnalyzerTest::act_on_swordfish(analyzer);
-    check(acted, "act_on_swordfish reports an elimination");
+    bool acted = sf.apply(board, found);
+    check(acted, "apply reports an elimination");
     check(!has_candidate(board, 4, 0, V), "stray 8 at (4,0) eliminated");
     check(!has_candidate(board, 5, 1, V), "stray 8 at (5,1) eliminated");
     check(has_candidate(board, 0, 0, V) && has_candidate(board, 0, 1, V)
@@ -262,10 +293,10 @@ void test_swordfish_no_elimination() {
     const Value V = kEight;
     confine_value(board, V, { {0,0},{1,0}, {1,1},{2,1}, {0,2},{2,2} });
 
-    Analyzer analyzer(board);
-    bool found = AnalyzerTest::find_swordfish(analyzer, cell_at(board, 0, 0), V);
-    check(!found, "no Swordfish reported when there is nothing to eliminate");
-    check(AnalyzerTest::swordfish_count(analyzer) == 0, "no Swordfish recorded");
+    FindingList found;
+    check(!SwordfishTechnique::find_swordfish(board, cell_at(board, 0, 0), V, found),
+          "no Swordfish reported when there is nothing to eliminate");
+    check(found.empty(), "no Swordfish recorded");
 }
 
 // ===========================================================================
@@ -543,14 +574,6 @@ void test_hidden_pair_accept_and_reject() {
 // directly (the finding type is visible via analyzer-xwing.h, the seam that
 // replaces the old AnalyzerTest hook -- no friendship needed, issue #7's payoff).
 
-// The lone XWingFinding recorded in `out`, or nullptr if the search recorded
-// something other than exactly one finding. Downcasts within the technique's own
-// bucket, so every entry is an XWingFinding by construction.
-const XWingFinding *only_xwing(const FindingList &out) {
-    if (out.size() != 1) return nullptr;
-    return dynamic_cast<const XWingFinding *>(out.front().get());
-}
-
 // A row-based X-Wing on value 7: rows 0 and 3 each hold 7 in exactly columns 1
 // and 5. Columns 1 and 5 carry one extra 7 apiece (rows 6 and 7), so the pattern
 // is actionable and those strays are eliminated.
@@ -571,7 +594,9 @@ void test_xwing_row_based() {
     // Anchor on (0,1), the first 7 of row 0 -- find_xwing's top-left corner.
     check(XWingTechnique::find_xwing(board, cell_at(board, 0, 1), V, found), "row X-Wing detected with anchor (0,1)");
     check(found.size() == 1, "exactly one X-Wing recorded");
-    if (auto const *f = only_xwing(found)) {
+    auto const *f = only<XWingFinding>(found);
+    check(f, "the recorded finding is an XWingFinding");
+    if (f) {
         check(f->is_row_based, "recorded X-Wing is row-based");
         check(f->value == V, "recorded X-Wing is for value 7");
     }
@@ -603,7 +628,9 @@ void test_xwing_column_based() {
     FindingList found;
     check(XWingTechnique::find_xwing(board, cell_at(board, 1, 0), V, found), "column X-Wing detected with anchor (1,0)");
     check(found.size() == 1, "exactly one X-Wing recorded");
-    if (auto const *f = only_xwing(found)) {
+    auto const *f = only<XWingFinding>(found);
+    check(f, "the recorded finding is an XWingFinding");
+    if (f) {
         check(!f->is_row_based, "recorded X-Wing is column-based");
         check(f->value == V, "recorded X-Wing is for value 7");
     }
@@ -751,8 +778,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 8, "eight registry buckets (NS, HS, NP, LC, HP, XW, SC, YW)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC/YW short-circuited)");
+    check(AnalyzerTest::findings_bucket_count(a) == 9, "nine registry buckets (NS, HS, NP, LC, HP, XW, SC, YW, SF)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC/YW/SF short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.
