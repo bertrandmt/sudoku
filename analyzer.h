@@ -16,7 +16,6 @@ public:
 
     Analyzer(Board &board, Analyzer const &other)
         : mFindings(other.mFindings)
-        , mSwordfish(other.mSwordfish)
         , mXYChains(other.mXYChains)
         , mBoard(board) { }
 
@@ -64,32 +63,6 @@ private:
     // -Wreorder; the rebinding-ctor regression test guards the one hand-written
     // mFindings(other.mFindings) copy.
     std::vector<FindingList> mFindings;
-
-private:
-    //** swordfish
-    struct Swordfish {
-        Value value;
-        std::vector<Coord> anchors;  // three corners defining the Swordfish pattern
-        bool is_row_based;           // true if rows contain the pattern, false if columns contain the pattern
-
-        bool operator==(const Swordfish &other) const = default;
-    };
-    friend std::ostream& operator<<(std::ostream& outs, const Swordfish &);
-    std::vector<Swordfish> mSwordfish;
-
-    // find
-    template<class CandidateSet, class EliminationSet>
-    bool find_swordfish(const Cell &, const Value &, const CandidateSet &, const EliminationSet &, const std::vector<CandidateSet> &, bool by_row);
-    bool find_swordfish(const Cell &, const Value &);
-    bool find_swordfish();
-
-    // act
-    template<class CandidateSet, class EliminationSet>
-    bool act_on_swordfish(const Value &value, const CandidateSet &cset1, const CandidateSet &cset2, const CandidateSet &cset3,
-                                              const EliminationSet &eset, Unit unit);
-    template<class EliminationSet>
-    bool act_on_swordfish(const Swordfish &entry);
-    bool act_on_swordfish();
 
 private:
     //** xy-chain

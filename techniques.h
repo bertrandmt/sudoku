@@ -14,3 +14,4 @@
 #include "analyzer-xwing.h"
 #include "analyzer-colorchain.h"
 #include "analyzer-ywing.h"
+#include "analyzer-swordfish.h"
