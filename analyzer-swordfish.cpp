@@ -228,11 +228,7 @@ bool SwordfishTechnique::apply(Board &board, FindingList &mine) const {
     if (mine.empty()) return false;
     assert(mine.size() == 1);
 
-    // Bucket invariant: every entry in this technique's bucket is a
-    // SwordfishFinding (see NakedSingleTechnique::apply). The assert turns a
-    // wrong-bucket wiring bug into a caught error, not UB.
-    assert(dynamic_cast<const SwordfishFinding *>(mine.front().get()));
-    auto const *sf = static_cast<const SwordfishFinding *>(mine.front().get());
+    auto const *sf = bucket_cast<SwordfishFinding>(mine.front());
 
     // Row-based pattern eliminates from columns; column-based, from rows.
     bool did_act = sf->is_row_based

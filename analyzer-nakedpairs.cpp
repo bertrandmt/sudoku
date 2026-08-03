@@ -62,8 +62,7 @@ bool find_naked_pair(const Cell &cell, const Set &set, FindingList &out) {
         NakedPairFinding np({cell.coord(), pair_cell.coord()}, {cellv.at(0), cellv.at(1)});
         bool already = false;
         for (auto const &f : out) {
-            assert(dynamic_cast<const NakedPairFinding *>(f.get()));
-            if (static_cast<const NakedPairFinding *>(f.get())->same(np)) { already = true; break; }
+            if (bucket_cast<NakedPairFinding>(f)->same(np)) { already = true; break; }
         }
         if (already) continue;
 
@@ -177,10 +176,7 @@ bool NakedPairTechnique::apply(Board &board, FindingList &mine) const {
 
     bool did_act = false;
     for (auto const &f : mine) {
-        // Bucket invariant: see NakedSingleTechnique::apply for the rationale.
-        // The assert turns a wrong-bucket wiring bug into a caught error, not UB.
-        assert(dynamic_cast<const NakedPairFinding *>(f.get()));
-        auto const *np = static_cast<const NakedPairFinding *>(f.get());
+        auto const *np = bucket_cast<NakedPairFinding>(f);
 
         // three units of the pair's first cell, addressed by coord
         did_act |= act_on_naked_pair(board, *np, board.row(np->coords.first));

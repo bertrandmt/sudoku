@@ -82,10 +82,7 @@ bool HiddenSingleTechnique::apply(Board &board, FindingList &mine) const {
 
     // singles can be acted on all at once
     for (auto const &f : mine) {
-        // Bucket invariant: see NakedSingleTechnique::apply for the rationale.
-        // The assert turns a wrong-bucket wiring bug into a caught error, not UB.
-        assert(dynamic_cast<const HiddenSingleFinding *>(f.get()));
-        auto const *hs = static_cast<const HiddenSingleFinding *>(f.get());
+        auto const *hs = bucket_cast<HiddenSingleFinding>(f);
         std::cout << "[HS] " << hs->coord << " =" << hs->value << " [" << tag(hs->unit) << "]" << std::endl;
         board.set_value_at(hs->coord, hs->value);
     }

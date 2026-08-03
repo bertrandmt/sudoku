@@ -377,8 +377,7 @@ void test_ywing_detect_and_act() {
     check(found, "Y-wing detected with pivot (0,0)");
     check(findings.size() == 1, "exactly one Y-wing recorded");
     if (findings.size() == 1) {
-        assert(dynamic_cast<const YWingFinding *>(findings.front().get()));
-        auto const *yw = static_cast<const YWingFinding *>(findings.front().get());
+        auto const *yw = bucket_cast<YWingFinding>(findings.front());
         check(yw->value == kThree, "elimination value is 3");
     }
 

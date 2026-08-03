@@ -47,14 +47,7 @@ bool NakedSingleTechnique::apply(Board &board, FindingList &mine) const {
 
     // singles can be acted on all at once
     for (auto const &f : mine) {
-        // Bucket invariant: analyze() routes reg[i]->find() into mFindings[i],
-        // so this bucket only ever holds this technique's own findings -- which
-        // is what makes the static_cast sound. Nothing but discipline enforces
-        // that, and this line is the template every apply() copies, so assert the
-        // contract to turn a wrong-bucket wiring bug into a caught error instead
-        // of UB.
-        assert(dynamic_cast<const NakedSingleFinding *>(f.get()));
-        auto const *ns = static_cast<const NakedSingleFinding *>(f.get());
+        auto const *ns = bucket_cast<NakedSingleFinding>(f);
         std::cout << "[NS] " << ns->coord << " =" << ns->value << std::endl;
         board.set_value_at(ns->coord, ns->value);
     }

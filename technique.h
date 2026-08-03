@@ -4,6 +4,7 @@
 
 #include "board.h"
 
+#include <cassert>
 #include <memory>
 #include <vector>
 #include <iostream>
@@ -24,6 +25,26 @@ struct Finding {
 // no clone() ladder, no slicing (findings are immutable once found).
 using FindingList = std::vector<std::shared_ptr<const Finding>>;
 
+// Downcast a bucket entry to the concrete subtype the bucket holds. A stored
+// finding's fields are only reachable through its concrete type, so every read
+// of one goes through here; print() is the exception that needs no cast, being
+// virtual on the base.
+//
+// Bucket invariant: analyze() routes reg[i]->find() into mFindings[i], so a
+// bucket only ever holds the Finding subtype its own technique recorded (see
+// Technique::find below), and only that technique ever reads it. Nothing but
+// that discipline enforces it -- type erasure gave up the compile-time check
+// that a typed member would have had -- so the assert stands in for it, turning
+// a wrong-bucket wiring bug into a caught error instead of UB. It is live in the
+// shipped binary: the build does not define NDEBUG.
+//
+// Stated and asserted here, once, rather than re-argued at every call site.
+template<class T>
+const T *bucket_cast(const std::shared_ptr<const Finding> &f) {
+    assert(dynamic_cast<const T *>(f.get()));
+    return static_cast<const T *>(f.get());
+}
+
 class Technique {
 public:
     virtual ~Technique() = default;
@@ -40,7 +61,7 @@ public:
     // without recording, or records without returning true. `out` is this
     // technique's own bucket and is empty on entry (each find() asserts it);
     // everything recorded must be this technique's own Finding subtype, which is
-    // what licenses the downcast in apply().
+    // what licenses bucket_cast above.
     //
     // How *much* a find() enumerates is deliberately not part of the contract.
     // Most record every occurrence and apply() acts on the lot -- the greedy
