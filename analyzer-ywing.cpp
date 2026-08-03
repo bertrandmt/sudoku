@@ -199,7 +199,7 @@ bool YWingTechnique::find_ywing(const Board &board, const Cell &pivot, FindingLi
             YWingFinding yw{*ywing_value, pivot.coord(), {wing1.coord(), wing2.coord()}};
             bool already = false;
             for (auto const &f : out) {
-                if (bucket_cast<YWingFinding>(f)->same(yw)) { already = true; break; }
+                if (bucket_cast<YWingFinding>(*f).same(yw)) { already = true; break; }
             }
             if (already) continue;
 
@@ -240,13 +240,13 @@ bool YWingTechnique::apply(Board &board, FindingList &mine) const {
 
     bool did_act = false;
     for (auto const &f : mine) {
-        auto const *yw = bucket_cast<YWingFinding>(f);
+        auto const &yw = bucket_cast<YWingFinding>(*f);
 
         // for each entry, look for candidates for elimination within the first
         // wing's row, column or nonet
-        did_act |= act_on_ywing(board, *yw, board.row(yw->wings.first));
-        did_act |= act_on_ywing(board, *yw, board.column(yw->wings.first));
-        did_act |= act_on_ywing(board, *yw, board.nonet(yw->wings.first));
+        did_act |= act_on_ywing(board, yw, board.row(yw.wings.first));
+        did_act |= act_on_ywing(board, yw, board.column(yw.wings.first));
+        did_act |= act_on_ywing(board, yw, board.nonet(yw.wings.first));
     }
     mine.clear();
 

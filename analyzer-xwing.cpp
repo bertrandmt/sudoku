@@ -163,12 +163,12 @@ bool XWingTechnique::apply(Board &board, FindingList &mine) const {
     if (mine.empty()) return false;
     assert(mine.size() == 1);
 
-    auto const *xw = bucket_cast<XWingFinding>(mine.front());
+    auto const &xw = bucket_cast<XWingFinding>(*mine.front());
 
     // Row-based pattern eliminates from columns; column-based, from rows.
-    bool did_act = xw->is_row_based
-        ? act_on_xwing<Column>(board, *xw)
-        : act_on_xwing<Row>(board, *xw);
+    bool did_act = xw.is_row_based
+        ? act_on_xwing<Column>(board, xw)
+        : act_on_xwing<Row>(board, xw);
 
     mine.clear();
     assert(did_act);

@@ -165,7 +165,7 @@ bool XYChainTechnique::record_if_best(FindingList &out, const XYChainFinding &ca
     // `out` holds at most one chain: the most desirable offered so far.
     if (!out.empty()) {
         assert(out.size() == 1);
-        auto const &best = *bucket_cast<XYChainFinding>(out.front());
+        auto const &best = bucket_cast<XYChainFinding>(*out.front());
 
         // is the same chain already recorded (same value, same endpoints)?
         // then keep the one found first.
@@ -314,7 +314,7 @@ bool XYChainTechnique::apply(Board &board, FindingList &mine) const {
     if (mine.empty()) return false;
     assert(mine.size() == 1);
 
-    auto const &entry = *bucket_cast<XYChainFinding>(mine.front());
+    auto const &entry = bucket_cast<XYChainFinding>(*mine.front());
 
     bool did_act = false;
 

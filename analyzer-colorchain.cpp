@@ -249,14 +249,14 @@ bool ColorChainTechnique::apply(Board &board, FindingList &mine) const {
     if (mine.empty()) return false;
     assert(mine.size() == 1);
 
-    auto const *chain = bucket_cast<ColorChainFinding>(mine.front());
+    auto const &chain = bucket_cast<ColorChainFinding>(*mine.front());
 
     bool did_act = false;
 
     // Check rule 2: cells of same color in the same unit
-    auto [green_cells, red_cells] = chain->group_cells_by_color();
-    bool eliminated_a = act_on_color_chain_rule_2(board, green_cells, chain->value, "🟩");
-    bool eliminated_b = act_on_color_chain_rule_2(board, red_cells, chain->value, "🟥");
+    auto [green_cells, red_cells] = chain.group_cells_by_color();
+    bool eliminated_a = act_on_color_chain_rule_2(board, green_cells, chain.value, "🟩");
+    bool eliminated_b = act_on_color_chain_rule_2(board, red_cells, chain.value, "🟥");
 
     if (eliminated_a || eliminated_b) {
         did_act = true;
@@ -264,9 +264,9 @@ bool ColorChainTechnique::apply(Board &board, FindingList &mine) const {
 
     // Check rule 4: cells that can see both colors
     for (const auto &cell : board.cells()) {
-        if (chain->cell_sees_both_colors(cell, board)) {
-            std::cout << "[SC] " << cell.coord() << " x" << chain->value << " [👀🟩🟥]" << std::endl;
-            board.clear_note_at(cell.coord(), chain->value);
+        if (chain.cell_sees_both_colors(cell, board)) {
+            std::cout << "[SC] " << cell.coord() << " x" << chain.value << " [👀🟩🟥]" << std::endl;
+            board.clear_note_at(cell.coord(), chain.value);
             did_act = true;
         }
     }

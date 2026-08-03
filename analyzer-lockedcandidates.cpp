@@ -107,7 +107,7 @@ bool find_locked_candidate(const Cell &cell, const Value &value,
         // but is this entry already recorded?
         LockedCandidatesFinding lc(lc_coords, value, set_to_ignore.kind());
         for (auto const &f : out) {
-            if (bucket_cast<LockedCandidatesFinding>(f)->same(lc)) return did_find;
+            if (bucket_cast<LockedCandidatesFinding>(*f).same(lc)) return did_find;
         }
 
         // no! let's record it
@@ -184,17 +184,17 @@ bool LockedCandidatesTechnique::apply(Board &board, FindingList &mine) const {
 
     bool did_act = false;
     for (auto const &f : mine) {
-        auto const *lc = bucket_cast<LockedCandidatesFinding>(f);
+        auto const &lc = bucket_cast<LockedCandidatesFinding>(*f);
 
-        switch (lc->unit) {
+        switch (lc.unit) {
         case Unit::Row:
-            did_act |= act_on_locked_candidate(board, *lc, board.row(lc->coords.at(0)));
+            did_act |= act_on_locked_candidate(board, lc, board.row(lc.coords.at(0)));
             break;
         case Unit::Column:
-            did_act |= act_on_locked_candidate(board, *lc, board.column(lc->coords.at(0)));
+            did_act |= act_on_locked_candidate(board, lc, board.column(lc.coords.at(0)));
             break;
         case Unit::Nonet:
-            did_act |= act_on_locked_candidate(board, *lc, board.nonet(lc->coords.at(0)));
+            did_act |= act_on_locked_candidate(board, lc, board.nonet(lc.coords.at(0)));
             break;
         }
     }

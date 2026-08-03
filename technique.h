@@ -15,7 +15,7 @@ enum class Tier { Single, Advanced };
 
 // Type-erased finding. Concrete subtypes live either in the technique's .cpp
 // (hook-free techniques) or in a shared header (hooked techniques -- see the
-// test-seam contract). Only the owning technique downcasts its own bucket.
+// test-seam contract).
 struct Finding {
     virtual ~Finding() = default;
     virtual void print(std::ostream &) const = 0;
@@ -32,17 +32,21 @@ using FindingList = std::vector<std::shared_ptr<const Finding>>;
 //
 // Bucket invariant: analyze() routes reg[i]->find() into mFindings[i], so a
 // bucket only ever holds the Finding subtype its own technique recorded (see
-// Technique::find below), and only that technique ever reads it. Nothing but
-// that discipline enforces it -- type erasure gave up the compile-time check
-// that a typed member would have had -- so the assert stands in for it, turning
-// a wrong-bucket wiring bug into a caught error instead of UB. It is live in the
+// Technique::find below), and only that technique downcasts it. Nothing but that
+// discipline enforces it -- type erasure gave up the compile-time check that a
+// typed member would have had -- so the assert stands in for it, turning a
+// wrong-bucket wiring bug into a caught error instead of UB. It is live in the
 // shipped binary: the build does not define NDEBUG.
 //
-// Stated and asserted here, once, rather than re-argued at every call site.
+// Call sites carry no comment on why the cast is sound; this is its one home.
+//
+// Takes the Finding, not the shared_ptr that owns it: the ownership choice
+// belongs to FindingList, and a reference in and out leaves no raw pointer to
+// outlive its owner.
 template<class T>
-const T *bucket_cast(const std::shared_ptr<const Finding> &f) {
-    assert(dynamic_cast<const T *>(f.get()));
-    return static_cast<const T *>(f.get());
+const T &bucket_cast(const Finding &f) {
+    assert(dynamic_cast<const T *>(&f));
+    return static_cast<const T &>(f);
 }
 
 class Technique {

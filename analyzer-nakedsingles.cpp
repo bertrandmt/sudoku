@@ -47,9 +47,9 @@ bool NakedSingleTechnique::apply(Board &board, FindingList &mine) const {
 
     // singles can be acted on all at once
     for (auto const &f : mine) {
-        auto const *ns = bucket_cast<NakedSingleFinding>(f);
-        std::cout << "[NS] " << ns->coord << " =" << ns->value << std::endl;
-        board.set_value_at(ns->coord, ns->value);
+        auto const &ns = bucket_cast<NakedSingleFinding>(*f);
+        std::cout << "[NS] " << ns.coord << " =" << ns.value << std::endl;
+        board.set_value_at(ns.coord, ns.value);
     }
     mine.clear();
     return true;

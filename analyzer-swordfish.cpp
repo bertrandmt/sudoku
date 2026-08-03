@@ -228,12 +228,12 @@ bool SwordfishTechnique::apply(Board &board, FindingList &mine) const {
     if (mine.empty()) return false;
     assert(mine.size() == 1);
 
-    auto const *sf = bucket_cast<SwordfishFinding>(mine.front());
+    auto const &sf = bucket_cast<SwordfishFinding>(*mine.front());
 
     // Row-based pattern eliminates from columns; column-based, from rows.
-    bool did_act = sf->is_row_based
-        ? act_on_swordfish<Column>(board, *sf)
-        : act_on_swordfish<Row>(board, *sf);
+    bool did_act = sf.is_row_based
+        ? act_on_swordfish<Column>(board, sf)
+        : act_on_swordfish<Row>(board, sf);
 
     mine.clear();
     assert(did_act);

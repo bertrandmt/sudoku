@@ -143,15 +143,17 @@ const Cell &cell_at(const Board &board, size_t r, size_t c) {
 
 // The lone finding recorded in `out`, downcast to `F`; nullptr if the search
 // recorded something other than exactly one finding, or one of another type.
-// Used by the cases whose technique records at most one finding and that must
-// read that finding's concrete fields: X-Wing and Swordfish (find() stops at the
-// first hit) and XY-chain (its bucket retains only the most desirable chain).
-// Not every hooked technique wants it -- simple coloring's cases judge chains
-// they build themselves through the promoted test_color_chain static, and never
-// downcast a bucket. Each call downcasts within that technique's own bucket, so
-// the entry is an `F` by construction -- the dynamic_cast is belt and braces, and
-// its result is check()ed at the call site so a wrong type fails loudly rather
-// than silently skipping the field assertions.
+// Used by the cases that read a lone recorded finding's concrete fields. Why
+// there is only one differs: X-Wing and Swordfish stop at the first hit, XY-chain
+// retains only the most desirable chain, and Y-Wing records every pattern it
+// finds but its case crafts a board bearing exactly one. Not every hooked
+// technique wants it -- simple coloring's cases judge chains they build
+// themselves through the promoted test_color_chain static, and never downcast a
+// bucket. The entry is an `F` by construction, for the reason technique.h's
+// bucket_cast documents; this is the test-side counterpart, differing on purpose
+// in what it does when the invariant breaks -- its result is check()ed at the
+// call site, so a wrong type fails loudly as a failed check rather than aborting
+// the suite or silently skipping the field assertions.
 template<class F>
 const F *only(const FindingList &out) {
     if (out.size() != 1) return nullptr;
@@ -376,10 +378,9 @@ void test_ywing_detect_and_act() {
     bool found = YWingTechnique::find_ywing(board, cell_at(board, 0, 0), findings);
     check(found, "Y-wing detected with pivot (0,0)");
     check(findings.size() == 1, "exactly one Y-wing recorded");
-    if (findings.size() == 1) {
-        auto const *yw = bucket_cast<YWingFinding>(findings.front());
-        check(yw->value == kThree, "elimination value is 3");
-    }
+    auto const *yw = only<YWingFinding>(findings);
+    check(yw, "the recorded finding is a YWingFinding");
+    if (yw) check(yw->value == kThree, "elimination value is 3");
 
     YWingTechnique tech;
     bool acted = tech.apply(board, findings);

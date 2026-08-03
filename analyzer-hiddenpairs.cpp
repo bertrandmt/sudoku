@@ -39,7 +39,7 @@ bool find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const 
         HiddenPairFinding hp({cell.coord(), other_cell.coord()}, {v1, v2});
         bool already = false;
         for (auto const &f : out) {
-            if (bucket_cast<HiddenPairFinding>(f)->same(hp)) { already = true; break; }
+            if (bucket_cast<HiddenPairFinding>(*f).same(hp)) { already = true; break; }
         }
         if (already) continue;
 
@@ -157,11 +157,11 @@ bool HiddenPairTechnique::apply(Board &board, FindingList &mine) const {
 
     bool did_act = false;
     for (auto const &f : mine) {
-        auto const *hp = bucket_cast<HiddenPairFinding>(f);
+        auto const &hp = bucket_cast<HiddenPairFinding>(*f);
 
         // the pair's two cells, addressed by coord (findings carry coords)
-        did_act |= act_on_hidden_pair(board, hp->coords.first, *hp);
-        did_act |= act_on_hidden_pair(board, hp->coords.second, *hp);
+        did_act |= act_on_hidden_pair(board, hp.coords.first, hp);
+        did_act |= act_on_hidden_pair(board, hp.coords.second, hp);
     }
     mine.clear();
 
