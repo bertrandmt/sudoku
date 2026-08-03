@@ -195,14 +195,11 @@ bool YWingTechnique::find_ywing(const Board &board, const Cell &pivot, FindingLi
             assert(wing1.check(*ywing_value));
             assert(wing2.check(*ywing_value));
 
-            // Record the Y-Wing pattern -- but is it already recorded? Dedup is a
-            // scan of `out`, this technique's own bucket, so every entry downcasts
-            // to YWingFinding.
+            // Record the Y-Wing pattern -- but is it already recorded?
             YWingFinding yw{*ywing_value, pivot.coord(), {wing1.coord(), wing2.coord()}};
             bool already = false;
             for (auto const &f : out) {
-                assert(dynamic_cast<const YWingFinding *>(f.get()));
-                if (static_cast<const YWingFinding *>(f.get())->same(yw)) { already = true; break; }
+                if (bucket_cast<YWingFinding>(*f).same(yw)) { already = true; break; }
             }
             if (already) continue;
 
@@ -243,17 +240,13 @@ bool YWingTechnique::apply(Board &board, FindingList &mine) const {
 
     bool did_act = false;
     for (auto const &f : mine) {
-        // Bucket invariant: every entry in this technique's bucket is a YWingFinding
-        // (see NakedSingleTechnique::apply). The assert turns a wrong-bucket wiring
-        // bug into a caught error, not UB.
-        assert(dynamic_cast<const YWingFinding *>(f.get()));
-        auto const *yw = static_cast<const YWingFinding *>(f.get());
+        auto const &yw = bucket_cast<YWingFinding>(*f);
 
         // for each entry, look for candidates for elimination within the first
         // wing's row, column or nonet
-        did_act |= act_on_ywing(board, *yw, board.row(yw->wings.first));
-        did_act |= act_on_ywing(board, *yw, board.column(yw->wings.first));
-        did_act |= act_on_ywing(board, *yw, board.nonet(yw->wings.first));
+        did_act |= act_on_ywing(board, yw, board.row(yw.wings.first));
+        did_act |= act_on_ywing(board, yw, board.column(yw.wings.first));
+        did_act |= act_on_ywing(board, yw, board.nonet(yw.wings.first));
     }
     mine.clear();
 
