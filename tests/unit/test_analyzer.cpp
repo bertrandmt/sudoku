@@ -13,10 +13,9 @@
 // exercises Rule 4) are the second.
 // These tests construct a candidate grid (or an analyzer result) directly and
 // drive one technique's entry points, on a position designed for it. Every
-// technique now reaches those entry points through a public static seam: the
-// last one ported (issue #7) took its friend hooks with it, so the AnalyzerTest
-// friend below survives only for the rebinding-ctor regression test, which is
-// about the Analyzer itself rather than any technique.
+// technique reaches those entry points through a public static seam, so the
+// AnalyzerTest friend below exists only for the rebinding-ctor regression test,
+// which is about the Analyzer itself rather than any technique.
 //
 // Framework-free on purpose: this matches the project's no-dependency testing
 // style. Each CHECK records a line; a nonzero exit code means a failure.
@@ -67,40 +66,39 @@ struct AnalyzerTest {
     }
 
     // --- xy-chain ---
-    // No hooks: XY is ported to a standalone Technique (issue #7), the last of
-    // the ten. It is materialized-object shaped (see
-    // docs/test-predicate-idiom.md), but unlike simple coloring its cases do not
-    // drive its scoring predicate; they drive the per-anchor search
+    // No hooks: XY is a standalone Technique. It is materialized-object shaped
+    // (see docs/test-predicate-idiom.md), but unlike simple coloring its cases
+    // do not drive its scoring predicate; they drive the per-anchor search
     // XYChainTechnique::find_xychain and the best-chain selection
     // XYChainTechnique::record_if_best, both public statics, and read the
     // recorded XYChainFinding (visible via analyzer-xychain.h). No friendship.
 
     // --- y-wing ---
-    // No hooks: YW is ported to a standalone Technique (issue #7). It is
-    // given-tuple shaped (see docs/test-predicate-idiom.md), so its validation
-    // predicate promotes to a public static YWingTechnique::test_ywing the cases
-    // call directly on crafted near-misses. Because those cases also drive
-    // find_ywing on a crafted pivot and read the recorded finding's value,
-    // find_ywing is likewise a public static and YWingFinding is declared in
-    // analyzer-ywing.h -- both without friendship.
+    // No hooks: YW is a standalone Technique. It is given-tuple shaped (see
+    // docs/test-predicate-idiom.md), so its validation predicate is a public
+    // static YWingTechnique::test_ywing the cases call directly on crafted
+    // near-misses. Because those cases also drive find_ywing on a crafted pivot
+    // and read the recorded finding's value, find_ywing is likewise a public
+    // static and YWingFinding is declared in analyzer-ywing.h -- both without
+    // friendship.
 
     // --- x-wing / swordfish / naked pair / hidden pair ---
-    // No hooks: all four are ported to standalone Techniques (issue #7). Naked
-    // pair and hidden pair are given-tuple shaped, so their test_naked_pair /
-    // test_hidden_pair are promoted public statics the whitebox cases call
-    // directly. The two fish are scan-fused (no test_ predicate -- see
-    // docs/test-predicate-idiom.md); the cases drive XWingTechnique::find_xwing /
+    // No hooks: all four are standalone Techniques. Naked pair and hidden pair
+    // are given-tuple shaped, so their test_naked_pair / test_hidden_pair are
+    // public statics the whitebox cases call directly. The two fish are
+    // scan-fused (no test_ predicate -- see docs/test-predicate-idiom.md); the
+    // cases drive XWingTechnique::find_xwing /
     // SwordfishTechnique::find_swordfish on crafted boards and inspect the
     // recorded XWingFinding / SwordfishFinding (visible via analyzer-xwing.h /
     // analyzer-swordfish.h). Either way: no friendship.
 
     // --- simple coloring ---
-    // No hooks: SC is ported to a standalone Technique (issue #7). It is
-    // materialized-object shaped (see docs/test-predicate-idiom.md), so its
-    // validation predicate promotes to a public static
-    // ColorChainTechnique::test_color_chain(board, chain) the cases call
-    // directly, and ColorChainFinding is declared in analyzer-colorchain.h so a
-    // case can build a chain and drive apply() -- both without friendship.
+    // No hooks: SC is a standalone Technique. It is materialized-object shaped
+    // (see docs/test-predicate-idiom.md), so its validation predicate is a
+    // public static ColorChainTechnique::test_color_chain(board, chain) the
+    // cases call directly, and ColorChainFinding is declared in
+    // analyzer-colorchain.h so a case can build a chain and drive apply() --
+    // both without friendship.
 };
 
 namespace {
@@ -168,8 +166,7 @@ const F *only(const FindingList &out) {
 // like its sibling X-Wing. These cases craft small boards and drive
 // SwordfishTechnique::find_swordfish through its anchor entry point, then read
 // the recorded SwordfishFinding's fields directly (the finding type is visible
-// via analyzer-swordfish.h, the seam that replaces the old AnalyzerTest hook --
-// no friendship needed, issue #7's payoff).
+// via analyzer-swordfish.h -- no friendship needed).
 
 // A column-based Swordfish on value 8.
 //
@@ -493,8 +490,7 @@ void test_naked_pair_accept_and_reject() {
 
 // test_hidden_pair is given-tuple shaped like test_naked_pair (see
 // docs/test-predicate-idiom.md): find_ enumerates the partner cell, the
-// predicate judges each (c1,c2,v1,v2). Now that HP is ported to a standalone
-// HiddenPairTechnique (issue #7), the predicate is a promoted public static, so
+// predicate judges each (c1,c2,v1,v2). The predicate is a public static, so
 // these cases call it directly -- no friend hook. They pin down its substantive
 // branches -- value ordering, cell ordering, the hidden loop, actionability,
 // and partner incompleteness -- and leave the trivial distinctness/shape guards
@@ -575,8 +571,8 @@ void test_hidden_pair_accept_and_reject() {
 // the same way the Swordfish tests drive find_swordfish -- to cover both
 // orientations and the rejection paths a happy-path solve does not isolate. Since
 // there is no predicate to inspect, they read the recorded XWingFinding's fields
-// directly (the finding type is visible via analyzer-xwing.h, the seam that
-// replaces the old AnalyzerTest hook -- no friendship needed, issue #7's payoff).
+// directly (the finding type is visible via analyzer-xwing.h -- no friendship
+// needed).
 
 // A row-based X-Wing on value 7: rows 0 and 3 each hold 7 in exactly columns 1
 // and 5. Columns 1 and 5 carry one extra 7 apiece (rows 6 and 7), so the pattern
@@ -763,13 +759,13 @@ void test_colorchain_benign_not_actionable() {
 // Rebinding ctor (issue #7)
 // ===========================================================================
 //
-// The migration to the technique registry collapses the ten hand-copied result
-// vectors into one carried member, mFindings, initialized by a single
-// hand-written line in the rebinding ctor (`mFindings(other.mFindings)`). Drop
-// that line and *every* ported technique silently stops carrying forward. This
-// test isolates exactly that line: it builds an analyzer with a known finding,
-// then constructs a second analyzer through the rebinding ctor ONLY (never
-// calling analyze() on it), so the copied member is the sole possible source of
+// All ten techniques' findings live in one carried member, mFindings,
+// initialized by a single hand-written line in the rebinding ctor
+// (`mFindings(other.mFindings)`). Drop that line and *every* technique
+// silently stops carrying forward. This test isolates exactly that line: it
+// builds an analyzer with a known finding, then constructs a second analyzer
+// through the rebinding ctor ONLY (never calling analyze() on it), so the
+// copied member is the sole possible source of
 // its findings. Removing the initializer turns this into a named failure rather
 // than a mysterious integration hang.
 void test_rebinding_ctor_carries_findings() {

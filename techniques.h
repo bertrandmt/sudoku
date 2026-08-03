@@ -6,8 +6,7 @@
 // Analyzer::registry() (in analyzer.cpp) can construct each one directly.
 // Listed in cascade order.
 //
-// Adding a technique is SIX sites, not the "one new file plus one registration
-// line" issue #7's write-up promised. Each is followed by what catches it if you
+// Adding a technique is SEVEN sites. Each is followed by what catches it if you
 // forget:
 //   1. analyzer-<name>.h and analyzer-<name>.cpp  -- two new files    [compile]
 //   2. a `src =` entry in the Makefile (explicit list, no glob)          [link]
@@ -16,14 +15,31 @@
 //   5. the registry() push_back in analyzer.cpp                [registry assert]
 //   6. the bucket count and label in the unit suite's
 //      test_rebinding_ctor_carries_findings                       [unit suite]
+//   7. README.md, in three parts:
+//      a. an entry in the numbered technique list ("denoted as
+//         `[XY]`")                                            [tests/run.sh]
+//      b. regenerated dump blocks -- every full dump prints one line
+//         per registry entry, and each worked example registered in
+//         run.sh is diffed against live solver output         [tests/run.sh]
+//      c. a `## <Name>` heuristic section for the new technique   [nothing]
 // (4) and (5) cross-check each other: the assert compares the built registry's
 // size and names against kCascade, so getting exactly one of them wrong aborts.
+// (7a) and (7b) read what they expect out of the binary rather than hardcoding
+// it, so they track this list by construction and cannot themselves go stale.
+// (7c) is the one unguarded step: nothing forces a *new* technique to be given
+// its own section, because checking that means mapping "XY" to "## XY-Chain"
+// and the registry does not know that. Sections that do exist are covered --
+// run.sh replays each registered example's fixture board and diffs the block.
 //
-// So what #7 bought is not really the smaller number -- it is that the number is
-// now self-enforcing. Of the eight sites it replaced, five were silent: forget
-// the analyze() entry, the act() entry, the operator<< line, the clear(), or the
-// rebinding-ctor initializer, and the technique just quietly never fired. That
-// hazard is what the issue was filed about, and it is the part that is gone.
+// CLAUDE.md also lists every tag, and is deliberately NOT a site here. It is
+// agent guidance rather than project documentation: a stale entry there misleads
+// a tool, not a reader of the solver. Recorded so the next person to notice it
+// does not have to re-litigate whether the omission was an oversight.
+//
+// Six of the seven fail loudly -- at compile time, at link time, on an assert
+// the shipped binary carries, or in the suite CI runs on every PR. None of those
+// can be missed in a way that leaves a technique quietly never firing, or leaves
+// documented output quietly describing a solver that no longer exists.
 
 #include "analyzer-nakedsingles.h"
 #include "analyzer-hiddensingles.h"

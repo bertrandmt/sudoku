@@ -296,6 +296,7 @@ Notes remaining: 178
 [XW](1) {{{[5, 5],[9, 8]}#2[^r]}}
 [SC](0) {}
 [YW](0) {}
+[SF](0) {}
 [XY](0) {}
 ```
 This indicates there is one X-Wing structure in the board, with top-left and bottom-right corners as cells at row 5, column 5 and row 9, column 8 respectively, for candidate value 2.
@@ -373,8 +374,9 @@ Notes remaining: 49
 [LC](0) {}
 [HP](0) {}
 [XW](0) {}
-[SC](1) {{{[6, 7]🟥,[6, 5]🟩,[8, 7]🟩,[9, 8]🟥,[4, 8]🟩}#4}}
+[SC](1) {{{[4, 8]🟩,[6, 5]🟩,[6, 7]🟥,[8, 7]🟩,[9, 8]🟥}#4}}
 [YW](0) {}
+[SF](0) {}
 [XY](0) {}
 ```
 This indicates there is a simple color chain for candidate value 4, running via `[4, 8]`, `[9, 8]`, `[8, 7]`, `[6, 7]` and `[6, 5]`.
@@ -430,15 +432,15 @@ Notes remaining: 47
 [LC](0) {}
 [HP](0) {}
 [XW](0) {}
-[SC](1) {{{[9, 5]🟥,[6, 7]🟥,[6, 5]🟩,[8, 7]🟩,[9, 8]🟥,[4, 8]🟩}#5}}
+[SC](1) {{{[4, 8]🟩,[6, 5]🟩,[6, 7]🟥,[8, 7]🟩,[9, 5]🟥,[9, 8]🟥}#5}}
 [YW](0) {}
 [SF](0) {}
 [XY](0) {}
 ```
 However, `[9, 5]` is colored red, but sees `[9, 8]` also colored red. Per "Rule 2", all reds from the chain can be eliminated:
 ```
-[SC] [9, 5] x5 [r🟥]
 [SC] [6, 7] x5 [r🟥]
+[SC] [9, 5] x5 [r🟥]
 [SC] [9, 8] x5 [r🟥]
 ```
 Additionally, "Rule 4" also applies, with `[8, 4]` and `[8, 6]` seeing both red at `[9, 5]` (same nonet) and green at `[8, 7]` (same row):

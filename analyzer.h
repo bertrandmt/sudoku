@@ -34,11 +34,11 @@ public:
     friend std::ostream& operator<< (std::ostream& outs, Analyzer const &);
 
     // Whitebox unit tests reach mFindings through this friend, so the
-    // rebinding-ctor regression test can prove the one remaining hand-written
-    // member copy carries the findings forward. That is all it is still for: the
-    // techniques themselves are standalone and expose their own public seams
-    // (issue #7). Defined in tests/unit/test_analyzer.cpp; no production code
-    // depends on it.
+    // rebinding-ctor regression test can prove the one hand-written member copy
+    // carries the findings forward. That is all it is for: the techniques
+    // themselves are standalone and expose their own public seams, so nothing
+    // else needs friendship. Defined in tests/unit/test_analyzer.cpp; no
+    // production code depends on it.
     friend struct AnalyzerTest;
 
 private:
@@ -51,10 +51,10 @@ private:
     //** technique registry
     // The solving techniques, constructed once and shared by every Analyzer.
     // Function-local static (defined in analyzer.cpp): built on first use, and
-    // -- crucially -- never copied per state, so forgetting to copy a technique
-    // in the rebinding ctor is no longer possible (issue #7). Private: analyze(),
-    // act() and operator<< all reach it via membership or friendship, and nothing
-    // else needs to (AnalyzerTest does not -- see the friend declaration above).
+    // -- crucially -- never copied per state, so no technique can be dropped by
+    // a missed copy in the rebinding ctor. Private: analyze(), act() and
+    // operator<< all reach it via membership or friendship, and nothing else
+    // needs to (AnalyzerTest does not -- see the friend declaration above).
     static const std::vector<std::unique_ptr<Technique>> &registry();
 
     // Per-state findings, one bucket per registry() technique, indexed parallel

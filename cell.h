@@ -38,11 +38,10 @@ class Cell;
 
 // The candidates of a Notes, materialized inline with no heap allocation. A cell
 // holds at most nine candidates, so a fixed nine-slot array plus a count covers
-// every case while staying trivially copyable. This is a drop-in for the
-// std::vector<Value> that Notes::values() used to return, exposing exactly what
-// the analyzer call sites need: range iteration, indexing, and size. (Set
-// equality of two cells' candidates goes through Notes::operator== on the
-// bitmask, so ValueList itself needs no equality.)
+// every case while staying trivially copyable. It exposes exactly what the
+// analyzer call sites need: range iteration, indexing, and size. (Set equality
+// of two cells' candidates goes through Notes::operator== on the bitmask, so
+// ValueList itself needs no equality.)
 class ValueList {
 public:
     using const_iterator = const Value *;

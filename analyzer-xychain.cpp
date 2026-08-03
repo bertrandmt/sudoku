@@ -20,18 +20,18 @@
 namespace {
 
 // The chain under construction, as the search holds it: the cells themselves,
-// not their coordinates. The old code kept coords and called the friends-only
-// Board::at to get each cell back, which a ported technique cannot do (issue #7);
-// rather than reintroduce that lookup through some other door, the search keeps
-// what it already had in hand and pays the Cell -> Coord conversion once, at the
-// point a chain is actually recorded.
+// not their coordinates. Recovering a Cell from a Coord takes Board::at, which
+// is reserved to Board's friends and a technique is not one; rather than reach
+// for that lookup through some other door, the search keeps what it already had
+// in hand and pays the Cell -> Coord conversion once, at the point a chain is
+// actually recorded.
 //
 // Only element 0 points at a cell the board owns (the anchor find_xychain was
 // handed). Every later element points into a `std::unordered_set<Cell>` of
 // selected candidates, so it is a *snapshot* of that cell taken when
-// select_chain_candidates copied it in -- not the live cell the old Board::at
-// lookup returned. That is equivalent here only because find is a pure query:
-// nothing mutates the board between the copy and the read.
+// select_chain_candidates copied it in, not a live board cell. That is
+// equivalent here only because find is a pure query: nothing mutates the board
+// between the copy and the read.
 //
 // Lifetime: each frame's candidate set outlives the calls that frame makes, and
 // every push_back is popped before the frame exits, so a pointer is only ever
@@ -54,8 +54,7 @@ bool on_chain(const ChainCells &chain, const Coord &coord) {
 // also a candidate for the initial cell, then count the off-chain cells that
 // would lose `value`. Zero means "not actionable" -- either the chain does not
 // close or it eliminates nothing, a distinction the caller does not need.
-// Was Analyzer::test_xychain; reads the board through the parameter now, and
-// stays file-local because no whitebox case calls it (see analyzer-xychain.h).
+// File-local because no whitebox case calls it (see analyzer-xychain.h).
 size_t test_xychain(const Board &board, const Value &value, const ChainCells &chain) {
     // validate that the chain chains properly, and that the end candidate value is also a
     // candidate for the initial cell.
@@ -121,9 +120,7 @@ void select_chain_candidates(const Cell &current, Value value, const Set &set, c
 }
 
 // Clear `entry.value` from every cell of `chain_front_set` that sees the far end
-// of the chain and is not on the chain itself. Was Analyzer::act_on_xychain (the
-// templated inner overload); takes the Board as a parameter instead of reading
-// mBoard.
+// of the chain and is not on the chain itself.
 template<class Set>
 bool act_on_xychain(Board &board, const XYChainFinding &entry, const Set &chain_front_set) {
     bool did_act = false;
@@ -165,10 +162,7 @@ void XYChainFinding::print(std::ostream &outs) const {
 }
 
 bool XYChainTechnique::record_if_best(FindingList &out, const XYChainFinding &candidate) {
-    // `out` holds at most one chain. The old code expressed the same policy as a
-    // std::set<XYChain> ordered by desirability that it pruned back to one entry
-    // after every insert, so the set never in fact held more than one; this is
-    // that policy without the container that never earned its keep.
+    // `out` holds at most one chain: the most desirable offered so far.
     if (!out.empty()) {
         assert(out.size() == 1);
         // Bucket invariant: every entry in this technique's bucket is an
@@ -178,13 +172,12 @@ bool XYChainTechnique::record_if_best(FindingList &out, const XYChainFinding &ca
         auto const &best = static_cast<const XYChainFinding &>(*out.front());
 
         // is the same chain already recorded (same value, same endpoints)?
-        // then keep the one found first, as the old dedup scan did.
+        // then keep the one found first.
         if (best == candidate) return false;
 
         // no! but is the candidate strictly more desirable? `!(candidate < best)`
         // also rejects the equally-desirable case (same elimination count, same
-        // length), which the old std::set, ordering and equivalence being the
-        // same relation for it, likewise refused to insert.
+        // length): a tie leaves the incumbent in place.
         if (!(candidate < best)) return false;
     }
 
@@ -195,8 +188,7 @@ bool XYChainTechnique::record_if_best(FindingList &out, const XYChainFinding &ca
     // the copy below reading a destroyed object. No caller can reach that today
     // -- an alias trips the `best == candidate` gate above, operator== being
     // reflexive -- but that makes this function's safety rest on a property of a
-    // gate two lines up, which is not where a reader would look for it, and
-    // which issue #36 proposes to replace.
+    // gate two lines up, which is not where a reader would look for it.
     auto finding = std::make_shared<const XYChainFinding>(candidate);
     if (sVerbose) { std::cout << "  [fXY] "; finding->print(std::cout); std::cout << std::endl; }
     out.clear();
@@ -227,9 +219,39 @@ bool XYChainTechnique::find_xychain(const Board &board, const Cell &cell, const 
         select_chain_candidates(cell, common_link_value, board.column(cell), visited, candidates);
         select_chain_candidates(cell, common_link_value, board.nonet(cell), visited, candidates);
 
+        // Walk the candidates coord-sorted, not in the set's own order. Two
+        // reasons, and the second is the load-bearing one:
+        //
+        //  - `candidates` is an unordered_set, so its iteration order is
+        //    unspecified and differs between standard libraries. It reaches
+        //    stdout: the chain is recorded in traversal order, so it fixes both
+        //    the "{c1:c2:..}" dump and the order of apply()'s [XY] lines.
+        //  - record_if_best keeps ONE chain and rejects ties, so whichever
+        //    equally-desirable chain is *offered first* wins. Discovery order is
+        //    therefore part of the result, not just of the presentation.
+        //
+        // Measured over the 34-board corpus (31 in notes.txt plus run.sh's 9
+        // fixtures, 6 of which are the same boards), sorting changes the output of
+        // exactly one, and there it selects the same
+        // chain traversed in the opposite direction: same endpoints, same value,
+        // same two eliminations, same final grid. So this buys determinism without
+        // changing what the solver concludes on any board we have. It is not a
+        // proof for all boards -- two genuinely different chains tied on
+        // (elimination count, length) would still be resolved by whoever is
+        // offered first -- which is one more reason to prefer issue #36's
+        // greedy-on-all-distinct-effects rewrite over this trim-to-one.
+        //
         // `candidates` outlives every recursive call made from this frame, so the
-        // pointers pushed below stay valid for as long as they are on the chain.
-        for (const auto &next_cell : candidates) {
+        // pointers pushed below stay valid for as long as they are on the chain,
+        // and `ordered` only holds pointers into it.
+        std::vector<const Cell *> ordered;
+        ordered.reserve(candidates.size());
+        for (const Cell &c : candidates) ordered.push_back(&c);
+        std::sort(ordered.begin(), ordered.end(),
+                  [](const Cell *a, const Cell *b) { return a->coord() < b->coord(); });
+
+        for (const auto *next_cell_ptr : ordered) {
+            const Cell &next_cell = *next_cell_ptr;
             // proactively extend the chain with next_cell
             chain.push_back(&next_cell);
             visited.insert(next_cell.coord());

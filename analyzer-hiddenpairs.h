@@ -24,15 +24,13 @@ public:
     bool apply(Board &, FindingList &mine) const override;
 
     // Tested contract, NOT a leaked private: is (c1, c2) a genuine, actionable
-    // hidden pair for values (v1, v2) within `set`? The old Analyzer::test_hidden_pair
-    // was reached by a friend hook because techniques weren't standalone; now that
-    // HiddenPairTechnique is standalone this is promoted to a public static so the
-    // whitebox suite judges crafted tuples directly, without friendship (issue #7's
-    // stated payoff). It requires v1 < v2 and c1 before c2: find_ enumerates in that
-    // order, but a direct test caller can pass either way, so the predicate guards
-    // the precondition itself. Templated on the unit type; an explicit Row
-    // instantiation in the .cpp forces an out-of-line symbol so the gcc -O3 cross-TU
-    // reference from the test links (see docs/test-predicate-idiom.md).
+    // hidden pair for values (v1, v2) within `set`? Public static so the whitebox
+    // suite judges crafted tuples directly, without friendship. It requires v1 < v2
+    // and c1 before c2: find_ enumerates in that order, but a direct test caller
+    // can pass either way, so the predicate guards the precondition itself.
+    // Templated on the unit type; an explicit Row instantiation in the .cpp forces
+    // an out-of-line symbol so the gcc -O3 cross-TU reference from the test links
+    // (see docs/test-predicate-idiom.md).
     template<class Set>
     static bool test_hidden_pair(const Cell &c1, const Cell &c2, const Value &v1, const Value &v2, const Set &set);
 };
