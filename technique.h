@@ -4,6 +4,7 @@
 
 #include "board.h"
 
+#include <cassert>
 #include <memory>
 #include <vector>
 #include <iostream>
@@ -14,7 +15,7 @@ enum class Tier { Single, Advanced };
 
 // Type-erased finding. Concrete subtypes live either in the technique's .cpp
 // (hook-free techniques) or in a shared header (hooked techniques -- see the
-// test-seam contract). Only the owning technique downcasts its own bucket.
+// test-seam contract).
 struct Finding {
     virtual ~Finding() = default;
     virtual void print(std::ostream &) const = 0;
@@ -23,6 +24,30 @@ struct Finding {
 // shared_ptr<const> => per-state copy of mFindings is a shallow vector copy,
 // no clone() ladder, no slicing (findings are immutable once found).
 using FindingList = std::vector<std::shared_ptr<const Finding>>;
+
+// Downcast a bucket entry to the concrete subtype the bucket holds. A stored
+// finding's fields are only reachable through its concrete type, so every read
+// of one goes through here; print() is the exception that needs no cast, being
+// virtual on the base.
+//
+// Bucket invariant: analyze() routes reg[i]->find() into mFindings[i], so a
+// bucket only ever holds the Finding subtype its own technique recorded (see
+// Technique::find below), and only that technique downcasts it. Nothing but that
+// discipline enforces it -- type erasure gave up the compile-time check that a
+// typed member would have had -- so the assert stands in for it, turning a
+// wrong-bucket wiring bug into a caught error instead of UB. It is live in the
+// shipped binary: the build does not define NDEBUG.
+//
+// Call sites carry no comment on why the cast is sound; this is its one home.
+//
+// Takes the Finding, not the shared_ptr that owns it: the ownership choice
+// belongs to FindingList, and a reference in and out leaves no raw pointer to
+// outlive its owner.
+template<class T>
+const T &bucket_cast(const Finding &f) {
+    assert(dynamic_cast<const T *>(&f));
+    return static_cast<const T &>(f);
+}
 
 class Technique {
 public:
@@ -40,7 +65,7 @@ public:
     // without recording, or records without returning true. `out` is this
     // technique's own bucket and is empty on entry (each find() asserts it);
     // everything recorded must be this technique's own Finding subtype, which is
-    // what licenses the downcast in apply().
+    // what licenses bucket_cast above.
     //
     // How *much* a find() enumerates is deliberately not part of the contract.
     // Most record every occurrence and apply() acts on the lot -- the greedy

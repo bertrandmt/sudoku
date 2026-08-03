@@ -165,11 +165,7 @@ bool XYChainTechnique::record_if_best(FindingList &out, const XYChainFinding &ca
     // `out` holds at most one chain: the most desirable offered so far.
     if (!out.empty()) {
         assert(out.size() == 1);
-        // Bucket invariant: every entry in this technique's bucket is an
-        // XYChainFinding (see NakedSingleTechnique::apply). The assert turns a
-        // wrong-bucket wiring bug into a caught error, not UB.
-        assert(dynamic_cast<const XYChainFinding *>(out.front().get()));
-        auto const &best = static_cast<const XYChainFinding &>(*out.front());
+        auto const &best = bucket_cast<XYChainFinding>(*out.front());
 
         // is the same chain already recorded (same value, same endpoints)?
         // then keep the one found first.
@@ -318,9 +314,7 @@ bool XYChainTechnique::apply(Board &board, FindingList &mine) const {
     if (mine.empty()) return false;
     assert(mine.size() == 1);
 
-    // Bucket invariant: see record_if_best.
-    assert(dynamic_cast<const XYChainFinding *>(mine.front().get()));
-    auto const &entry = static_cast<const XYChainFinding &>(*mine.front());
+    auto const &entry = bucket_cast<XYChainFinding>(*mine.front());
 
     bool did_act = false;
 

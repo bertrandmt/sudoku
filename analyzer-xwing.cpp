@@ -163,16 +163,12 @@ bool XWingTechnique::apply(Board &board, FindingList &mine) const {
     if (mine.empty()) return false;
     assert(mine.size() == 1);
 
-    // Bucket invariant: every entry in this technique's bucket is an XWingFinding
-    // (see NakedSingleTechnique::apply). The assert turns a wrong-bucket wiring
-    // bug into a caught error, not UB.
-    assert(dynamic_cast<const XWingFinding *>(mine.front().get()));
-    auto const *xw = static_cast<const XWingFinding *>(mine.front().get());
+    auto const &xw = bucket_cast<XWingFinding>(*mine.front());
 
     // Row-based pattern eliminates from columns; column-based, from rows.
-    bool did_act = xw->is_row_based
-        ? act_on_xwing<Column>(board, *xw)
-        : act_on_xwing<Row>(board, *xw);
+    bool did_act = xw.is_row_based
+        ? act_on_xwing<Column>(board, xw)
+        : act_on_xwing<Row>(board, xw);
 
     mine.clear();
     assert(did_act);
