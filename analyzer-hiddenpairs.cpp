@@ -14,8 +14,7 @@
 
 namespace {
 // File-local: HP's whitebox hook tests the predicate, not the finding, so nothing
-// outside this TU needs to name or downcast HiddenPairFinding. print() emits the
-// same bytes the old free operator<<(ostream, Analyzer::HiddenPair) did:
+// outside this TU needs to name or downcast HiddenPairFinding. print() format:
 // "{coord1,coord2}#{value1,value2}".
 struct HiddenPairFinding : Finding {
     std::pair<Coord, Coord> coords;
@@ -28,8 +27,8 @@ struct HiddenPairFinding : Finding {
 };
 
 // Find a hidden pair for (cell, v1, v2) within `set`, if any, appending it to
-// `out`. Was Analyzer::find_hidden_pair; the member vector dedup is now a scan of
-// `out` (this technique's own bucket, so every entry downcasts to HiddenPairFinding).
+// `out`. Dedup is a scan of `out` -- this technique's own bucket, so every entry
+// downcasts to HiddenPairFinding.
 template<class Set>
 bool find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set, FindingList &out) {
     for (auto const &other_cell : set) {
@@ -55,11 +54,10 @@ bool find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const 
 }
 
 // Strip every candidate other than the hidden pair's two values from the cell at
-// `coord`. Was Analyzer::act_on_hidden_pair(cell, entry); coord-native like Naked
-// Pairs (no coord->Cell resolution). clear_note_at is a no-op returning false for
-// an absent note (board.cpp), so enumerating value_range() and acting on its
-// return strips exactly the candidates the old cell.notes().values() loop did, in
-// the same ascending order (values() is value_range() filtered) -- byte-identical.
+// `coord`. Coord-native like Naked Pairs (no coord->Cell resolution).
+// clear_note_at is a no-op returning false for an absent note (board.cpp), so
+// enumerating value_range() and acting on its return strips exactly the
+// candidates the cell actually holds, in ascending order.
 bool act_on_hidden_pair(Board &board, const Coord &coord, const HiddenPairFinding &entry) {
     bool did_act = false;
 
@@ -108,8 +106,7 @@ bool HiddenPairTechnique::test_hidden_pair(const Cell &c1, const Cell &c2,
 
     // yes! but is the pair "hidden", i.e. no other cell in the set carries
     // either value? (A stray cell carrying exactly one value, or a third cell
-    // carrying both, are equally disqualifying -- this one test subsumes both
-    // rejection paths the old discovery scan handled separately.)
+    // carrying both, are equally disqualifying -- this one test rejects both.)
     for (auto const &other_cell : set) {
         if (!other_cell.isNote()) continue;
         if (other_cell == c1 || other_cell == c2) continue;

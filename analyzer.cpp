@@ -18,16 +18,14 @@
 // The stateless techniques, built once and shared by every Analyzer. This list
 // *is* the solver's cascade: analyze() and act() walk it in order. Registering a
 // technique takes two edits in this function -- the push_back below AND the
-// kCascade literal above it, which the assert cross-checks -- and four more
-// elsewhere; techniques.h enumerates all six.
+// kCascade literal above it, which the assert cross-checks -- and several more
+// elsewhere; techniques.h enumerates every site. Deliberately no count here: one
+// unenforced copy of that number is enough, and it belongs next to the list.
 const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
     // Canonical cascade order. Order is a correctness property, not a style
     // convention -- the cheapest technique that fires must fire first -- so it is
     // spelled out here once and checked against the built registry below, rather
-    // than left implicit in the sequence of push_backs. Through the issue-#7
-    // series this list also outran the registry, which was required to be a
-    // strict in-order prefix of it while the rest of the cascade was still
-    // hand-written; the last port closed that gap, so the two now match exactly.
+    // than left implicit in the sequence of push_backs.
     [[maybe_unused]] static constexpr const char *kCascade[] = {
         "NS", "HS", "NP", "LC", "HP", "XW", "SC", "YW", "SF", "XY",
     };
@@ -101,8 +99,8 @@ void Analyzer::analyze() {
     const auto &reg = registry();
     // mFindings is indexed in lockstep with reg (bucket i belongs to reg[i]);
     // the two are sized together at construction. Assert it here rather than
-    // trust it: this positional coupling is the invariant that replaced the ten
-    // hand-synchronized init sites, so it gets the same executable guard.
+    // trust it: this positional coupling is what stands in for ten separately
+    // named members, so it gets an executable guard.
     assert(mFindings.size() == reg.size());
     bool did_find = false;
     for (size_t i = 0; i < reg.size() && !did_find; ++i)
@@ -146,10 +144,8 @@ void print_section(std::ostream &outs, const Technique &tech, const FindingList 
 std::ostream &operator<<(std::ostream &outs, Analyzer const &a) {
     // One line per technique, in cascade order, separated -- not terminated -- by
     // endl. The dump deliberately does not end in a newline: SolverState's
-    // operator<< streams the analyzer last and appends nothing. Before the final
-    // port that fell out of the shape of the code (the loop terminated each of
-    // its lines, and the hand-written XY section after it did not); now it is the
-    // loop's own business, hence the separator form.
+    // operator<< streams the analyzer last and appends nothing, so the separator
+    // form (not a terminator) is what keeps the trailing byte off.
     const auto &reg = Analyzer::registry();
     assert(a.mFindings.size() == reg.size());  // lockstep index; see analyze()
     for (size_t i = 0; i < reg.size(); ++i) {

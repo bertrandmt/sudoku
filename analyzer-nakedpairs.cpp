@@ -14,8 +14,7 @@
 
 namespace {
 // File-local: NP's whitebox hook tests the predicate, not the finding, so nothing
-// outside this TU needs to name or downcast NakedPairFinding. print() emits the
-// same bytes the old free operator<<(ostream, Analyzer::NakedPair) did:
+// outside this TU needs to name or downcast NakedPairFinding. print() format:
 // "{coord1,coord2}#{value1,value2}".
 struct NakedPairFinding : Finding {
     std::pair<Coord, Coord> coords;
@@ -28,8 +27,7 @@ struct NakedPairFinding : Finding {
 };
 
 // Would acting on the pair (c1, c2) with values (v1, v2) actually eliminate a
-// candidate somewhere in `set`? Was the anon-namespace helper of the same name;
-// unchanged by the port.
+// candidate somewhere in `set`?
 template<class Set>
 bool would_act(const Set &set, const Cell &c1, const Cell &c2, const Value &v1, const Value &v2) {
     bool would_act = false;
@@ -79,10 +77,9 @@ bool find_naked_pair(const Cell &cell, const Set &set, FindingList &out) {
 }
 
 // Apply one recorded pair to one `set`, eliminating its two values from the other
-// cells. Was Analyzer::act_on_naked_pair(entry, set); the board is now the passed
-// reference, and the pair's cells are addressed by coord (findings carry coords,
-// and Cell equality / set membership are coord-based anyway) rather than resolved
-// through the friends-only Board::at the member had via Analyzer's friendship.
+// cells. The pair's cells are addressed by coord (findings carry coords, and Cell
+// equality / set membership are coord-based anyway) rather than resolved through
+// the friends-only Board::at.
 template<class Set>
 bool act_on_naked_pair(Board &board, const NakedPairFinding &entry, const Set &set) {
     bool did_act = false;

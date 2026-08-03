@@ -6,6 +6,7 @@
 #include "coord.h"
 #include "cell.h"  // Value, Cell used in the finding and the test_ contract below
 
+#include <algorithm>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -15,34 +16,39 @@
 // and eliminate via Rule 2 (a color repeated in a unit is false) or Rule 4 (an
 // off-chain candidate that sees both colors is false).
 //
-// SC is a *materialized-object* technique (see docs/test-predicate-idiom.md):
-// discovery (find_color_chains builds a ColorChain graph by following links) and
-// validation (test_color_chain scores the eliminations that graph would make)
-// are genuinely distinct steps, so it carries a separable test_ predicate --
-// unlike the scan-fused X-Wing/Swordfish, whose membership emerges only from the
-// validating scan. Because the graph is a first-class value, ColorChainFinding
-// lives in this header (not file-local in the .cpp): the whitebox suite
-// constructs one directly and hands it to test_color_chain, so both must be
-// visible to tests/unit/test_analyzer.cpp.
+// SC is *materialized-object* shaped (docs/test-predicate-idiom.md): building
+// the graph and scoring its eliminations are distinct steps, so it carries a
+// separable test_color_chain predicate. ColorChainFinding is in this header, not
+// file-local, because the whitebox cases construct one and hand it to that
+// predicate.
 struct ColorChainFinding : Finding {
     Value value;
     std::unordered_map<Coord, bool> cells;  // coord -> color (true=green, false=red)
 
     explicit ColorChainFinding(Value v) : value(v) { }
 
+    // Both vectors come back sorted by coord, for the same reason print() sorts:
+    // `cells` is an unordered_map, so its iteration order is unspecified and
+    // differs between standard libraries. These vectors are not internal -- Rule 2
+    // prints one "[SC] <coord> x<v>" line per element in order, and
+    // Board::any_see_each_other returns the unit of the *first* conflicting pair,
+    // so an unsorted vector leaks bucket order into both the line sequence and the
+    // printed unit tag. The elimination set is the same either way.
     std::pair<std::vector<Coord>, std::vector<Coord>> group_cells_by_color() const {
         std::vector<Coord> green_cells, red_cells;
         for (const auto &[coord, color] : cells) {
             if (color) { green_cells.push_back(coord); } // true = green
             else       { red_cells.push_back(coord); }   // false = red
         }
+        std::sort(green_cells.begin(), green_cells.end());
+        std::sort(red_cells.begin(), red_cells.end());
         return {green_cells, red_cells};
     }
 
     bool cell_sees_both_colors(const Cell &, const Board &) const;
 
-    // Byte-for-byte the old free operator<<(ostream, Analyzer::ColorChain):
-    // "{coord🟩,coord🟥,...}#value".
+    // Format: "{coord🟩,coord🟥,...}#value", cells sorted by coord so the dump is
+    // deterministic across standard libraries (see the definition).
     void print(std::ostream &) const override;
 };
 
@@ -57,12 +63,9 @@ public:
 
     // Tested contract, NOT a leaked private: is `chain` actionable on `board`?
     // (Rule 2: a same-colored pair shares a unit; or Rule 4: some off-chain
-    // candidate sees both colors.) The old Analyzer::test_color_chain was reached
-    // by a friend hook because techniques weren't standalone; now that
-    // ColorChainTechnique is standalone this is promoted to a public static so
-    // the whitebox suite judges crafted chains directly, without friendship
-    // (issue #7's stated payoff). Static, not const-member: the technique is
-    // stateless and this reads only its arguments (the board it queries is passed
-    // in), matching the promoted-static shape of the other hooked techniques.
+    // candidate sees both colors.) Public so the whitebox suite judges crafted
+    // chains directly, without friendship. Static, not const-member: the technique
+    // is stateless and this reads only its arguments (the board it queries is
+    // passed in), matching the static shape of the other hooked techniques.
     static bool test_color_chain(const Board &, const ColorChainFinding &);
 };

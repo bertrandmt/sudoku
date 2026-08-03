@@ -15,8 +15,7 @@
 
 namespace {
 // File-local: LC has no whitebox hooks, so nothing outside this TU needs to name
-// or downcast the finding. print() emits the same bytes the old free
-// operator<<(ostream, Analyzer::LockedCandidates) did: "{c1,c2,...}#value[^unit]".
+// or downcast the finding. print() format: "{c1,c2,...}#value[^unit]".
 struct LockedCandidatesFinding : Finding {
     std::vector<Coord> coords;
     Value value;
@@ -24,10 +23,9 @@ struct LockedCandidatesFinding : Finding {
     LockedCandidatesFinding(std::vector<Coord> c, Value v, Unit u)
         : coords(std::move(c)), value(v), unit(u) { }
 
-    // Order-independent equality on the coord set, matching the old
-    // Analyzer::LockedCandidates::operator==: the two find forms enumerate the
-    // same locked group from different starting cells, so the coord vectors can
-    // differ in order while denoting the same finding.
+    // Order-independent equality on the coord set: the two find forms enumerate
+    // the same locked group from different starting cells, so the coord vectors
+    // can differ in order while denoting the same finding.
     bool same(const LockedCandidatesFinding &o) const {
         if (unit != o.unit) return false;
         if (value != o.value) return false;
