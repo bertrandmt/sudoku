@@ -15,6 +15,7 @@
 #include <cassert>
 #include <memory>
 #include <optional>
+#include <vector>
 #include <unordered_set>
 
 namespace { // anon
@@ -77,15 +78,13 @@ namespace { // anon
     }
 
     // Apply one recorded Y-Wing to one `wing1_set`: clear `value` from every cell
-    // of that set that also sees wing2. Was Analyzer::act_on_ywing(entry, set); the
-    // board is now the passed reference, and cells are addressed by coord (findings
-    // carry coords) rather than resolved through the friends-only Board::at.
+    // of that set that also sees wing2.
     template <class Set>
     bool act_on_ywing(Board &board, const YWingFinding &entry, const Set &wing1_set) {
         // Contract mirror of would_act_for_set's find-side assert: the set we were
         // handed is wing1's own unit. wings.first is a Coord (findings carry coords,
-        // and the ported technique has no friend Board::at to resolve it to a Cell),
-        // so check membership by coord.
+        // and a technique has no friend Board::at to resolve it to a Cell), so
+        // check membership by coord.
         assert(std::any_of(wing1_set.begin(), wing1_set.end(),
             [&](const Cell &c) { return c.coord() == entry.wings.first; }));
 
@@ -163,11 +162,32 @@ bool YWingTechnique::find_ywing(const Board &board, const Cell &pivot, FindingLi
     select_wing_candidates(pivot, board.column(pivot), wing_candidates);
     select_wing_candidates(pivot, board.nonet(pivot), wing_candidates);
 
+    // Enumerate pairs over a coord-sorted view, not over the unordered_set
+    // directly. The set's iteration order is unspecified and differs between
+    // standard libraries, and it reaches stdout two ways:
+    //
+    //  - which cell of a pair is wing1 and which is wing2, so it fixes the
+    //    *contents* of a printed finding -- "[1, 5]Y{[9, 5],[1, 7]}#9" versus
+    //    "[1, 5]Y{[1, 7],[9, 5]}#9" -- not just the order of findings;
+    //  - the order findings are pushed, hence their order within "[YW](2) {A, B}"
+    //    and the order of the "[YW] ... x<v>" lines apply() emits.
+    //
+    // The elimination *set* does not depend on any of it: find() records every
+    // Y-Wing and apply() acts on all of them, so sorting is free of behavioral
+    // cost while still changing printed output on 3 of the 34 corpus boards.
+    // (Contrast XY-chain, where discovery order selects *which* chain is kept, so
+    // the two are not the same case; see analyzer-xychain.cpp.)
+    std::vector<const Cell *> ordered;
+    ordered.reserve(wing_candidates.size());
+    for (const Cell &c : wing_candidates) ordered.push_back(&c);
+    std::sort(ordered.begin(), ordered.end(),
+              [](const Cell *a, const Cell *b) { return a->coord() < b->coord(); });
+
     // Try all pairs of visible cells as potential wings
-    for (auto it1 = wing_candidates.begin(); it1 != wing_candidates.end(); ++it1) {
-        for (auto it2 = std::next(it1); it2 != wing_candidates.end(); ++it2) {
-            const Cell &wing1 = *it1;
-            const Cell &wing2 = *it2;
+    for (auto it1 = ordered.begin(); it1 != ordered.end(); ++it1) {
+        for (auto it2 = std::next(it1); it2 != ordered.end(); ++it2) {
+            const Cell &wing1 = **it1;
+            const Cell &wing2 = **it2;
 
             std::optional<Value> ywing_value;
             if (!test_ywing(board, pivot, wing1, wing2, ywing_value)) continue;
@@ -175,9 +195,9 @@ bool YWingTechnique::find_ywing(const Board &board, const Cell &pivot, FindingLi
             assert(wing1.check(*ywing_value));
             assert(wing2.check(*ywing_value));
 
-            // Record the Y-Wing pattern -- but is it already recorded? The member
-            // vector dedup (std::find over mYWings) is now a scan of `out` (this
-            // technique's own bucket, so every entry downcasts to YWingFinding).
+            // Record the Y-Wing pattern -- but is it already recorded? Dedup is a
+            // scan of `out`, this technique's own bucket, so every entry downcasts
+            // to YWingFinding.
             YWingFinding yw{*ywing_value, pivot.coord(), {wing1.coord(), wing2.coord()}};
             bool already = false;
             for (auto const &f : out) {

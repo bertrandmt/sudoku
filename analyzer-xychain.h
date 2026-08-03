@@ -16,14 +16,11 @@
 // way that end resolves, one of the two ends must hold X -- so any off-chain cell
 // seeing *both* ends can drop X.
 //
-// XY-chain is a *materialized-object* technique (see docs/test-predicate-idiom.md),
-// like simple coloring: the recursive search *builds* a chain by following links,
-// and a separate predicate *scores* the eliminations that chain would make. That
-// predicate stays file-local in the .cpp: no whitebox case calls it, and
-// promoting it to a public static would advertise a tested contract nothing
-// tests. The seams below are the two things the whitebox cases do drive -- the
-// per-anchor search and the best-chain selection -- and XYChainFinding lives in
-// this header because a case reads the recorded chain's fields.
+// XY-chain is *materialized-object* shaped (docs/test-predicate-idiom.md), like
+// simple coloring. Its scoring predicate stays file-local: no whitebox case calls
+// it, and exposing it would advertise a contract nothing tests. The two seams the
+// cases do drive are below, and XYChainFinding is in this header because a case
+// reads the recorded chain's fields.
 struct XYChainFinding : Finding {
     Value value;                // candidate to eliminate from cells seeing both chain ends
     std::vector<Coord> chain;   // sequence of XY-cells forming the chain
@@ -49,8 +46,7 @@ struct XYChainFinding : Finding {
                (num_elim == other.num_elim && chain.size() < other.chain.size());
     }
 
-    // Byte-for-byte the old free operator<<(ostream, Analyzer::XYChain):
-    // "{c1:c2:...}#value" followed by "x" and the elimination count.
+    // Format: "{c1:c2:...}#value" followed by "x" and the elimination count.
     void print(std::ostream &) const override;
 };
 
@@ -66,10 +62,8 @@ public:
     // Whitebox seam, NOT a leaked private: anchor the chain search on one cell
     // and one of its two candidates, so a case can drive detection on a crafted
     // three-cell chain instead of hunting for a board whose whole cascade falls
-    // through to XY. The old Analyzer::find_xychain was reached by a friend hook
-    // because techniques weren't standalone; now that XYChainTechnique is
-    // standalone this is a public static -- static because the technique holds no
-    // state and this entry touches none, matching the other ported seams.
+    // through to XY. Static because the technique holds no state and this entry
+    // touches none, matching the other seams.
     static bool find_xychain(const Board &, const Cell &, const Value &, FindingList &out);
 
     // Tested contract, NOT a leaked private: `out` retains at most one chain, the
@@ -81,17 +75,6 @@ public:
     // competing chains to exercise, and which chains a board yields is not
     // controllable. The whitebox case offers them directly instead.
     //
-    // Under review, not settled design: **issue #36** proposes dropping the
-    // trim-to-one entirely and acting greedily on every distinct elimination
-    // effect, which is what the rest of the cascade does. This port preserved the
-    // existing behavior byte-for-byte, so it necessarily promoted that behavior
-    // into a named seam with a test behind it -- read this as "here is what the
-    // solver does today", not as an endorsement. #36 would delete this function
-    // and XYChainFinding::operator== (endpoint equivalence is only a proxy for
-    // "same elimination set", and an inexact one), and would have test_xychain
-    // collect the eliminated coords instead of counting them. operator< is not
-    // settled either way: #36 leaves open whether to keep the coverage-maximal
-    // chain -- which is what this comparator already ranks first -- or the
-    // shortest chain per elimination.
+    // Trimming to one is what the solver does today, not settled design; see #36.
     static bool record_if_best(FindingList &out, const XYChainFinding &candidate);
 };

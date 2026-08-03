@@ -22,9 +22,8 @@ namespace {
 
 // Find an X-Wing anchored on `cell` for `value`, with `cset` the base line and
 // `eset` the cross line through `cell`; `csets` are all lines parallel to `cset`.
-// Was Analyzer::find_xwing (the templated inner overload); records into the
-// technique's own bucket `out` instead of the member vector. find() stops at the
-// first hit, so out holds at most one entry (asserted below).
+// Records into the technique's own bucket `out`. find() stops at the first hit,
+// so out holds at most one entry (asserted below).
 template<class CandidateSet, class EliminationSet>
 bool find_xwing(const Board &board, const Cell &cell, const Value &value,
                 const CandidateSet &cset, const EliminationSet &eset,
@@ -81,7 +80,7 @@ bool find_xwing(const Board &board, const Cell &cell, const Value &value,
 }
 
 // Clear `value` from every cell of `eset` that is not one of the pattern's two
-// cross-line cells. Was Analyzer::act_on_xwing (the templated inner overload).
+// cross-line cells.
 template<class CandidateSet, class EliminationSet>
 bool act_on_xwing(Board &board, const Value &value, const CandidateSet &cset1, const CandidateSet &cset2,
                                                     const EliminationSet &eset, Unit unit) {

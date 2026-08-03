@@ -132,7 +132,7 @@ bool find_swordfish(const Board &board, const Cell &cell, const Value &value,
 }
 
 // Clear `value` from every cell of `eset` that is not on one of the pattern's
-// three base lines. Was Analyzer::act_on_swordfish (the templated inner overload).
+// three base lines.
 template<class CandidateSet, class EliminationSet>
 bool act_on_swordfish(Board &board, const Value &value, const CandidateSet &cset1, const CandidateSet &cset2, const CandidateSet &cset3,
                                                         const EliminationSet &eset, Unit unit) {
@@ -160,7 +160,6 @@ bool act_on_swordfish(Board &board, const Value &value, const CandidateSet &cset
 }
 
 // Apply one recorded Swordfish: eliminate strays from all three cover lines.
-// Was Analyzer::act_on_swordfish(const Swordfish &).
 template<class EliminationSet>
 bool act_on_swordfish(Board &board, const SwordfishFinding &entry) {
     // The base lines and the elimination lines are always opposite kinds, so

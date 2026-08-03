@@ -13,13 +13,11 @@
 // for that value, whose cross lines union to exactly three. Every other
 // candidate for the value on those three cross lines can then be eliminated.
 //
-// Swordfish is *scan-fused* (see docs/test-predicate-idiom.md), exactly like its
-// sibling X-Wing: the pattern's membership emerges only from the validating scan
-// -- the second and third base lines are discovered by that scan, not handed in
-// -- so there is no separable test_ predicate to promote. The whitebox suite
-// drives the per-anchor search directly and inspects the recorded finding, which
-// is why SwordfishFinding lives in this header rather than file-local in the
-// .cpp (mirroring XWingFinding).
+// Swordfish is *scan-fused* (docs/test-predicate-idiom.md), like its sibling
+// X-Wing: the second and third base lines are discovered by the validating scan
+// rather than handed in, so there is no separable test_ predicate. The seam is
+// find_swordfish below, and SwordfishFinding is in this header, not file-local,
+// because the whitebox cases read its fields (mirroring XWingFinding).
 struct SwordfishFinding : Finding {
     Value value;
     // One anchor per base line: the first candidate cell encountered in each.
@@ -35,8 +33,7 @@ struct SwordfishFinding : Finding {
         : value(v), anchors(a), is_row_based(row_based) { }
     // No same()/dedup here (unlike NP/HP/LC): find() short-circuits at the first
     // hit, so a bucket never holds two Swordfish to compare.
-    // Byte-for-byte the old free operator<<(ostream, Analyzer::Swordfish):
-    // "{a1,a2,a3}#value[^c]" (c if row-based, r if column-based).
+    // Format: "{a1,a2,a3}#value[^c]" (c if row-based, r if column-based).
     void print(std::ostream &o) const override {
         o << "{";
         bool is_first = true;
@@ -59,16 +56,14 @@ public:
     bool find(const Board &, FindingList &out) const override;
     bool apply(Board &, FindingList &mine) const override;
 
-    // Whitebox seam, NOT a leaked private: drive the per-anchor search on a
-    // crafted board and inspect the finding it records. Swordfish is scan-fused,
-    // so there is no test_ predicate to call directly (see
-    // docs/test-predicate-idiom.md); the tests instead anchor find_swordfish on a
-    // chosen cell -- reaching the no-eliminations rejection that a happy-path
-    // solve does not isolate, and pinning the tight-cover-line rule on a position
-    // built for it. (Both orientations are already covered black-box: P_hard
+    // Whitebox seam, NOT a leaked private: anchor the per-anchor search on a
+    // chosen cell of a crafted board and inspect the finding it records --
+    // reaching the no-eliminations rejection that a happy-path solve does not
+    // isolate, and pinning the tight-cover-line rule on a position built for it.
+    // (Both orientations are already covered black-box: P_hard
     // fires a row-based Swordfish, P_sf a column-based one.) Public *static* so
-    // the whitebox suite calls it without friendship *and* without an instance
-    // (issue #7's stated payoff): the technique is stateless and this touches no
-    // instance data. Same shape as XWingTechnique::find_xwing.
+    // the whitebox suite calls it without friendship *and* without an instance:
+    // the technique is stateless and this touches no instance data. Same shape as
+    // XWingTechnique::find_xwing.
     static bool find_swordfish(const Board &, const Cell &, const Value &, FindingList &out);
 };

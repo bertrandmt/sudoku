@@ -10,11 +10,14 @@
 #include "coord.h"
 #include "verbose.h"
 
+#include <algorithm>
 #include <cassert>
 #include <memory>
 #include <queue>
 #include <string>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 bool ColorChainFinding::cell_sees_both_colors(const Cell &cell, const Board &board) const {
     // is this cell a note?
@@ -40,10 +43,23 @@ bool ColorChainFinding::cell_sees_both_colors(const Cell &cell, const Board &boa
     return did_see_green && did_see_red;
 }
 
+// Sorted by coord, deliberately. cells is an unordered_map, so iterating it
+// directly emits its bucket order -- unspecified, and different under libc++ and
+// libstdc++, so README's Simple Coloring examples used to reproduce only on the
+// machine that generated them. This is one of two places that leaked; the other
+// is group_cells_by_color(), which feeds the Rule 2 elimination lines. Sorting
+// costs nothing here (a chain is a handful of cells, and this runs only when
+// printing) and loses nothing: the chain's traversal order is already destroyed
+// by the unordered_map, and README states the path in prose.
+// Format: "{coord🟩,coord🟥,...}#value".
 void ColorChainFinding::print(std::ostream &outs) const {
+    std::vector<std::pair<Coord, bool>> ordered(cells.begin(), cells.end());
+    std::sort(ordered.begin(), ordered.end(),
+              [](const auto &a, const auto &b) { return a.first < b.first; });
+
     outs << "{";
     bool first = true;
-    for (const auto &[coord, color] : cells) {
+    for (const auto &[coord, color] : ordered) {
         if (!first) outs << ",";
         first = false;
         outs << coord << (color ? "🟩" : "🟥");
@@ -74,11 +90,10 @@ bool ColorChainTechnique::test_color_chain(const Board &board, const ColorChainF
 }
 
 namespace {
-    // Anchored on a coord (not a Cell): ported techniques are no longer friends
-    // of Board, and the self-skip below only needs the anchor's coord anyway, so
-    // there is no reason to round-trip Coord -> Cell -> Coord through the private
-    // Board::at. Callers pass the unit via the public row/column/nonet(Coord)
-    // overloads.
+    // Anchored on a coord (not a Cell): techniques are not friends of Board, and
+    // the self-skip below only needs the anchor's coord anyway, so there is no
+    // reason to round-trip Coord -> Cell -> Coord through the private Board::at.
+    // Callers pass the unit via the public row/column/nonet(Coord) overloads.
     template<class Set>
     bool find_strong_link_candidates(const Coord &coord, const Value &value, const Set &set, const Cell *&out_candidate) {
         bool did_find = false;
@@ -99,9 +114,8 @@ namespace {
     }
 
 // Build and record the first actionable color chain for `value` on `board`, if
-// any. Was Analyzer::find_color_chains(const Value &); records into the
-// technique's own bucket `out` (at most one entry -- find() short-circuits)
-// instead of the member vector.
+// any, into the technique's own bucket `out` (at most one entry -- find()
+// short-circuits).
 bool find_color_chains(const Board &board, const Value &value, FindingList &out) {
     bool did_find = false;
 
@@ -169,19 +183,11 @@ bool find_color_chains(const Board &board, const Value &value, FindingList &out)
         // yes! but is it actionable?
         if (!ColorChainTechnique::test_color_chain(board, chain)) continue;
 
-        // yes! let's record it -- move (not copy) the chain into the finding. cells
-        // is an unordered_map: std::move transfers its buckets intact, so dump and
-        // act iterate the as-built map's own (hash/bucket) order -- NOT insertion
-        // order (the green seed inserted first at [to_process.push] need not print
-        // first). libc++'s copy ctor instead prepends per bucket, reversing that
-        // order; that reversal is why the pre-#7 dump and act printed the same chain
-        // in opposite orders (see README): act consumed a chain the rebinding copy
-        // ctor had deep-copied once MORE than the dump's, and two reversals cancel.
-        // #7 carries findings by a shallow shared_ptr<const>, so dump and act now
-        // read one shared object and print one consistent order. Reproducing both
-        // old orders would require re-copying the map inside apply() purely to mimic
-        // that STL quirk; we don't. The elimination *set* is unchanged and the
-        // black-box suite sorts before comparing: print-order-only.
+        // yes! let's record it -- move (not copy) the chain into the finding; the
+        // map is built here and never needed again. cells is an unordered_map, so
+        // it has no meaningful iteration order of its own: print() sorts by coord
+        // to get a deterministic dump, and every consumer of the eliminations
+        // works from the *set*, not an ordering.
         assert(out.empty());
         if (sVerbose) { std::cout << "  [fSC] "; chain.print(std::cout); std::cout << std::endl; }
         out.push_back(std::make_shared<ColorChainFinding>(std::move(chain)));

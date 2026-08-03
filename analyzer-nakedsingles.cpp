@@ -12,8 +12,7 @@
 
 namespace {
 // File-local: Naked Singles has no whitebox hooks, so nothing outside this TU
-// needs to name or downcast the finding. print() emits the same bytes the old
-// free operator<<(ostream, Analyzer::NakedSingle) did: "coord#value".
+// needs to name or downcast the finding. print() format: "coord#value".
 struct NakedSingleFinding : Finding {
     Coord coord;
     Value value;
@@ -51,9 +50,9 @@ bool NakedSingleTechnique::apply(Board &board, FindingList &mine) const {
         // Bucket invariant: analyze() routes reg[i]->find() into mFindings[i],
         // so this bucket only ever holds this technique's own findings -- which
         // is what makes the static_cast sound. Nothing but discipline enforces
-        // that, and this line is the template every ported apply() copies, so
-        // assert the contract to turn a wrong-bucket wiring bug into a caught
-        // error instead of UB.
+        // that, and this line is the template every apply() copies, so assert the
+        // contract to turn a wrong-bucket wiring bug into a caught error instead
+        // of UB.
         assert(dynamic_cast<const NakedSingleFinding *>(f.get()));
         auto const *ns = static_cast<const NakedSingleFinding *>(f.get());
         std::cout << "[NS] " << ns->coord << " =" << ns->value << std::endl;

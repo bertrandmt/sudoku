@@ -66,8 +66,7 @@ bool HiddenSingleTechnique::find(const Board &board, FindingList &out) const {
             // yes! let's record it. (No duplicate-coord guard: the bucket is
             // cleared each analyze(), the outer loop visits each cell once, and we
             // break after the first hidden single found for a cell -- so no coord
-            // can recur. The old scan of the member vector for a duplicate coord
-            // was dead for exactly these reasons.)
+            // can recur.)
             auto finding = std::make_shared<HiddenSingleFinding>(cell.coord(), value, *unit);
             if (sVerbose) { std::cout << "  [fHS] "; finding->print(std::cout); std::cout << std::endl; }
             out.push_back(std::move(finding));

@@ -524,6 +524,175 @@ else
 fi
 
 echo
+echo "[9] Documentation: README tracks the technique registry"
+# README documents each heuristic with verbatim solver output, and the numbered
+# technique list names every tag. Neither is reachable by the compiler or the
+# linker, so adding a technique can leave both behind silently -- which is what
+# happened when Swordfish landed and two dump blocks kept printing nine lines.
+# techniques.h calls this edit site 7; these are its enforcers.
+#
+# CLAUDE.md's tag list is deliberately NOT checked here; see techniques.h for
+# why that exclusion is intentional rather than an oversight.
+
+README_MD="$ROOT/README.md"
+
+# Print the Nth *worked example* under the given heading: the Nth fenced block
+# holding more than one "[TAG](n)" line. Counting dumps rather than fenced blocks
+# keeps the index stable when a section also quotes action snippets ("[SC] [9, 5]
+# x4 ..."), which several do; requiring more than one tag line is the same rule
+# the tag-sequence check uses to skip the single-line excerpts.
+#
+# Anchored on the heading, not on any line inside the block: the block's contents
+# are exactly what is under test, so anchoring there would turn a content change
+# into a confusing "block not found" instead of "block does not match".
+readme_block() {
+    awk -v H="$1" -v want="${2:-1}" '
+        !seen && $0 == H { seen = 1; next }
+        seen && /^```/ {
+            if (inblock) {
+                inblock = 0
+                if (dumplines > 1 && ++n == want) { for (i = 1; i <= c; i++) print b[i]; exit }
+            } else { inblock = 1 }
+            c = 0; dumplines = 0
+            next
+        }
+        seen && inblock { b[++c] = $0; if ($0 ~ /^\[[A-Z][A-Z]\]\(/) dumplines++ }
+    ' "$README_MD"
+}
+
+# Does the needle file appear as a verbatim consecutive run of lines in stdin?
+contains_block() {
+    awk '
+        NR == FNR { want[FNR] = $0; n = FNR; next }
+                  { hay[++m] = $0 }
+        END {
+            for (i = 1; i + n - 1 <= m; i++) {
+                ok = 1
+                for (j = 1; j <= n; j++) if (hay[i + j - 1] != want[j]) { ok = 0; break }
+                if (ok) { print "FOUND"; exit }
+            }
+            print "MISSING"
+        }
+    ' "$1" -
+}
+
+# Tag-sequence check: every full dump block lists the whole cascade, in order.
+# The expected tags are read out of the binary rather than hardcoded, so this
+# tracks the registry by construction -- register an eleventh technique and any
+# block that was not regenerated fails, without editing this file.
+cascade=$(printf 'n.%s\n' "$P_easy" | run_solver 2>&1 \
+          | grep -E '^\[[A-Z]{2}\]\(' | sed -E 's/^\[([A-Z]{2})\].*/\1/' | tr '\n' ' ' | sed 's/ $//')
+if [ -z "$cascade" ]; then
+    bad "README : could not read the technique cascade from the solver"
+elif [ ! -r "$README_MD" ]; then
+    bad "README : not readable at $README_MD"
+else
+    # Collapse each run of consecutive dump lines into one "NS HS ..." line.
+    # Single-tag runs are excerpts (the short heuristic sections quote just their
+    # own line), so only multi-tag runs are held to the full cascade.
+    blocks=$(awk '
+        /^\[[A-Z][A-Z]\]\(/ { run = run (run ? " " : "") substr($1, 2, 2); next }
+                              { if (run != "") { print run; run = "" } }
+        END                   { if (run != "") print run }
+    ' "$README_MD")
+    checked=0
+    stale=0
+    stale_eg=""
+    while IFS= read -r block; do
+        [ -z "$block" ] && continue
+        case "$block" in *" "*) ;; *) continue ;; esac
+        checked=$((checked + 1))
+        if [ "$block" != "$cascade" ]; then
+            stale=$((stale + 1))
+            [ -z "$stale_eg" ] && stale_eg="$block"
+        fi
+    done <<EOF
+$blocks
+EOF
+    if [ "$checked" -eq 0 ]; then
+        bad "README : found no full analyzer dump blocks to check"
+    elif [ "$stale" -eq 0 ]; then
+        ok "README : all $checked analyzer dump blocks list the full cascade"
+    else
+        bad "README : $stale of $checked analyzer dump blocks are stale" \
+            "expected {$cascade}, got {$stale_eg}"
+    fi
+
+    # The prose side: README introduces the techniques as a numbered list, each
+    # entry naming its tag ("denoted as `[NS]`"). A registered tag with no entry
+    # is a technique the documentation never introduces.
+    missing=""
+    for tag in $cascade; do
+        grep -qF "denoted as \`[$tag]\`" "$README_MD" || missing="$missing $tag"
+    done
+    if [ -z "$missing" ]; then
+        ok "README : every registered technique is named in the technique list"
+    else
+        bad "README : technique list is missing entries" "no \"denoted as\" entry for:$missing"
+    fi
+
+    # Coverage: every worked example under a "## " heading must be registered in
+    # the content table below. Without this, the content check silently covers a
+    # shrinking fraction of README as sections are added -- which is how it went
+    # out at three of seven. The dump under "# Solver" is deliberately excluded:
+    # it is a transcript excerpt including the interactive "λ >" prompt, which a
+    # piped replay does not reproduce, so it is not mechanically checkable here.
+    documented=$(awk '
+        /^## /        { sec = 1 }
+        /^# [^#]/     { sec = 0 }
+        /^```/        { if (inblock) { inblock = 0; if (sec && dumplines > 1) n++; dumplines = 0 }
+                        else inblock = 1
+                        next }
+        inblock       { if ($0 ~ /^\[[A-Z][A-Z]\]\(/) dumplines++ }
+        END           { print n + 0 }
+    ' "$README_MD")
+
+    # Content check: the worked examples must still be what the solver prints.
+    # The tag-sequence check above only catches a block short by a tag; a changed
+    # print format or a changed elimination would sail past it. Each fixture below
+    # is the board that produced its block -- a mapping that is expensive to
+    # rediscover (it was found by replaying every board in notes.txt against the
+    # documented output), so it is recorded here rather than left in a PR
+    # description. Regenerating a block after an intentional change is then just
+    # running the board and pasting the state.
+    #
+    # label | heading | nth worked example under it | board
+    registered=0
+    while IFS='|' read -r label heading nth board; do
+        [ -z "$label" ] && continue
+        needle=$(readme_block "$heading" "$nth")
+        if [ -z "$needle" ]; then
+            bad "README : no fenced block found under \"$heading\"" "the $label example"
+            continue
+        fi
+        found=$( { printf 'n.%s\n' "$board"
+                   i=0; while [ "$i" -lt 20 ]; do echo .; i=$((i + 1)); done
+                 } | run_solver 2>&1 | contains_block <(printf '%s\n' "$needle") )
+        if [ "$found" = FOUND ]; then
+            ok "README : the $label worked example matches live solver output"
+        else
+            bad "README : the $label worked example no longer matches the solver" \
+                "regenerate the block from board $board"
+        fi
+        registered=$((registered + 1))
+    done <<EOF
+X-Wing|## X-Wing|1|$P_xy2
+Simple Coloring (value 4)|## Simple Coloring|1|$P_color
+Simple Coloring (value 5)|## Simple Coloring|2|$P_color
+Y-Wing|## Y-Wing|1|$P_yw1
+Swordfish|## Swordfish|1|$P_sf
+XY-Chain|## XY-Chain|1|$P_xy2
+EOF
+
+    if [ "$registered" -eq "$documented" ]; then
+        ok "README : all $documented worked examples under \"## \" headings are content-checked"
+    else
+        bad "README : $registered of $documented worked examples are content-checked" \
+            "register the new example in the table above, or it is never verified"
+    fi
+fi
+
+echo
 echo "----------------------------------------"
 printf 'passed: %d   failed: %d\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
