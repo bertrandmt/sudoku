@@ -32,10 +32,12 @@ public:
 
     bool solved() const { return mBoard.note_cells_count() == 0; }
 
-    // Read-only view of the current board, used by the interactive completer to
-    // read live cell state (see completion.h). The REPL reaches this through
-    // Solver's intent-level accessors rather than touching the board directly.
-    const Board &board() const { return mBoard; }
+    // Live cell queries for the interactive completer (see completion.h),
+    // delegating to Board exactly as edit_note/set_value do for the mutations.
+    // Intent-level rather than a `const Board &` accessor, so mBoard stays
+    // private. Preconditions are Board's: row and col must be in range.
+    bool is_unset(size_t row, size_t col) const { return mBoard.is_unset_at(row, col); }
+    ValueList candidates_at(size_t row, size_t col) const { return mBoard.candidates_at(row, col); }
 
     void print(std::ostream &outs) const {
         mBoard.print(outs);

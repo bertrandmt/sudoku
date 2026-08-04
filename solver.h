@@ -35,13 +35,15 @@ public:
     bool solved() const { return mStates.back()->solved(); }
 
     // --- accessors for interactive tab completion (see completion.h) ---
-    // Is the cell at (row,col) currently unset (still a note cell)? Returns
-    // false if there is no board yet or the coordinates are out of range.
+    // These delegate down to SolverState and then Board, the same chain
+    // edit_note/set_value take for the mutating side. row and col must be in
+    // range: Board asserts it, as it does for the '=' and 'x' edits.
+    //
+    // Is the cell at (row,col) currently unset (still a note cell)?
     bool is_unset(size_t row, size_t col) const;
-    // The candidate values still legal at (row,col), ascending. Empty if the
-    // cell is already set, there is no board, or the coordinates are out of
-    // range.
-    std::vector<Value> candidates_at(size_t row, size_t col) const;
+    // The candidate values still legal at (row,col), ascending. Empty for a cell
+    // that is already set.
+    ValueList candidates_at(size_t row, size_t col) const;
 
     friend std::ostream &operator<<(std::ostream &, const Solver &);
 

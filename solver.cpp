@@ -97,16 +97,12 @@ bool Solver::set_value(const std::string &entry) {
 
 bool Solver::is_unset(size_t row, size_t col) const {
     if (mStates.empty()) return false;
-    if (row >= Board::height || col >= Board::width) return false;
-    return mStates.back()->board().cells()[row * Board::width + col].isNote();
+    return mStates.back()->is_unset(row, col);
 }
 
-std::vector<Value> Solver::candidates_at(size_t row, size_t col) const {
+ValueList Solver::candidates_at(size_t row, size_t col) const {
     if (mStates.empty()) return {};
-    if (row >= Board::height || col >= Board::width) return {};
-    const Cell &cell = mStates.back()->board().cells()[row * Board::width + col];
-    if (!cell.isNote()) return {};
-    return cell.notes().values();
+    return mStates.back()->candidates_at(row, col);
 }
 
 std::ostream &operator<<(std::ostream &outs, const Solver &solver) {

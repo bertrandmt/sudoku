@@ -51,6 +51,15 @@ const std::string kEmpty(81, '.');
 const std::string kMed =
     "3........97..1....6..583...2.....9..5..621..3..8.....5...435..2....9..56........1";
 
+// The "color" fixture from tests/run.sh, chosen because rows 3, 5 and 7 are
+// *fully* given ("517283964", "145836729", "451378296"). kEmpty and kMed both
+// have an unset cell in every row, so neither can observe stage 0 rejecting a
+// row -- deleting that filter entirely leaves them green. This board is what
+// pins it. Loading a board only analyzes, never places, so the set cells are
+// exactly the non-'.' characters here.
+const std::string kColor =
+    "289...375364.9.812517283964893.2.6.1145836729726....83451378296.72.1..38.38..21.7";
+
 // ---------------------------------------------------------------------------
 
 void test_stage0_rows() {
@@ -64,6 +73,13 @@ void test_stage0_rows() {
     Solver med = make_solver(kMed);
     check(eq(complete_move(med, ""), {"1","2","3","4","5","6","7","8","9"}),
           "kMed offers all nine rows (each row has an unset cell)");
+
+    // The rejecting direction: kColor's rows 3, 5 and 7 are fully given, so they
+    // are the rows stage 0 must drop. This is the only case here that fails if
+    // the "has an unset cell" filter is removed.
+    Solver color = make_solver(kColor);
+    check(eq(complete_move(color, ""), {"1","2","4","6","8","9"}),
+          "kColor: fully-given rows 3, 5 and 7 are not offered");
 }
 
 void test_stage1_columns() {
@@ -76,6 +92,17 @@ void test_stage1_columns() {
     Solver med = make_solver(kMed);
     check(eq(complete_move(med, "1"), {"12","13","14","15","16","17","18","19"}),
           "kMed row 1: the set clue's column (1) is excluded");
+
+    // kColor row 1 = "289...375": only columns 4, 5 and 6 are still unset.
+    Solver color = make_solver(kColor);
+    check(eq(complete_move(color, "1"), {"14","15","16"}),
+          "kColor row 1: only the three unset columns are offered");
+
+    // A row with nothing left in it offers nothing -- the row-level counterpart
+    // of the set-cell case in stage 2. Reachable by typing a row digit that
+    // stage 0 would not have offered.
+    check(complete_move(color, "3").empty(),
+          "kColor row 3 is fully given -> no columns offered");
 }
 
 void test_stage2_values() {

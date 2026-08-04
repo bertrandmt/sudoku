@@ -242,6 +242,19 @@ bool Board::set_value_at(const Coord &coord, const Value &value) {
     return true;
 }
 
+bool Board::is_unset_at(size_t row, size_t col) const {
+    return at(row, col).isNote();
+}
+
+ValueList Board::candidates_at(size_t row, size_t col) const {
+    const Cell &cell = at(row, col);
+
+    // notes() asserts isNote(), so a set cell has to be answered before asking.
+    if (!cell.isNote()) return {};
+
+    return cell.notes().values();
+}
+
 Cell &Board::at(size_t row, size_t col) {
     assert(row < height);
     assert(col < width);

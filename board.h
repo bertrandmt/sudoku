@@ -59,6 +59,15 @@ public:
     bool set_value_at(const Coord &, const Value &);
     bool set_value_at(size_t row, size_t col, const Value &);
 
+    // Read-only counterparts to the two mutators above, addressed the same way
+    // and carrying the same precondition: row and col must be in range (the
+    // private at() asserts it, as it does for clear_note_at/set_value_at). They
+    // exist so a caller outside the Analyzer friendship can ask about a cell
+    // without indexing cells() -- the flat row-major layout stays private.
+    // candidates_at returns an empty list for a cell that is already set.
+    bool is_unset_at(size_t row, size_t col) const;
+    ValueList candidates_at(size_t row, size_t col) const;
+
     const Row &row(const Cell &) const;
     const Column &column(const Cell &) const;
     const Nonet &nonet(const Cell &) const;
