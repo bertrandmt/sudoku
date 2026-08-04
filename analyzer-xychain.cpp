@@ -33,8 +33,10 @@ namespace {
 // between the copy and the read.
 //
 // Lifetime: each frame's candidate set outlives the calls that frame makes, and
-// every push_back is popped before the frame exits, so a pointer is only ever
-// dereferenced while the set holding it is alive (see extend_chain's loop).
+// every push_back in extend_chain is popped before that frame exits, so a pointer
+// is only ever dereferenced while the set holding it is alive (see extend_chain's
+// loop). The one push that is never popped is find_xychain's anchor, element 0,
+// which needs no such guarantee: it points into the board, not into a frame.
 using ChainCells = std::vector<const Cell *>;
 
 std::vector<Coord> coords_of(const ChainCells &chain) {
@@ -124,11 +126,15 @@ void select_chain_candidates(const Cell &current, Value value, const Set &set, c
 // so the chain continues on `cell`'s *other* candidate. Returns whether any
 // offer was accepted.
 //
-// A plain recursive function, not a lambda: recursing through a std::function
-// cost a heap allocation and an indirect call (#30). The two accumulators
-// find_xychain owns -- the chain under construction and the visited set -- are
-// threaded by reference rather than captured, which also makes it visible at the
-// call site that the recursion mutates them.
+// A plain recursive function, not a lambda: the std::function was there only so
+// the lambda could name itself for the recursive call, and cost a heap allocation
+// per search root plus an indirect call at every node (#30). The better reason is
+// scoping -- the lambda's own `cell` parameter shadowed find_xychain's anchor cell
+// under a capture-all, so an accidental read of the anchor from inside the
+// recursion would have compiled silently. Here the anchor is not in scope at all.
+//
+// The two accumulators find_xychain owns -- the chain under construction and the
+// visited set -- are threaded by reference rather than captured.
 bool extend_chain(const Board &board, const Cell &cell, Value incoming_link_value,
                   ChainCells &chain, std::unordered_set<Coord> &visited, FindingList &out) {
     assert(cell.isNote());
@@ -156,15 +162,19 @@ bool extend_chain(const Board &board, const Cell &cell, Value incoming_link_valu
     //    therefore part of the result, not just of the presentation.
     //
     // Measured over the 34-board corpus (31 in notes.txt plus run.sh's 9
-    // fixtures, 6 of which are the same boards), sorting changes the output of
-    // exactly one, and there it selects the same
-    // chain traversed in the opposite direction: same endpoints, same value,
-    // same two eliminations, same final grid. So this buys determinism without
-    // changing what the solver concludes on any board we have. It is not a
-    // proof for all boards -- two genuinely different chains tied on
-    // (elimination count, length) would still be resolved by whoever is
-    // offered first -- which is one more reason to prefer issue #36's
-    // greedy-on-all-distinct-effects rewrite over this trim-to-one.
+    // fixtures, 6 of which are the same boards), removing the sort changes the
+    // output of two boards, and in both the solver still reaches the same final
+    // grid: it selects an equally desirable chain, on one board simply the same
+    // chain walked from the other end. So this buys output determinism without
+    // changing what the solver concludes on any board we have. It is not a proof
+    // for all boards -- two genuinely different chains tied on (elimination count,
+    // length) would still be resolved by whoever is offered first -- which is one
+    // more reason to prefer issue #36's greedy-on-all-distinct-effects rewrite
+    // over this trim-to-one.
+    //
+    // No test pins this: neither suite fails with the sort removed, because the
+    // final grids are unchanged and that is all the black-box tiers compare. See
+    // #53.
     //
     // `candidates` outlives every recursive call made from this frame, so the
     // pointers pushed below stay valid for as long as they are on the chain,
