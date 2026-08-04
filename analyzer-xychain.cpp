@@ -12,7 +12,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <functional>
 #include <memory>
 #include <unordered_set>
 #include <vector>
@@ -35,7 +34,7 @@ namespace {
 //
 // Lifetime: each frame's candidate set outlives the calls that frame makes, and
 // every push_back is popped before the frame exits, so a pointer is only ever
-// dereferenced while the set holding it is alive (see the loop below).
+// dereferenced while the set holding it is alive (see extend_chain's loop).
 using ChainCells = std::vector<const Cell *>;
 
 std::vector<Coord> coords_of(const ChainCells &chain) {
@@ -119,6 +118,88 @@ void select_chain_candidates(const Cell &current, Value value, const Set &set, c
     }
 }
 
+// Extend `chain` by one cell in every direction it can go, offering each
+// actionable chain met along the way to record_if_best, and recurse.
+// `incoming_link_value` is the candidate the previous link resolved into `cell`,
+// so the chain continues on `cell`'s *other* candidate. Returns whether any
+// offer was accepted.
+//
+// A plain recursive function, not a lambda: recursing through a std::function
+// cost a heap allocation and an indirect call (#30). The two accumulators
+// find_xychain owns -- the chain under construction and the visited set -- are
+// threaded by reference rather than captured, which also makes it visible at the
+// call site that the recursion mutates them.
+bool extend_chain(const Board &board, const Cell &cell, Value incoming_link_value,
+                  ChainCells &chain, std::unordered_set<Coord> &visited, FindingList &out) {
+    assert(cell.isNote());
+    assert(cell.check(incoming_link_value));
+    assert(cell.notes().count() == 2);
+
+    bool did_find = false;
+
+    // select cells that can see current cell and share its "other" value
+    Value common_link_value = cell.other_value(incoming_link_value);
+    std::unordered_set<Cell> candidates;
+    select_chain_candidates(cell, common_link_value, board.row(cell), visited, candidates);
+    select_chain_candidates(cell, common_link_value, board.column(cell), visited, candidates);
+    select_chain_candidates(cell, common_link_value, board.nonet(cell), visited, candidates);
+
+    // Walk the candidates coord-sorted, not in the set's own order. Two
+    // reasons, and the second is the load-bearing one:
+    //
+    //  - `candidates` is an unordered_set, so its iteration order is
+    //    unspecified and differs between standard libraries. It reaches
+    //    stdout: the chain is recorded in traversal order, so it fixes both
+    //    the "{c1:c2:..}" dump and the order of apply()'s [XY] lines.
+    //  - record_if_best keeps ONE chain and rejects ties, so whichever
+    //    equally-desirable chain is *offered first* wins. Discovery order is
+    //    therefore part of the result, not just of the presentation.
+    //
+    // Measured over the 34-board corpus (31 in notes.txt plus run.sh's 9
+    // fixtures, 6 of which are the same boards), sorting changes the output of
+    // exactly one, and there it selects the same
+    // chain traversed in the opposite direction: same endpoints, same value,
+    // same two eliminations, same final grid. So this buys determinism without
+    // changing what the solver concludes on any board we have. It is not a
+    // proof for all boards -- two genuinely different chains tied on
+    // (elimination count, length) would still be resolved by whoever is
+    // offered first -- which is one more reason to prefer issue #36's
+    // greedy-on-all-distinct-effects rewrite over this trim-to-one.
+    //
+    // `candidates` outlives every recursive call made from this frame, so the
+    // pointers pushed below stay valid for as long as they are on the chain,
+    // and `ordered` only holds pointers into it.
+    std::vector<const Cell *> ordered;
+    ordered.reserve(candidates.size());
+    for (const Cell &c : candidates) ordered.push_back(&c);
+    std::sort(ordered.begin(), ordered.end(),
+              [](const Cell *a, const Cell *b) { return a->coord() < b->coord(); });
+
+    for (const auto *next_cell_ptr : ordered) {
+        const Cell &next_cell = *next_cell_ptr;
+        // proactively extend the chain with next_cell
+        chain.push_back(&next_cell);
+        visited.insert(next_cell.coord());
+
+        // is the chain valid and would acting on it have an impact
+        Value next_link_value = next_cell.other_value(common_link_value);
+        size_t num_elim = test_xychain(board, next_link_value, chain);
+        if (num_elim > 0) {
+            // yes! offer it; only a strictly more desirable chain is kept
+            did_find |= XYChainTechnique::record_if_best(out, XYChainFinding{next_link_value, coords_of(chain), num_elim});
+        }
+
+        // recurse
+        did_find |= extend_chain(board, next_cell, common_link_value, chain, visited, out);
+
+        // backtrack
+        chain.pop_back();
+        visited.erase(next_cell.coord());
+    }
+
+    return did_find;
+}
+
 // Clear `entry.value` from every cell of `chain_front_set` that sees the far end
 // of the chain and is not on the chain itself.
 template<class Set>
@@ -200,85 +281,10 @@ bool XYChainTechnique::find_xychain(const Board &board, const Cell &cell, const 
     ChainCells chain;
     std::unordered_set<Coord> visited;
 
-    // Try to extend chain recursively
-    std::function<bool(const Cell&, Value)> extend_chain = [&](const Cell &cell, Value incoming_link_value) -> bool {
-        assert(cell.isNote());
-        assert(cell.check(incoming_link_value));
-        assert(cell.notes().count() == 2);
-
-        bool did_find = false;
-
-        // select cells that can see current cell and share its "other" value
-        Value common_link_value = cell.other_value(incoming_link_value);
-        std::unordered_set<Cell> candidates;
-        select_chain_candidates(cell, common_link_value, board.row(cell), visited, candidates);
-        select_chain_candidates(cell, common_link_value, board.column(cell), visited, candidates);
-        select_chain_candidates(cell, common_link_value, board.nonet(cell), visited, candidates);
-
-        // Walk the candidates coord-sorted, not in the set's own order. Two
-        // reasons, and the second is the load-bearing one:
-        //
-        //  - `candidates` is an unordered_set, so its iteration order is
-        //    unspecified and differs between standard libraries. It reaches
-        //    stdout: the chain is recorded in traversal order, so it fixes both
-        //    the "{c1:c2:..}" dump and the order of apply()'s [XY] lines.
-        //  - record_if_best keeps ONE chain and rejects ties, so whichever
-        //    equally-desirable chain is *offered first* wins. Discovery order is
-        //    therefore part of the result, not just of the presentation.
-        //
-        // Measured over the 34-board corpus (31 in notes.txt plus run.sh's 9
-        // fixtures, 6 of which are the same boards), sorting changes the output of
-        // exactly one, and there it selects the same
-        // chain traversed in the opposite direction: same endpoints, same value,
-        // same two eliminations, same final grid. So this buys determinism without
-        // changing what the solver concludes on any board we have. It is not a
-        // proof for all boards -- two genuinely different chains tied on
-        // (elimination count, length) would still be resolved by whoever is
-        // offered first -- which is one more reason to prefer issue #36's
-        // greedy-on-all-distinct-effects rewrite over this trim-to-one.
-        //
-        // `candidates` outlives every recursive call made from this frame, so the
-        // pointers pushed below stay valid for as long as they are on the chain,
-        // and `ordered` only holds pointers into it.
-        std::vector<const Cell *> ordered;
-        ordered.reserve(candidates.size());
-        for (const Cell &c : candidates) ordered.push_back(&c);
-        std::sort(ordered.begin(), ordered.end(),
-                  [](const Cell *a, const Cell *b) { return a->coord() < b->coord(); });
-
-        for (const auto *next_cell_ptr : ordered) {
-            const Cell &next_cell = *next_cell_ptr;
-            // proactively extend the chain with next_cell
-            chain.push_back(&next_cell);
-            visited.insert(next_cell.coord());
-
-            // is the chain valid and would acting on it have an impact
-            Value next_link_value = next_cell.other_value(common_link_value);
-            size_t num_elim = test_xychain(board, next_link_value, chain);
-            if (num_elim > 0) {
-                // yes! offer it; only a strictly more desirable chain is kept
-                did_find |= record_if_best(out, XYChainFinding{next_link_value, coords_of(chain), num_elim});
-            }
-
-            // recurse
-            did_find |= extend_chain(next_cell, common_link_value);
-
-            // backtrack
-            chain.pop_back();
-            visited.erase(next_cell.coord());
-        }
-
-        return did_find;
-    };
-
-    bool did_find = false;
-
     chain.push_back(&cell);
     visited.insert(cell.coord());
 
-    did_find |= extend_chain(cell, value);
-
-    return did_find;
+    return extend_chain(board, cell, value, chain, visited, out);
 }
 
 // https://www.sudokuwiki.org/XY_Chains
