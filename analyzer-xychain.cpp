@@ -163,10 +163,12 @@ bool extend_chain(const Board &board, const Cell &cell, Value incoming_link_valu
     //
     // Measured over the 34-board corpus (31 in notes.txt plus run.sh's 9
     // fixtures, 6 of which are the same boards), removing the sort changes the
-    // output of two boards, and in both the solver still reaches the same final
-    // grid: it selects an equally desirable chain, on one board simply the same
-    // chain walked from the other end. So this buys output determinism without
-    // changing what the solver concludes on any board we have. It is not a proof
+    // output of two boards, neither of them in its final grid, and it changes them
+    // differently: on one the recorded winner flips to the same chain walked from
+    // the other end, while on the other the winner and its eliminations are
+    // untouched and only the trace of superseded offers moves. So what this buys
+    // is a reproducible transcript rather than a correct one -- nothing the solver
+    // concludes on any board we have depends on it. It is not a proof
     // for all boards -- two genuinely different chains tied on (elimination count,
     // length) would still be resolved by whoever is offered first -- which is one
     // more reason to prefer issue #36's greedy-on-all-distinct-effects rewrite
