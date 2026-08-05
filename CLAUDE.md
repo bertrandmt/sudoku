@@ -21,16 +21,13 @@ echo -e "v\nn.board_string\n.\n.\n.\n.\n.\n.\n.\n.\n.\n." | ./sudoku-solver | gr
 ```
 
 ## Pattern abbreviations in output
-- [NS] = Naked Singles
-- [HS] = Hidden Singles  
-- [NP] = Naked Pairs
-- [LC] = Locked Candidates
-- [HP] = Hidden Pairs
-- [XW] = XWing patterns
-- [SC] = Simple Coloring (single's chains)
-- [YW] = Y-Wing
-- [SF] = Swordfish
-- [XY] = XY-Chain
+Each heuristic prints a two-letter tag: `[NS] [7, 8] =4`, `[SC](0) {}`. The
+canonical tag-to-name mapping is README.md's numbered technique list, which
+`tests/run.sh` enforces against the binary's own registry, so look there rather
+than trusting a copy. This file deliberately keeps no copy: it had one, ungated,
+and it went stale the first time a technique was added.
+
+One alias the tag hides: Simple Coloring (`[SC]`) is also called single's chains.
 
 ## Reading board display output
 The visual board display shows each Sudoku cell as a 3x3 grid of positions representing candidate values:

@@ -31,10 +31,9 @@
 // and the registry does not know that. Sections that do exist are covered --
 // run.sh replays each registered example's fixture board and diffs the block.
 //
-// CLAUDE.md also lists every tag, and is deliberately NOT a site here. It is
-// agent guidance rather than project documentation: a stale entry there misleads
-// a tool, not a reader of the solver. Recorded so the next person to notice it
-// does not have to re-litigate whether the omission was an oversight.
+// README's list is the project's only tag-to-name mapping, and (7a) is what keeps
+// it honest. Do not stand up a second copy elsewhere: nothing would check it, and
+// it would go stale the first time this list grew.
 //
 // Six of the seven fail loudly -- at compile time, at link time, on an assert
 // the shipped binary carries, or in the suite CI runs on every PR. None of those
@@ -50,4 +49,5 @@
 #include "analyzer-colorchain.h"
 #include "analyzer-ywing.h"
 #include "analyzer-swordfish.h"
+#include "analyzer-finnedxwing.h"
 #include "analyzer-xychain.h"
