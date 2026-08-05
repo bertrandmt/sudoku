@@ -852,6 +852,8 @@ The command `v` toggles verbosity of the analysis of the board state. By default
 make              # optimized build -> ./sudoku-solver
 make debug=1      # unoptimized build with debug symbols
 make test         # build, then run the black-box correctness suite
+make unit         # whitebox unit tests for the analyzer
+make fuzz         # randomised soundness fuzz (see below)
 make clean        # remove build and coverage artifacts
 ```
 
@@ -863,6 +865,32 @@ tests and the examples above expect it.
 The correctness suite lives in `tests/run.sh` and drives the compiled binary
 through its REPL. CI additionally builds across gcc, clang and macOS/libc++ and
 runs an ASan/UBSan build against adversarial input.
+
+## Soundness fuzz
+
+`tests/run.sh` and the unit tests both check chosen boards. That is the right shape
+for pinning behaviour, but it is a weak instrument for *soundness*: a newly added
+technique fires on only the one or two fixtures added alongside it, so a green
+suite can mean the new rule was exercised on a single position.
+
+`make fuzz` generates puzzles instead, keeps those with a unique solution, and
+steps the solver through each one checking the invariant that must never break:
+after every step, every unsolved cell still offers its solution value, and every
+solved cell holds it. A wrong elimination surfaces as the step that dropped a
+needed candidate, with the technique named and the seed and puzzle printed as a
+reproduction recipe.
+
+```sh
+make fuzz                          # 200 puzzles, fixed seed, ~20s
+make fuzz FUZZ_ARGS="2000 12345"   # more puzzles, or a different seed
+```
+
+The seed is fixed by default and echoed on every run, so a failure is reproducible
+rather than anecdotal. The report ends by naming any technique the run never
+reached, since a rule the fuzz did not exercise is not a rule the fuzz has
+anything to say about; the rarer ones (Swordfish especially) need a larger count
+before they appear. It is not part of `make test`: its runtime is a knob rather
+than a constant, so it is a tool to reach for when adding or changing a technique.
 
 ## Coverage
 

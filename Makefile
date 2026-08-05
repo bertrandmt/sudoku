@@ -79,6 +79,24 @@ unit: $(unit_bin)
 $(unit_bin): tests/unit/test_analyzer.cpp $(lib_obj)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I. $^ $(LDFLAGS) -o $@
 
+# Randomised soundness fuzz. Links the same library objects and drives the public
+# Solver, so it needs no friend hook. Deliberately NOT part of `test` or `unit`:
+# it generates puzzles rather than reading fixtures, so its runtime scales with
+# the count and it is the one suite whose duration is a knob. Run it when adding
+# or changing a technique -- the fixtures prove a rule works on the board it
+# shipped with, this proves it is sound across positions nobody chose.
+#   make fuzz                          the default 200 puzzles, fixed seed
+#   make fuzz FUZZ_ARGS="2000 12345"   more puzzles, or a different seed
+fuzz_bin = tests/fuzz/fuzz_soundness
+FUZZ_ARGS ?=
+
+.PHONY: fuzz
+fuzz: $(fuzz_bin)
+	$(fuzz_bin) $(FUZZ_ARGS)
+
+$(fuzz_bin): tests/fuzz/fuzz_soundness.cpp $(lib_obj)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I. $^ $(LDFLAGS) -o $@
+
 # One-shot coverage report. Rebuilds instrumented from clean, exercises both
 # test suites to accumulate .gcda counts, then has gcovr render the report.
 # gcovr runs gcov in its own scratch directory, so no stray .gcov files land in
