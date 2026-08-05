@@ -135,7 +135,7 @@ materialized-object) and 4 inline (the 4 scan-fused). The codebase matches:
   the technique's class — the same "exposed exactly when the test must read it"
   rule that governs the findings.
 
-  `record_if_best` is the one seam here with no analogue in the other nine.
+  `record_if_best` is the one seam here with no analogue in any other technique.
   XY-chain is the solver's only find-many/act-one technique: it ranks every chain
   it discovers and applies just the most desirable one, so the ranking rule is a
   contract in its own right, and one a crafted board cannot isolate (it takes
@@ -190,9 +190,9 @@ PR #27 for `test_naked_pair`:
   (a `test_foo_row` wrapper calling `a.test_foo(..., a.mBoard.row(c1))`), with
   `template bool Analyzer::test_foo<Row>(...) const;` beside the definition. Both
   naked pair and hidden pair took it while private and shed it on porting. It is
-  recorded here only so an old commit reads clearly: with all ten techniques
-  ported there is no longer a predicate that could need it, and a new technique
-  is a standalone `Technique` from its first line.
+  recorded here only so an old commit reads clearly: with the port complete there
+  is no longer a predicate that could need it, and a new technique is a standalone
+  `Technique` from its first line.
 
 - **The decision.** When extracting a templated predicate, choose up front: test
   it through `find_` (cheap, coarser, no link tax), or pay the

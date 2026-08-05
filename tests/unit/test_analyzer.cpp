@@ -913,7 +913,7 @@ void test_colorchain_benign_not_actionable() {
 // Rebinding ctor (issue #7)
 // ===========================================================================
 //
-// All ten techniques' findings live in one carried member, mFindings,
+// Every technique's findings live in one carried member, mFindings,
 // initialized by a single hand-written line in the rebinding ctor
 // (`mFindings(other.mFindings)`). Drop that line and *every* technique
 // silently stops carrying forward. This test isolates exactly that line: it

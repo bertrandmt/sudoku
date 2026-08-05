@@ -100,7 +100,7 @@ P_sf="5...1...3..6..3..2..32.......23...76....5....19...75.......94..2..8..6..9.
 S_sf="529418763716593842843276159452381976637954218198627534385169427274835691961742385"
 
 # A puzzle that the pre-Finned-X-Wing solver could NOT crack: singles carry it 15
-# steps and then every one of the other ten techniques goes dry with 31 cells
+# steps and then every other technique in the cascade goes dry with 31 cells
 # left. Two finned X-Wings on values 5 and 3 -- both column-based on base columns
 # 2 and 4 with the same fin at [4, 2] -- each strike a candidate from [6, 1],
 # leaving it a naked 4 that cascades to the full grid. So this fixture proves the

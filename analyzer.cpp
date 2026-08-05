@@ -100,8 +100,8 @@ void Analyzer::analyze() {
     const auto &reg = registry();
     // mFindings is indexed in lockstep with reg (bucket i belongs to reg[i]);
     // the two are sized together at construction. Assert it here rather than
-    // trust it: this positional coupling is what stands in for ten separately
-    // named members, so it gets an executable guard.
+    // trust it: this positional coupling is what stands in for one separately
+    // named member per registered technique, so it gets an executable guard.
     assert(mFindings.size() == reg.size());
     bool did_find = false;
     for (size_t i = 0; i < reg.size() && !did_find; ++i)

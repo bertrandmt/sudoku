@@ -6,15 +6,16 @@
 // Analyzer::registry() (in analyzer.cpp) can construct each one directly.
 // Listed in cascade order.
 //
-// Adding a technique is TEN sites. Each is followed by what catches it if you
+// Adding a technique is ELEVEN sites. Each is followed by what catches it if you
 // forget:
 //   1. analyzer-<name>.h and analyzer-<name>.cpp  -- two new files    [compile]
 //   2. a `src =` entry in the Makefile (explicit list, no glob)          [link]
 //   3. the #include here                                             [compile]
 //   4. the kCascade literal in analyzer.cpp                    [registry assert]
 //   5. the registry() push_back in analyzer.cpp                [registry assert]
-//   6. the bucket count and label in the unit suite's
-//      test_rebinding_ctor_carries_findings                       [unit suite]
+//   6. every technique count in the unit suite -- the bucket count and its
+//      label in test_rebinding_ctor_carries_findings, plus any count in the
+//      prose around it. The count is what fails; the prose is not [unit suite]
 //   7. README.md, in three parts:
 //      a. an entry in the numbered technique list ("denoted as
 //         `[XY]`")                                            [tests/run.sh]
@@ -28,9 +29,17 @@
 //      and its name in tier [0]/[1]/[2]'s shared loop            [nothing]
 //   9. a tests/run.sh tier [7] prec_check block, pinning the exact
 //      candidates its first application removes                   [nothing]
-//  10. docs/test-predicate-idiom.md: the class table, the
-//      with-`test_`-versus-inline count under it, and a bullet placing
-//      the technique in its class and saying why                  [nothing]
+//  10. docs/test-predicate-idiom.md: a bullet placing the technique in its
+//      class and saying why, and **every technique count in the file**, not
+//      an enumerated few. Enumerating is what failed here: the first pass
+//      updated the class table and the partition line and left two counts
+//      in the prose stale                                         [nothing]
+//  11. a whitebox seam decision, and usually cases to go with it: whether the
+//      per-anchor entry is promoted to a public static and whether the
+//      Finding leaves its .cpp for the header. Conditional, like the fixture
+//      in (8) -- locked candidates carries no whitebox cases at all and so
+//      needs no seam -- so what is mandatory is *deciding*, and recording
+//      that decision in (10), not writing cases either way        [nothing]
 // (4) and (5) cross-check each other: the assert compares the built registry's
 // size and names against kCascade, so getting exactly one of them wrong aborts.
 // (7a) and (7b) read what they expect out of the binary rather than hardcoding
@@ -46,18 +55,25 @@
 // it honest. Do not stand up a second copy elsewhere: nothing would check it, and
 // it would go stale the first time this list grew.
 //
-// Six of the ten fail loudly -- at compile time, at link time, on an assert the
-// shipped binary carries, or in the suite CI runs on every PR -- and so do (7a)
-// and (7b). None of those can be missed in a way that leaves a technique quietly
-// never firing, or leaves documented output quietly describing a solver that no
-// longer exists.
+// Six fail loudly -- at compile time, at link time, on an assert the shipped
+// binary carries, or in the suite CI runs on every PR -- and so do (7a) and (7b).
+// None of those can be missed in a way that leaves a technique quietly never
+// firing, or leaves documented output quietly describing a solver that no longer
+// exists. (6) is the awkward one: its count fails the unit suite, but the prose
+// naming the techniques beside it does not.
 //
-// The remaining four -- (7c), (8), (9), (10) -- are unguarded, and for one shared
-// reason: each is coverage or prose *for* the new technique, and nothing can know
-// that a technique deserves a test or a section it does not yet have. Those four
-// are what this list is really for. (8), (9) and (10) were missing from it until
-// Finned X-Wing was added and needed all three, which is the argument for writing
-// down even the sites no machine will ever check.
+// The remaining five -- (7c), (8), (9), (10), (11) -- are unguarded, for one
+// shared reason: each is coverage or prose *for* the new technique, and nothing
+// can know that a technique deserves a test, a section, or a seam it does not yet
+// have. Those five are what this list is really for; the loud six would announce
+// themselves without it.
+//
+// Two lessons are baked into the wording above, both learned by getting it wrong.
+// (8) through (11) were missing entirely until Finned X-Wing needed all four, so
+// a site absent from this list is not a site that does not exist. And (6) and
+// (10) say "every count in the file" rather than naming places, because naming
+// places is exactly what went stale: the same change that added (10) to this list
+// updated two of the four counts in that file and missed the other two.
 
 #include "analyzer-nakedsingles.h"
 #include "analyzer-hiddensingles.h"

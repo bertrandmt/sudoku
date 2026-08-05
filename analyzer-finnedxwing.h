@@ -13,17 +13,17 @@
 // X-Wing needs two base lines whose candidates for one value fall entirely
 // within the same two cross lines. A finned X-Wing allows extra candidates
 // outside those two cross lines -- the fins -- provided every fin sits in a
-// single box.
+// single nonet.
 //
 // The either/or that licenses it: if every fin is false, the base lines are
 // confined to the two cover lines after all and a true X-Wing eliminates the
-// value from them; if some fin is true, its box already holds the value. Only
+// value from them; if some fin is true, its nonet already holds the value. Only
 // cells covered by *both* branches are safe to eliminate, i.e. cells that see
-// every fin: those on a cover line, inside the fin box, outside the base lines.
+// every fin: those on a cover line, inside the fin's nonet, outside the base lines.
 //
 // Sashimi X-Wing (a base line holding only one cover candidate, so that deleting
 // the fin leaves the fish a corner short) needs no special case: the rule above
-// is stated over the fin box, not over corners, so it covers that shape too.
+// is stated over the fin's nonet, not over corners, so it covers that shape too.
 //
 // Finned X-Wing is *scan-fused* (docs/test-predicate-idiom.md), like the plain
 // fish it extends: the second base line, the cover pair and the fin set are all
@@ -41,9 +41,9 @@ struct FinnedXWingFinding : Finding {
     // The fins, in board order. Unlike the plain fish, this one cannot be left
     // to apply()'s recomputation: act_on_xwing rebuilds its cover as every cross
     // line the base lines touch, which for a finned position would drag in the
-    // fin's own line and drop the mandatory fin-box restriction. Recording the
+    // fin's own line and drop the mandatory fin-nonet restriction. Recording the
     // fins pins both down -- the cover is what the non-fin candidates lie on,
-    // and the box is the one every fin shares -- so a single field replaces two
+    // and the nonet is the one every fin shares -- so a single field replaces two
     // that could disagree with each other.
     std::vector<Coord> fins;
     bool is_row_based;  // true if rows hold the pattern, false if columns do
@@ -81,7 +81,7 @@ public:
     // Whitebox seam, NOT a leaked private: anchor the per-anchor search on a
     // chosen cell of a crafted board and inspect the finding it records --
     // reaching the rejections a happy-path solve does not isolate (fins spread
-    // across two boxes, a base line made entirely of fins, a cover pair with
+    // across two nonets, a base line made entirely of fins, a cover pair with
     // nothing to eliminate). Public *static* so the whitebox suite calls it
     // without friendship *and* without an instance: the technique is stateless
     // and this touches no instance data. Same shape as XWingTechnique::find_xwing

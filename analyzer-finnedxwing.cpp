@@ -107,21 +107,28 @@ bool find_finned_xwing(const Board &board, const Cell &cell, const Value &value,
                 // away by the crosses < 3 early-out above.
                 assert(!fins.empty());
 
-                // Every fin in one box is what licenses the elimination; fins
-                // spread across two boxes leave no cell seeing all of them.
-                const Nonet &fbox = board.nonet(fins.front());
-                bool one_box = true;
+                // Every fin in one nonet is what licenses the elimination, and the
+                // gate is exact rather than merely safe. An eliminable cell lies on
+                // a cover line outside the base lines, so it shares no line with a
+                // fin: a fin's cross line is not a cover line, and its base line is
+                // excluded. It can therefore see a fin only by sharing a nonet with
+                // it, and see *every* fin only if all the fins share that one
+                // nonet. Note the claim is about *eliminable* cells -- fins in a
+                // common base line are seen together by everything else on that
+                // line, so "no cell sees them all" would simply be false.
+                const Nonet &fin_nonet = board.nonet(fins.front());
+                bool one_nonet = true;
                 for (auto const &f : fins)
-                    if (&board.nonet(f) != &fbox) { one_box = false; break; }
-                if (!one_box) continue;
+                    if (&board.nonet(f) != &fin_nonet) { one_nonet = false; break; }
+                if (!one_nonet) continue;
 
-                // There is something to eliminate iff a cell of the fin box
+                // There is something to eliminate iff a cell of the fin's nonet
                 // holds the value on a cover line, outside the base lines. Those
                 // are exactly the cells that see every fin *and* would be
                 // eliminated by the fish, so they are safe under either branch
                 // of the either/or.
                 bool has_eliminations = false;
-                for (auto const &c : fbox) {
+                for (auto const &c : fin_nonet) {
                     if (!c.isNote() || !c.check(value)) continue;
                     if (!e1.contains(c) && !e2.contains(c)) continue;
                     if (cset.contains(c) || cset2.contains(c)) continue;
@@ -146,7 +153,7 @@ bool find_finned_xwing(const Board &board, const Cell &cell, const Value &value,
     return false;
 }
 
-// Apply one recorded finned X-Wing: clear `value` from the cells of the fin box
+// Apply one recorded finned X-Wing: clear `value` from the cells of the fin's nonet
 // that lie on a cover line and outside the two base lines.
 template<class EliminationSet>
 bool act_on_finned_xwing(Board &board, const FinnedXWingFinding &entry) {
@@ -157,7 +164,12 @@ bool act_on_finned_xwing(Board &board, const FinnedXWingFinding &entry) {
 
     const CandidateSet &b1 = line_of<CandidateSet>(board, entry.anchors[0]);
     const CandidateSet &b2 = line_of<CandidateSet>(board, entry.anchors[1]);
-    const Nonet &fbox = board.nonet(entry.fins.front());
+    // find() proved this non-empty; front() below is undefined without it, and the
+    // proof is on the far side of the find/apply boundary this finding crossed. So
+    // restate it here, for the same reason the cover assert below exists: a
+    // recorded finding's invariants are worth re-stating where they get used.
+    assert(!entry.fins.empty());
+    const Nonet &fin_nonet = board.nonet(entry.fins.front());
 
     // Recover the cover: the base candidates that are not fins all lie on it, and
     // there are exactly two such lines. Note what is *not* done here -- sweeping
@@ -176,12 +188,12 @@ bool act_on_finned_xwing(Board &board, const FinnedXWingFinding &entry) {
 
     // `unit` is fully determined by EliminationSet -- derive it, don't thread it
     // through as a second source of truth a caller could get wrong. The tag names
-    // the line the candidate is eliminated *from*; the fin box is what narrows
+    // the line the candidate is eliminated *from*; the fin's nonet is what narrows
     // which of that line's cells qualify.
     constexpr Unit unit = std::is_same_v<EliminationSet, Column> ? Unit::Column : Unit::Row;
 
     bool did_act = false;
-    for (auto const &cell : fbox) {
+    for (auto const &cell : fin_nonet) {
         if (!cell.isNote()) continue;
         if (!cell.check(entry.value)) continue;
         if (!cover[0]->contains(cell) && !cover[1]->contains(cell)) continue;
@@ -211,8 +223,8 @@ bool FinnedXWingTechnique::find_finned_xwing(const Board &board, const Cell &cel
 
 // https://www.sudokuwiki.org/Finned_X_Wing
 // A finned X-Wing is an X-Wing whose base lines are allowed extra candidates
-// outside the two cover lines, so long as all of those fins share one box. The
-// value is then eliminated from the cover lines' cells inside that box, outside
+// outside the two cover lines, so long as all of those fins share one nonet. The
+// value is then eliminated from the cover lines' cells inside that nonet, outside
 // the base lines.
 bool FinnedXWingTechnique::find(const Board &board, FindingList &out) const {
     assert(out.empty());

@@ -61,7 +61,7 @@ public:
     virtual bool        brace_each() const = 0;  // print_section wrap flag
 
     // Search the board, record findings into `out`, and return whether `out` is
-    // non-empty on exit -- exactly that, for all ten: no technique returns true
+    // non-empty on exit -- exactly that, for every one of them: no technique returns true
     // without recording, or records without returning true. `out` is this
     // technique's own bucket and is empty on entry (each find() asserts it);
     // everything recorded must be this technique's own Finding subtype, which is
