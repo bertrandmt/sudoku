@@ -99,6 +99,20 @@ S_hard="179482536546391278832675419381569742957248361264137895413826957698754123
 P_sf="5...1...3..6..3..2..32.......23...76....5....19...75.......94..2..8..6..9...4...5"
 S_sf="529418763716593842843276159452381976637954218198627534385169427274835691961742385"
 
+# A puzzle that the pre-Finned-X-Wing solver could NOT crack: singles carry it 15
+# steps and then every other technique in the cascade goes dry with 31 cells
+# left. Two finned X-Wings on values 5 and 3 -- both column-based on base columns
+# 2 and 4 with the same fin at [4, 2] -- each strike a candidate from [6, 1],
+# leaving it a naked 4 that cascades to the full grid. So this fixture proves the
+# technique is load-bearing, not merely reachable: delete FinnedXWingTechnique
+# from the registry and tier [1] fails here. It also exercises the technique
+# twice in consecutive steps, which pins the re-entry SolverState::act relies on
+# (find records one pattern, apply consumes it, analyze finds the next).
+# S_fx was computed by an independent brute-force solver, which also confirmed
+# the puzzle has exactly one completion.
+P_fx="9...4....7.4.8..5..8....1....76..82.62.4............19...1.2...89.7.........5...3"
+S_fx="951246387764381952283975146517693824629418735438527619375162498892734561146859273"
+
 echo "[0] Fixture sanity: puzzles and solutions are well-formed before they gate the solver"
 # A typo in a fixture would make a *correct* solver look broken, or mask a real
 # bug behind a "wrong grid" that is actually the fixture's fault. So validate the
@@ -157,7 +171,7 @@ fixture_ok() { # $1 = name, $2 = puzzle, $3 = solution
     why="$(consistent "$2" "$3")";    if [ -n "$why" ]; then bad "$1: solution contradicts a puzzle clue" "$why"; return; fi
     ok "$1: puzzle and solution are well-formed and consistent"
 }
-for name in easy med clm adv sf; do
+for name in easy med clm adv sf fx; do
     pvar="P_$name"; svar="S_$name"
     fixture_ok "$name" "${!pvar}" "${!svar}"
 done
@@ -168,7 +182,7 @@ done
 fixture_ok "hard" "$P_hard" "$S_hard"
 
 echo "[1] Full-solve correctness"
-for name in easy med clm adv sf; do
+for name in easy med clm adv sf fx; do
     pvar="P_$name"; svar="S_$name"
     out="$(printf 'n.%s\nr\np\n' "${!pvar}" | run_solver 2>&1)"
     got="$(printf '%s' "$out" | extract_grids | tail -1)"
@@ -228,7 +242,7 @@ elim_check() { # $1 = name, $2 = puzzle, $3 = solution
     else                           ok  "$1: every candidate grid still lists the solution's digits"
     fi
 }
-for name in easy med clm adv sf; do
+for name in easy med clm adv sf fx; do
     pvar="P_$name"; svar="S_$name"
     elim_check "$name" "${!pvar}" "${!svar}"
 done
@@ -255,6 +269,8 @@ check_tech "$vout_hard" LC "Locked Candidates"
 check_tech "$vout_hard" SF "Swordfish"
 vout_sf="$(printf 'v\nn.%s\nr\n' "$P_sf" | run_solver 2>&1)"
 check_tech "$vout_sf" SF "Swordfish (full-solve fixture)"
+vout_fx="$(printf 'v\nn.%s\nr\n' "$P_fx" | run_solver 2>&1)"
+check_tech "$vout_fx" FX "Finned X-Wing"
 vout_adv="$(printf 'v\nn.%s\nr\n' "$P_adv" | run_solver 2>&1)"
 check_tech "$vout_adv" SC "Simple Coloring"
 check_tech "$vout_adv" YW "Y-Wing"
@@ -456,6 +472,13 @@ prec_check "swordfish"         SF "$P_hard" "[SF] [2, 8] x8 [c]
 [SF] [3, 8] x8 [c]
 [SF] [7, 5] x8 [c]
 [SF] [7, 8] x8 [c]"
+# Finned X-Wing on value 5: base columns {2,4}, cover rows {1,6}, fin at [4, 2]
+# in the middle-left nonet. Only [6, 1] is a cover-row cell inside that nonet and
+# outside the base columns, so the single elimination is the whole pattern's
+# yield -- which makes this block a tight check: a cover set that wrongly swept
+# the fin's own row, or an elimination not restricted to the fin box, would show
+# up here as extra lines rather than as a missing one.
+prec_check "finned x-wing"     FX "$P_fx"    "[FX] [6, 1] x5 [r]"
 prec_check "simple coloring"   SC "$P_color" "[SC] [9, 5] x4 [👀🟩🟥]"
 prec_check "y-wing"            YW "$P_yw1" "[YW] [1, 5] x9
 [YW] [2, 8] x9"
@@ -531,8 +554,8 @@ echo "[9] Documentation: README tracks the technique registry"
 # happened when Swordfish landed and two dump blocks kept printing nine lines.
 # techniques.h calls this edit site 7; these are its enforcers.
 #
-# CLAUDE.md's tag list is deliberately NOT checked here; see techniques.h for
-# why that exclusion is intentional rather than an oversight.
+# README's numbered list is the project's only tag-to-name mapping, so checking it
+# here is sufficient: there is no second copy anywhere to drift away from it.
 
 README_MD="$ROOT/README.md"
 
@@ -681,6 +704,7 @@ Simple Coloring (value 4)|## Simple Coloring|1|$P_color
 Simple Coloring (value 5)|## Simple Coloring|2|$P_color
 Y-Wing|## Y-Wing|1|$P_yw1
 Swordfish|## Swordfish|1|$P_sf
+Finned X-Wing|## Finned X-Wing|1|$P_fx
 XY-Chain|## XY-Chain|1|$P_xy2
 EOF
 

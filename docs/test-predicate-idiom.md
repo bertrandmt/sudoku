@@ -21,13 +21,13 @@ and validating them are the same operation.
 
 ## The three classes
 
-Mapping all ten techniques:
+Mapping all eleven techniques:
 
 | Class | Pattern identity | Techniques | `test_`? |
 |-------|------------------|------------|----------|
 | **Given-tuple** | a small fixed-arity tuple the `find_` loop enumerates | naked single (1 cell), hidden single (cell+value), naked pair (2 cells), **hidden pair (2 cells + 2 values)**, Y-Wing (3 cells) | yes — natural |
 | **Materialized-object** | a standalone object built by an independent discovery step | simple coloring (`ColorChain`), XY-chain (chain vector) | yes — natural |
-| **Scan-fused** | membership emerges only from the validating scan; no tuple, no separable object | locked candidates, X-Wing, Swordfish | no — inline |
+| **Scan-fused** | membership emerges only from the validating scan; no tuple, no separable object | locked candidates, X-Wing, Swordfish, finned X-Wing | no — inline |
 
 - **Given-tuple**: `find_` enumerates tuples (`for` over cells / value pairs);
   `test_` judges each. The would-act / confinement scan inside `test_` operates
@@ -73,7 +73,7 @@ call `find_`, inspect the recorded pattern).
 ## Current state vs. the rule
 
 The partition the rule predicts is 7 with `test_` (5 given-tuple + 2
-materialized-object) and 3 inline (the 3 scan-fused). The codebase matches:
+materialized-object) and 4 inline (the 4 scan-fused). The codebase matches:
 
 - **Hidden pair is correctly factored.** It is given-tuple shaped (identity is
   `(c1, c2, v1, v2)`; the "no other cell in the unit carries v1 or v2" condition
@@ -113,6 +113,16 @@ materialized-object) and 3 inline (the 3 scan-fused). The codebase matches:
   black-box (`tests/run.sh`); it has no whitebox cases, so it needed no seam at
   all.
 
+- **Finned X-Wing joins them, and is the first technique added *after* the
+  registry rather than ported onto it.** Scan-fused for a sharper reason than its
+  siblings: it does not merely discover which cells belong to the pattern while
+  validating it, it discovers *which two cross lines the pattern is even about*.
+  The cover is chosen from the union rather than derived from it, so there is no
+  candidate identity to hand a predicate -- not even the ambiguous one X-Wing
+  could re-derive. It takes the same scan-fused seam shape as the other two fish
+  (`FinnedXWingTechnique::find_finned_xwing` public `static`, `FinnedXWingFinding`
+  in `analyzer-finnedxwing.h`) because its whitebox cases read the recorded fins.
+
 - **XY-chain has a `test_`, and keeps it private.** It is materialized-object
   shaped like simple coloring, so `test_xychain` is the right factoring and
   survives the port (issue #7) as a file-local function in
@@ -125,7 +135,7 @@ materialized-object) and 3 inline (the 3 scan-fused). The codebase matches:
   the technique's class — the same "exposed exactly when the test must read it"
   rule that governs the findings.
 
-  `record_if_best` is the one seam here with no analogue in the other nine.
+  `record_if_best` is the one seam here with no analogue in any other technique.
   XY-chain is the solver's only find-many/act-one technique: it ranks every chain
   it discovers and applies just the most desirable one, so the ranking rule is a
   contract in its own right, and one a crafted board cannot isolate (it takes
@@ -180,9 +190,9 @@ PR #27 for `test_naked_pair`:
   (a `test_foo_row` wrapper calling `a.test_foo(..., a.mBoard.row(c1))`), with
   `template bool Analyzer::test_foo<Row>(...) const;` beside the definition. Both
   naked pair and hidden pair took it while private and shed it on porting. It is
-  recorded here only so an old commit reads clearly: with all ten techniques
-  ported there is no longer a predicate that could need it, and a new technique
-  is a standalone `Technique` from its first line.
+  recorded here only so an old commit reads clearly: with the port complete there
+  is no longer a predicate that could need it, and a new technique is a standalone
+  `Technique` from its first line.
 
 - **The decision.** When extracting a templated predicate, choose up front: test
   it through `find_` (cheap, coarser, no link tax), or pay the

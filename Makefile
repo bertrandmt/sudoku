@@ -38,6 +38,7 @@ src = coord.cpp \
 	  analyzer-lockedcandidates.cpp \
 	  analyzer-hiddenpairs.cpp \
 	  analyzer-xwing.cpp \
+	  analyzer-finnedxwing.cpp \
 	  analyzer-swordfish.cpp \
 	  analyzer-colorchain.cpp \
 	  analyzer-ywing.cpp \

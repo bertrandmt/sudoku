@@ -28,6 +28,7 @@
 #include "analyzer-colorchain.h"
 #include "analyzer-ywing.h"
 #include "analyzer-swordfish.h"
+#include "analyzer-finnedxwing.h"
 #include "analyzer-xychain.h"
 #include "cell.h"
 #include "coord.h"
@@ -708,6 +709,159 @@ void test_xwing_anchor_not_first() {
 }
 
 // ===========================================================================
+// Finned X-Wing
+// ===========================================================================
+
+// A row-based finned X-Wing on value 7. Rows 0 and 3 are the base sets, columns
+// 1 and 5 the cover. Row 3 carries one extra 7, the fin at (3,2), inside the
+// nonet rows 3-5 / columns 0-2. Only cells in that nonet, on a cover column and
+// outside the base rows, are eliminable -- so the stray at (4,1) goes and
+// nothing else does. Note the position is invisible to plain X-Wing: the base
+// rows span three columns, not two.
+//
+//        c1 c2 c5
+//   r0    7     7      <- clean base row
+//   r3    7  7  7      <- base row, plus the fin at c2
+//   r4    7            <- cover column, fin's nonet, not a base row: eliminated
+void test_finnedxwing_row_based() {
+    std::cout << "[finned x-wing] row-based detection, action\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5}, {3,2}, {4,1} });
+
+    FinnedXWingTechnique fx;  // needed for apply() below; find_finned_xwing is static
+    FindingList found;
+    check(FinnedXWingTechnique::find_finned_xwing(board, cell_at(board, 0, 1), V, found),
+          "row finned X-Wing detected with anchor (0,1)");
+    check(found.size() == 1, "exactly one finned X-Wing recorded");
+    auto const *f = only<FinnedXWingFinding>(found);
+    check(f, "the recorded finding is a FinnedXWingFinding");
+    if (f) {
+        check(f->is_row_based, "recorded pattern is row-based");
+        check(f->value == V, "recorded pattern is for value 7");
+        check(f->fins.size() == 1 && f->fins[0] == Coord(3, 2),
+              "the fin at (3,2) is recorded -- apply() cannot re-derive the cover without it");
+    }
+
+    bool acted = fx.apply(board, found);
+    check(acted, "apply reports an elimination");
+    check(!has_candidate(board, 4, 1, V), "stray 7 at (4,1) eliminated");
+    check(has_candidate(board, 3, 2, V), "the fin at (3,2) survives: it sits in a base row");
+    check(has_candidate(board, 0, 1, V) && has_candidate(board, 0, 5, V)
+       && has_candidate(board, 3, 1, V) && has_candidate(board, 3, 5, V),
+          "all four fish corners kept candidate 7");
+}
+
+// The transpose: a column-based finned X-Wing on value 7, base columns 0 and 3,
+// cover rows 1 and 5, fin at (3,3) in the nonet rows 3-5 / columns 3-5. Column 3
+// holds just *one* cover candidate, at (5,3), which makes this a sashimi shape --
+// deleting the fin would leave the fish a corner short. It needs no separate code
+// path, which is what this case pins.
+//
+// Anchoring on (1,0) exercises the column orientation because row 1 holds a
+// single 7: the row search bails on the two-per-base-line floor before the column
+// search runs. (For plain X-Wing the same effect comes from a row with three;
+// here extra candidates are the point, so the bail has to come from below.)
+//
+//        c0 c3 c4
+//   r1    7             <- cover row, hit by base column 0 only
+//   r3       7          <- the fin
+//   r5    7  7  7       <- cover row; (5,4) is eliminated
+void test_finnedxwing_column_based() {
+    std::cout << "[finned x-wing] column-based (sashimi) detection, action\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {1,0},{5,0}, {5,3}, {3,3}, {5,4} });
+
+    FinnedXWingTechnique fx;  // needed for apply() below; find_finned_xwing is static
+    FindingList found;
+    check(FinnedXWingTechnique::find_finned_xwing(board, cell_at(board, 1, 0), V, found),
+          "column finned X-Wing detected with anchor (1,0)");
+    check(found.size() == 1, "exactly one finned X-Wing recorded");
+    auto const *f = only<FinnedXWingFinding>(found);
+    check(f, "the recorded finding is a FinnedXWingFinding");
+    if (f) {
+        check(!f->is_row_based, "recorded pattern is column-based");
+        check(f->fins.size() == 1 && f->fins[0] == Coord(3, 3), "the fin at (3,3) is recorded");
+    }
+
+    bool acted = fx.apply(board, found);
+    check(acted, "apply reports an elimination");
+    check(!has_candidate(board, 5, 4, V), "stray 7 at (5,4) eliminated");
+    check(has_candidate(board, 3, 3, V), "the fin at (3,3) survives: it sits in a base column");
+    check(has_candidate(board, 1, 0, V) && has_candidate(board, 5, 0, V) && has_candidate(board, 5, 3, V),
+          "the three fish cells kept candidate 7");
+}
+
+// The one-nonet rule, isolated. Row 3 gets a second fin at (3,6), in a different
+// nonet from (3,2), so no cell sees both fins and no choice of two cover columns
+// rescues the position -- every other pair leaves fins straddling nonets too.
+// Delete the (3,6) entry and the row-based pattern of the accept case above is
+// found again, which is what makes this a test of the one-nonet gate specifically.
+//
+// (7,1) is scaffolding, and worth explaining rather than leaving to be
+// rediscovered. Read down the columns instead of across the rows and this shape
+// contains a *second*, sound finned X-Wing: base columns 1 and 5, cover rows 0
+// and 3, with the row pattern's eliminable cell (4,1) serving as the fin and the
+// row pattern's fin (3,2) as the eliminable cell. The two readings always come in
+// pairs like that, so without something to break the column reading this case
+// would pass on a found-nothing that had nothing to do with nonets. A second
+// candidate at (7,1) puts two fins in two nonets down column 1 as well, which
+// rejects every column reading; row 7 holds only that one candidate, so it can
+// never serve as a base row itself.
+void test_finnedxwing_fins_in_two_nonets_rejected() {
+    std::cout << "[finned x-wing] fins spread across two nonets are not a pattern\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5}, {3,2}, {3,6}, {4,1}, {7,1} });
+
+    FindingList found;
+    check(!FinnedXWingTechnique::find_finned_xwing(board, cell_at(board, 0, 1), V, found),
+          "no finned X-Wing reported when the fins occupy two nonets");
+    check(found.empty(), "nothing recorded");
+}
+
+// The base-coverage rule, isolated. Row 3's 7s are at (3,0) and (3,2), neither on
+// a cover column, so choosing columns 1 and 5 as the cover makes row 3 *all*
+// fins. Both fins do share one nonet, and that nonet does meet cover column 1 at
+// an eliminable (4,1) -- so without the gate this position records a finding and
+// strikes a true candidate. It is not a fish: with every fin false, row 3 would
+// hold no 7 at all, which is a contradiction rather than a confinement, and a
+// different (stronger) deduction than this technique makes.
+//
+//        c0 c1 c2 c5
+//   r0       7     7    <- the only base row with a cover candidate
+//   r3    7     7       <- no cover candidate: all fins
+//   r4       7          <- what the missing gate would wrongly eliminate
+void test_finnedxwing_uncovered_base_line_rejected() {
+    std::cout << "[finned x-wing] a base line with no cover candidate is not a pattern\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,1},{0,5}, {3,0},{3,2}, {4,1} });
+
+    FindingList found;
+    check(!FinnedXWingTechnique::find_finned_xwing(board, cell_at(board, 0, 1), V, found),
+          "no finned X-Wing reported when a base line lies entirely outside the cover");
+    check(found.empty(), "nothing recorded");
+}
+
+// The has-eliminations rule, isolated: test_finnedxwing_row_based's position with
+// the stray at (4,1) removed. The pattern is still there and still sound, but its
+// eliminable set is empty, and a technique that reports a finding it cannot act on
+// would trip apply()'s did_act assert. Nothing else about the position changes.
+void test_finnedxwing_no_elimination() {
+    std::cout << "[finned x-wing] a sound pattern with nothing to eliminate is not reported\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,1},{0,5}, {3,1},{3,5}, {3,2} });
+
+    FindingList found;
+    check(!FinnedXWingTechnique::find_finned_xwing(board, cell_at(board, 0, 1), V, found),
+          "no finned X-Wing reported when the fin's nonet holds nothing to strike");
+    check(found.empty(), "nothing recorded");
+}
+
+// ===========================================================================
 // Simple coloring
 // ===========================================================================
 
@@ -759,7 +913,7 @@ void test_colorchain_benign_not_actionable() {
 // Rebinding ctor (issue #7)
 // ===========================================================================
 //
-// All ten techniques' findings live in one carried member, mFindings,
+// Every technique's findings live in one carried member, mFindings,
 // initialized by a single hand-written line in the rebinding ctor
 // (`mFindings(other.mFindings)`). Drop that line and *every* technique
 // silently stops carrying forward. This test isolates exactly that line: it
@@ -778,8 +932,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 10, "ten registry buckets (NS, HS, NP, LC, HP, XW, SC, YW, SF, XY)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC/YW/SF/XY short-circuited)");
+    check(AnalyzerTest::findings_bucket_count(a) == 11, "eleven registry buckets (NS, HS, NP, LC, HP, XW, SC, YW, SF, FX, XY)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC/YW/SF/FX/XY short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.
@@ -811,6 +965,11 @@ int main() {
     test_xwing_no_elimination();
     test_xwing_misaligned_not_found();
     test_xwing_anchor_not_first();
+    test_finnedxwing_row_based();
+    test_finnedxwing_column_based();
+    test_finnedxwing_fins_in_two_nonets_rejected();
+    test_finnedxwing_uncovered_base_line_rejected();
+    test_finnedxwing_no_elimination();
     test_colorchain_rule2_contradiction();
     test_colorchain_benign_not_actionable();
     test_rebinding_ctor_carries_findings();

@@ -27,7 +27,7 @@ const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
     // spelled out here once and checked against the built registry below, rather
     // than left implicit in the sequence of push_backs.
     [[maybe_unused]] static constexpr const char *kCascade[] = {
-        "NS", "HS", "NP", "LC", "HP", "XW", "SC", "YW", "SF", "XY",
+        "NS", "HS", "NP", "LC", "HP", "XW", "SC", "YW", "SF", "FX", "XY",
     };
     static const std::vector<std::unique_ptr<Technique>> reg = [] {
         std::vector<std::unique_ptr<Technique>> r;
@@ -40,6 +40,7 @@ const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
         r.push_back(std::make_unique<ColorChainTechnique>());
         r.push_back(std::make_unique<YWingTechnique>());
         r.push_back(std::make_unique<SwordfishTechnique>());
+        r.push_back(std::make_unique<FinnedXWingTechnique>());
         r.push_back(std::make_unique<XYChainTechnique>());
         assert(r.size() == std::size(kCascade));
         for (size_t i = 0; i < r.size(); ++i)
@@ -99,8 +100,8 @@ void Analyzer::analyze() {
     const auto &reg = registry();
     // mFindings is indexed in lockstep with reg (bucket i belongs to reg[i]);
     // the two are sized together at construction. Assert it here rather than
-    // trust it: this positional coupling is what stands in for ten separately
-    // named members, so it gets an executable guard.
+    // trust it: this positional coupling is what stands in for one separately
+    // named member per registered technique, so it gets an executable guard.
     assert(mFindings.size() == reg.size());
     bool did_find = false;
     for (size_t i = 0; i < reg.size() && !did_find; ++i)

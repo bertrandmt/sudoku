@@ -178,10 +178,11 @@ Notes remaining: 210
 [SC](0) {}
 [YW](0) {}
 [SF](0) {}
+[FX](0) {}
 [XY](0) {}
 ```
 
-There are currently ten implemented heuristics: 
+There are currently eleven implemented heuristics: 
 
 1. `naked-single`, denoted as `[NS]`,
 1. `hidden-single`, denoted as `[HS]`,
@@ -191,7 +192,8 @@ There are currently ten implemented heuristics:
 1. `x-wing`, denoted as `[XW]`,
 1. `simple-coloring`, denoted as `[SC]`,
 1. `y-wing`, denoted as `[YW]`,
-1. `swordfish`, denoted as `[SF]`, and
+1. `swordfish`, denoted as `[SF]`,
+1. `finned-x-wing`, denoted as `[FX]`, and
 1. `XY-chain`, denoted as `[XY]`.
 
 For each heuristic, the number of available actions associated with the heuristic appears in parentheses, followed by a summary description of such actions.
@@ -297,6 +299,7 @@ Notes remaining: 178
 [SC](0) {}
 [YW](0) {}
 [SF](0) {}
+[FX](0) {}
 [XY](0) {}
 ```
 This indicates there is one X-Wing structure in the board, with top-left and bottom-right corners as cells at row 5, column 5 and row 9, column 8 respectively, for candidate value 2.
@@ -377,6 +380,7 @@ Notes remaining: 49
 [SC](1) {{{[4, 8]🟩,[6, 5]🟩,[6, 7]🟥,[8, 7]🟩,[9, 8]🟥}#4}}
 [YW](0) {}
 [SF](0) {}
+[FX](0) {}
 [XY](0) {}
 ```
 This indicates there is a simple color chain for candidate value 4, running via `[4, 8]`, `[9, 8]`, `[8, 7]`, `[6, 7]` and `[6, 5]`.
@@ -435,6 +439,7 @@ Notes remaining: 47
 [SC](1) {{{[4, 8]🟩,[6, 5]🟩,[6, 7]🟥,[8, 7]🟩,[9, 5]🟥,[9, 8]🟥}#5}}
 [YW](0) {}
 [SF](0) {}
+[FX](0) {}
 [XY](0) {}
 ```
 However, `[9, 5]` is colored red, but sees `[9, 8]` also colored red. Per "Rule 2", all reds from the chain can be eliminated:
@@ -503,6 +508,7 @@ Notes remaining: 73
 [SC](0) {}
 [YW](2) {{[3, 3]Y{[1, 2],[3, 6]}#9}, {[3, 3]Y{[2, 2],[3, 8]}#9}}
 [SF](0) {}
+[FX](0) {}
 [XY](0) {}
 ```
 This indicates two Y-Wings, both pivoting on `[3, 3]` (candidates `{1, 6}`) for elimination value 9. The first uses wings `[1, 2]` (candidates `{6, 9}`, sharing 6 with the pivot) and `[3, 6]` (candidates `{1, 9}`, sharing 1 with the pivot); the value common to both wings but absent from the pivot is 9. The second Y-Wing pivots on the same cell, with wings `[2, 2]` and `[3, 8]`.
@@ -571,6 +577,7 @@ Notes remaining: 95
 [SC](0) {}
 [YW](0) {}
 [SF](1) {{{[2, 1],[2, 5],[2, 7]}#8[^r]}}
+[FX](0) {}
 [XY](0) {}
 ```
 This indicates one Swordfish for candidate value 8. The three anchor cells `[2, 1]`, `[2, 5]` and `[2, 7]` identify the three base sets, here columns 1, 5 and 7 (each anchor is the first candidate cell encountered in its base set). The `[^r]` tag, echoing the Locked Candidates notation, indicates that eliminations fall in the *rows*, making this a column-based Swordfish. Candidate 8 appears in columns 1, 5 and 7 only within rows 2, 3 and 4, so it can be removed from those three rows wherever it appears in any other column.
@@ -585,6 +592,75 @@ Step #14:
 [SF] [3, 9] x8 [r]
 [SF] [4, 6] x8 [r]
 ```
+
+## Finned X-Wing
+
+The Sudoku Wiki [explainer page](https://www.sudokuwiki.org/Finned_X_Wing) on the Finned X-Wing relaxes the X-Wing's confinement requirement. A plain X-Wing needs a candidate's appearances in two base sets to fall entirely within the same two cross sets. A finned X-Wing tolerates appearances outside those two cross sets -- the *fins* -- provided every fin sits in a single nonet.
+
+The reasoning is a case split. If every fin is false, the candidate is confined to the two cross sets after all, and a plain X-Wing eliminates it from them. If some fin is true, its nonet already holds the value. Only the cells vouched for by both branches can be eliminated: those on a cross set, inside the fin's nonet, and outside the two base sets. That intersection is why a finned X-Wing eliminates so much less than a plain one, and it is also why a *sashimi* X-Wing -- one whose base set holds just a single cross-set candidate, so that deleting the fin would leave the fish a corner short -- needs no separate treatment here: the rule is stated over the fin's nonet, not over four corners.
+
+For example, on a board where every cheaper heuristic has gone dry:
+```
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |*    |* *  ][  *  |     |*    ][     |     |  *  ]
+[  9  |  * *|  * *][  *  |  4  |  * *][  3  |  8  |    *]
+[     |     |     ][     |     |*    ][     |     |*    ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |*   *|     ][  * *|     |*   *][     |     |  *  ]
+[  7  |    *|  4  ][     |  8  |    *][  9  |  5  |    *]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[  * *|     |  * *][     |  *  |    *][     |     |  *  ]
+[  *  |  8  |  * *][  9  |     |  * *][  1  |  4  |    *]
+[     |     |     ][     |*    |*    ][     |     |*    ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[*   *|*   *|     ][     |     |    *][     |     |     ]
+[  *  |  *  |  7  ][  6  |  9  |  *  ][  8  |  2  |  4  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[  6  |  2  |  9  ][  4  |  1  |  8  ][  7  |  3  |  5  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|    *|     ][  * *|  *  |    *][     |     |     ]
+[* *  |* *  |  8  ][  *  |     |  *  ][  6  |  1  |  9  ]
+[     |     |     ][     |*    |*    ][     |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[    *|     |    *][     |     |     ][     |     |     ]
+[* *  |  7  |  *  ][  1  |  6  |  2  ][* *  |  9  |  8  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |  *  ][     |     |     ][  *  |     |     ]
+[  8  |  9  |  *  ][  7  |  3  |  4  ][  *  |  6  |  1  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[* *  |*    |* *  ][     |     |     ][  *  |     |     ]
+[*    |*   *|    *][  8  |  5  |  9  ][*    |  7  |  3  ]
+[     |     |     ][     |     |     ][     |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+Left to solve:   31
+Notes remaining: 86
+[NS](0) {}
+[HS](0) {}
+[NP](0) {}
+[LC](0) {}
+[HP](0) {}
+[XW](0) {}
+[SC](0) {}
+[YW](0) {}
+[SF](0) {}
+[FX](1) {{{[1, 2],[1, 4]}+{[4, 2]}#5[^r]}}
+[XY](0) {}
+```
+This indicates one finned X-Wing for candidate value 5. The two anchor cells `[1, 2]` and `[1, 4]` identify the base sets, here columns 2 and 4 (each anchor is the first candidate cell encountered in its base set, as for the Swordfish). After the `+` comes the fin, `[4, 2]`. The `[^r]` tag indicates that eliminations fall in the *rows*, making this a column-based pattern. Candidate 5 appears in columns 2 and 4 only within rows 1 and 6, save for that one fin; because the fin lies in the middle-left nonet, the sole cell both branches of the case split cover is `[6, 1]`.
+
+On execution, the solver acts on this single pattern:
+```
+λ >
+Step #16:
+[FX] [6, 1] x5 [r]
+```
+A second finned X-Wing -- same two base columns, same fin, this time on candidate 3 -- is found on the very next step and strikes the other candidate from `[6, 1]`, leaving a naked 4 there that carries the rest of the solve.
 
 ## XY-Chain
 
@@ -621,18 +697,18 @@ For example:
 +=====+=====+=====++=====+=====+=====++=====+=====+=====+
 [     |     |    *][     |     |    *][    *|     |    *]
 [  2  |  4  |  * *][  1  |    *|  * *][     |  7  |     ]
-[     |     |  *  ][     |  *  |  *  ][  * *|     |    *]
+[     |     |  *  ][     |  *  |     ][  * *|     |    *]
 +-----+-----+-----++-----+-----+-----++-----+-----+-----+
 [    *|     |    *][  * *|     |    *][  * *|     |     ]
 [    *|  1  |    *][    *|  9  |    *][     |  4  |  5  ]
-[  *  |     |* *  ][  *  |     |* *  ][  *  |     |     ]
+[  *  |     |* *  ][     |     |*    ][  *  |     |     ]
 +-----+-----+-----++-----+-----+-----++-----+-----+-----+
 [     |    *|     ][     |  *  |     ][     |  * *|     ]
 [  9  |  *  |  *  ][* *  |*    |* *  ][  1  |     |  6  ]
 [     |     |* *  ][  *  |* *  |* *  ][     |     |     ]
 +=====+=====+=====++=====+=====+=====++=====+=====+=====+
 Left to solve:   47
-Notes remaining: 142
+Notes remaining: 139
 [NS](0) {}
 [HS](0) {}
 [NP](0) {}
@@ -642,6 +718,7 @@ Notes remaining: 142
 [SC](0) {}
 [YW](0) {}
 [SF](0) {}
+[FX](0) {}
 [XY](1) {{{[5, 8]:[5, 2]:[6, 1]:[6, 4]}#2x2}}
 ```
 This indicates one XY-Chain for value 2 with two eliminations (the `x2` suffix), running `[5, 8]` -> `[5, 2]` -> `[6, 1]` -> `[6, 4]`. Those cells carry candidates `{2, 3}`, `{3, 5}`, `{4, 5}` and `{2, 4}` respectively; each consecutive pair shares exactly one value (3, then 5, then 4), and both ends carry the chain value 2. Cells `[5, 5]` and `[6, 7]` each see both ends of the chain and so lose candidate 2.
@@ -656,7 +733,7 @@ Step #9:
 
 ## Order of analysis and resolution
 
-The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring, Swordfish and XY-Chain.
+The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring, Swordfish, Finned X-Wing and XY-Chain.
 
 # Editing the table
 
