@@ -141,6 +141,16 @@ places is exactly what went stale when the cascade last grew:
   the first base line inside the has-eliminations scan, where a genuine elimination
   would otherwise short-circuit the check before the base-line test is reached.
 
+  Since #58 that exclusion is a fold over the base lines in one shared worker rather
+  than a hand-written chain of terms per fish, so "which case witnesses which term" is
+  no longer the right question — a fold cannot be written with a term missing. The
+  split-duty geometry above still describes what the *positions* reach, and the cases
+  are worth keeping for it: narrowing the fold to skip its first base line is caught
+  by the column-based accept case and by the first-base-line case, and narrowing it to
+  skip the last is caught by the row-based accept case, each still failing on the cell
+  it was built to protect. Both mutations are also caught by the plain fish's cases
+  now, which they were not when the two halves of the family had their own copies.
+
 - **XY-chain has a `test_`, and keeps it private.** It is materialized-object
   shaped like simple coloring, so `test_xychain` is the right factoring and
   survives the port (issue #7) as a file-local function in

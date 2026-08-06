@@ -11,6 +11,10 @@
 // same two cross lines. Every other candidate for the value on those two cross
 // lines can then be eliminated.
 //
+// The search is analyzer_fish::find_plain_fish at N=2, shared with Swordfish since
+// #58; see analyzer-fish.h for the rule the four fish have in common and for why
+// the plain and finned halves of the family keep separate workers.
+//
 // X-Wing is *scan-fused* (docs/test-predicate-idiom.md), so it has no separable
 // test_ predicate; the seam is find_xwing below. XWingFinding is in this header,
 // not file-local, because the whitebox cases read its fields.
@@ -33,7 +37,13 @@ struct XWingFinding : Finding {
 
 class XWingTechnique : public Technique {
 public:
-    const char *name() const override { return "XW"; }
+    // The technique's tag, written once. name() returns it, and find_xwing hands
+    // it to the shared worker, which prints both the find line and the
+    // elimination lines with it. A second literal would be a second source of
+    // truth for the string every one of this technique's outputs is keyed on.
+    static constexpr const char *kName = "XW";
+
+    const char *name() const override { return kName; }
     Tier        tier() const override { return Tier::Advanced; }
     bool  brace_each() const override { return true; }
 
