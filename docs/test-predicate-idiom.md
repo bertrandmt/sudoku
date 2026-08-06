@@ -38,9 +38,10 @@ Mapping every technique in the cascade:
   operations. `find_xychain` *builds* a chain by following links;
   `test_xychain` separately *scores* the eliminations that chain would make. The
   chain is a first-class value, so it is clean to pass to a predicate.
-  (`test_xychain` returns the elimination count rather than a `bool`, because
-  XY-chain also uses that count to rank competing chains. It is still a pure
-  predicate over a materialized object; "actionable" is just `> 0`.)
+  (`test_xychain` returns the eliminated coords rather than a `bool`, because the
+  finding carries its own effect so `apply` can replay it instead of rediscovering
+  it. It is still a pure predicate over a materialized object; "actionable" is just
+  "non-empty".)
 
 - **Scan-fused**: the act of checking the pattern condition *is* the act of
   discovering which cells belong to it. A locked candidate is "every candidate
@@ -156,32 +157,40 @@ places is exactly what went stale when the cascade last grew:
   survives the port (issue #7) as a file-local function in
   `analyzer-xychain.cpp`. It is *not* promoted, because no whitebox case calls
   it: promoting it would advertise a tested contract nothing tests. What the
-  cases do drive is the per-anchor search `XYChainTechnique::find_xychain` and
-  the best-chain selection `XYChainTechnique::record_if_best`, so those are the
-  public statics, and `XYChainFinding` is in the header because a case reads the
-  recorded chain's fields. The seam shape follows what the tests reach for, not
-  the technique's class — the same "exposed exactly when the test must read it"
-  rule that governs the findings.
+  cases do drive is the per-anchor search `XYChainTechnique::find_xychain`, so that
+  is the one public static, and `XYChainFinding` is in the header because a case
+  reads the recorded chain's fields. The seam shape follows what the tests reach
+  for, not the technique's class — the same "exposed exactly when the test must read
+  it" rule that governs the findings.
 
-  `record_if_best` is the one seam here with no analogue in any other technique.
-  XY-chain is the solver's only find-many/act-one technique: it ranks every chain
-  it discovers and applies just the most desirable one, so the ranking rule is a
-  contract in its own right, and one a crafted board cannot isolate (it takes
-  several competing chains, and which chains a board yields is not the case's to
-  dictate). The case offers them to the selector directly instead.
+  **`find_xychain` carries a `max_len` the other per-anchor seams do not.** XY-chain
+  is a first-hit technique like the fish and simple coloring, but its search is
+  *ordered* rather than merely truncated: `find` sweeps chain lengths upward and
+  stops at the first length that yields, so what it acts on is the shortest
+  actionable chain on the board. The bound is therefore part of the seam's contract,
+  and the cases use it both ways — to ask for one specific chain, and to assert a
+  chain is invisible below its own length.
 
-  That shape is described here, not endorsed. The design intent for the cascade
-  is that the cheapest firing technique is applied *as greedily as possible*, and
-  XY-chain is the one tier that isn't — **issue #36** is open to make it act on
-  every distinct elimination effect. That would delete `record_if_best` and the
-  finding's `operator==` (endpoint equivalence being only an inexact proxy for
-  "same elimination set"), and would have `test_xychain` collect the eliminated
-  coords rather than count them. It would *not* necessarily touch `operator<`:
-  #36's open question is whether to keep the coverage-maximal chain, which is
-  what this comparator already ranks first, or the shortest chain per
-  elimination, and it is deliberately left undecided there. The port preserved
-  existing behavior byte-for-byte, so it promoted that behavior into a named
-  seam; that is a consequence of the port's terms, not a ruling on #36.
+  There used to be a second seam here, `record_if_best`, promoted by the issue #7
+  port because XY-chain then searched exhaustively and ranked what it found. Issue
+  #36 first proposed replacing that ranking with greedy action on every distinct
+  elimination effect; that was implemented, measured, and reversed (see the reversal
+  comment on #36 — on a reduced grid the chains form one dense web and it yields
+  dozens of long chains, with no removable redundancy among them). Shortest-first
+  search replaced both. With one finding chosen by length there is no selection rule
+  left to test, so `record_if_best` and `XYChainFinding`'s comparators are gone
+  rather than reshaped, and the seam count went down.
+
+  What the reversal left behind is worth stating, because it is not obvious: with a
+  single finding chosen by arrival, **the traversal order inside a frame is a result,
+  not a presentation detail** — it decides which of several equal-length chains is
+  recorded. That is what issue #53 asked to have pinned, and
+  `test_xychain_visit_order` does it. It fails if the coord comparator is reversed,
+  and on libc++ it also fails if the sort is deleted — but only because that board's
+  candidates happen to leave the bucket in a non-coord order, which is a property of
+  one hash table rather than of the test. With no sort the result is unspecified
+  rather than wrong, and no test can compel an unordered container to disagree with
+  coord order.
 
 ## A note on templates
 

@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cassert>
 #include <memory>
+#include <set>
 #include <unordered_set>
 #include <vector>
 
@@ -52,11 +53,14 @@ bool on_chain(const ChainCells &chain, const Coord &coord) {
 }
 
 // Score `chain`: validate that it links up and that the far end's candidate is
-// also a candidate for the initial cell, then count the off-chain cells that
-// would lose `value`. Zero means "not actionable" -- either the chain does not
-// close or it eliminates nothing, a distinction the caller does not need.
+// also a candidate for the initial cell, then collect the off-chain cells that
+// would lose `value`. An empty set means "not actionable" -- either the chain does
+// not close or it eliminates nothing, a distinction the caller does not need.
 // File-local because no whitebox case calls it (see analyzer-xychain.h).
-size_t test_xychain(const Board &board, const Value &value, const ChainCells &chain) {
+//
+// Collecting the coords rather than counting them lets the finding carry its own
+// effect, so apply() replays what this saw instead of rediscovering it.
+std::set<Coord> test_xychain(const Board &board, const Value &value, const ChainCells &chain) {
     // validate that the chain chains properly, and that the end candidate value is also a
     // candidate for the initial cell.
     Value other_value = value;
@@ -65,14 +69,14 @@ size_t test_xychain(const Board &board, const Value &value, const ChainCells &ch
 
         assert(cell->isNote());
         assert(cell->notes().count() == 2);
-        if (!cell->check(this_value)) return 0;
+        if (!cell->check(this_value)) return {};
         other_value = cell->other_value(this_value);
     }
     // is the last "other_value" is the incoming candidate value
-    if (other_value != value) return 0;
+    if (other_value != value) return {};
 
-    // yes! count eliminations
-    size_t num_elim = 0;
+    // yes! collect eliminations
+    std::set<Coord> eliminations;
     for (const auto &cell : board.cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
@@ -87,11 +91,11 @@ size_t test_xychain(const Board &board, const Value &value, const ChainCells &ch
         if (!board.see_each_other(cell.coord(), chain.front()->coord())) continue;
         if (!board.see_each_other(cell.coord(), chain.back()->coord())) continue;
 
-        // yes! count it
-        num_elim++;
+        // yes! collect it
+        eliminations.insert(cell.coord());
     }
 
-    return num_elim;
+    return eliminations;
 }
 
 template<class Set>
@@ -120,11 +124,16 @@ void select_chain_candidates(const Cell &current, Value value, const Set &set, c
     }
 }
 
-// Extend `chain` by one cell in every direction it can go, offering each
-// actionable chain met along the way to record_if_best, and recurse.
+// Extend `chain` by one cell in every direction it can go, and recurse, stopping
+// the moment an actionable chain of exactly `max_len` cells is met.
 // `incoming_link_value` is the candidate the previous link resolved into `cell`,
-// so the chain continues on `cell`'s *other* candidate. Returns whether any
-// offer was accepted.
+// so the chain continues on `cell`'s *other* candidate. Returns whether anything
+// was recorded.
+//
+// Only chains of exactly `max_len` are tested, not every chain met on the way
+// down. Shorter ones were already tested -- and found not actionable, or find()
+// would have stopped -- on an earlier sweep, so re-testing them would repeat an
+// O(cells) scan per node for a result already known.
 //
 // A plain recursive function, not a lambda: the std::function was there only so
 // the lambda could name itself for the recursive call, and cost a heap allocation
@@ -136,12 +145,14 @@ void select_chain_candidates(const Cell &current, Value value, const Set &set, c
 // The two accumulators find_xychain owns -- the chain under construction and the
 // visited set -- are threaded by reference rather than captured.
 bool extend_chain(const Board &board, const Cell &cell, Value incoming_link_value,
-                  ChainCells &chain, std::unordered_set<Coord> &visited, FindingList &out) {
+                  ChainCells &chain, std::unordered_set<Coord> &visited, FindingList &out,
+                  size_t max_len) {
     assert(cell.isNote());
     assert(cell.check(incoming_link_value));
     assert(cell.notes().count() == 2);
+    assert(out.empty());
 
-    bool did_find = false;
+    if (chain.size() >= max_len) return false;
 
     // select cells that can see current cell and share its "other" value
     Value common_link_value = cell.other_value(incoming_link_value);
@@ -150,33 +161,27 @@ bool extend_chain(const Board &board, const Cell &cell, Value incoming_link_valu
     select_chain_candidates(cell, common_link_value, board.column(cell), visited, candidates);
     select_chain_candidates(cell, common_link_value, board.nonet(cell), visited, candidates);
 
-    // Walk the candidates coord-sorted, not in the set's own order. Two
-    // reasons, and the second is the load-bearing one:
+    // Walk the candidates coord-sorted, not in the set's own order. `candidates`
+    // is an unordered_set, so its own order is unspecified and differs between
+    // standard libraries, and this technique stops at the first actionable chain it
+    // meets: among the equal-length chains this frame could reach, which one gets
+    // recorded IS this order. It is a result, not a presentation detail.
     //
-    //  - `candidates` is an unordered_set, so its iteration order is
-    //    unspecified and differs between standard libraries. It reaches
-    //    stdout: the chain is recorded in traversal order, so it fixes both
-    //    the "{c1:c2:..}" dump and the order of apply()'s [XY] lines.
-    //  - record_if_best keeps ONE chain and rejects ties, so whichever
-    //    equally-desirable chain is *offered first* wins. Discovery order is
-    //    therefore part of the result, not just of the presentation.
+    // Chain length no longer rides on it -- find() sweeps lengths from short to
+    // long, so a chain recorded here is the shortest actionable one on the board
+    // whatever order this frame walks in. What is left to this sort is the choice
+    // among chains of that same shortest length, which is the whole of what #53
+    // asked to have pinned.
     //
-    // Measured over the 34-board corpus (31 in notes.txt plus run.sh's 9
-    // fixtures, 6 of which are the same boards), removing the sort changes the
-    // output of two boards, neither of them in its final grid, and it changes them
-    // differently: on one the recorded winner flips to the same chain walked from
-    // the other end, while on the other the winner and its eliminations are
-    // untouched and only the trace of superseded offers moves. So what this buys
-    // is a reproducible transcript rather than a correct one -- nothing the solver
-    // concludes on any board we have depends on it. It is not a proof
-    // for all boards -- two genuinely different chains tied on (elimination count,
-    // length) would still be resolved by whoever is offered first -- which is one
-    // more reason to prefer issue #36's greedy-on-all-distinct-effects rewrite
-    // over this trim-to-one.
-    //
-    // No test pins this: neither suite fails with the sort removed, because the
-    // final grids are unchanged and that is all the black-box tiers compare. See
-    // #53.
+    // test_xychain_visit_order pins it (tests/unit/test_analyzer.cpp): a crafted
+    // board offering several equal-length continuations, asserting the coord-least
+    // is the one recorded. Reversing this comparator fails that case, and so does
+    // deleting the sort -- on libc++, where the case's candidates come out of the
+    // bucket in an order that is not coord order. That second half is a coincidence
+    // of one hash table and cannot be relied on: with no sort the result is
+    // unspecified rather than wrong, and no test can compel an unordered container
+    // to disagree with coord order. Deleting the sort changes no board in the
+    // corpus, on either toolchain, so the black-box suite cannot see it at all.
     //
     // `candidates` outlives every recursive call made from this frame, so the
     // pointers pushed below stay valid for as long as they are on the chain,
@@ -193,50 +198,58 @@ bool extend_chain(const Board &board, const Cell &cell, Value incoming_link_valu
         chain.push_back(&next_cell);
         visited.insert(next_cell.coord());
 
-        // is the chain valid and would acting on it have an impact
         Value next_link_value = next_cell.other_value(common_link_value);
-        size_t num_elim = test_xychain(board, next_link_value, chain);
-        if (num_elim > 0) {
-            // yes! offer it; only a strictly more desirable chain is kept
-            did_find |= XYChainTechnique::record_if_best(out, XYChainFinding{next_link_value, coords_of(chain), num_elim});
+        bool done = false;
+        if (chain.size() == max_len) {
+            // at the length under test: is the chain valid, and would acting on it
+            // have an impact?
+            std::set<Coord> eliminations = test_xychain(board, next_link_value, chain);
+            if (!eliminations.empty()) {
+                auto finding = std::make_shared<const XYChainFinding>(
+                    next_link_value, coords_of(chain), std::move(eliminations));
+                if (sVerbose) { std::cout << "  [fXY] "; finding->print(std::cout); std::cout << std::endl; }
+                out.push_back(finding);
+                done = true;
+            }
+        } else {
+            // not yet: go deeper
+            done = extend_chain(board, next_cell, common_link_value, chain, visited, out, max_len);
         }
-
-        // recurse
-        did_find |= extend_chain(board, next_cell, common_link_value, chain, visited, out);
 
         // backtrack
         chain.pop_back();
         visited.erase(next_cell.coord());
+
+        // stop at the first actionable chain: acting on it moves the state forward,
+        // and SolverState::act re-runs analyze(), so anything else this frame could
+        // reach is re-derived against the board as it will then be.
+        if (done) return true;
     }
 
-    return did_find;
+    return false;
 }
 
-// Clear `entry.value` from every cell of `chain_front_set` that sees the far end
-// of the chain and is not on the chain itself.
-template<class Set>
-bool act_on_xychain(Board &board, const XYChainFinding &entry, const Set &chain_front_set) {
+// Clear `entry.value` from every cell of the effect `entry` recorded.
+//
+// The set is replayed, not rediscovered. Rescanning one chain end's units and
+// re-testing `see_each_other` against the other -- which is what this used to do --
+// re-derives from scratch the answer find() already had in hand, and made the
+// emission order depend on which end happened to be front(). Replaying takes the
+// set's own Coord order instead.
+//
+// Every cell in the set still carries the value: find() is a pure query, nothing
+// mutates the board between it and here, and there is only ever one finding. Hence
+// the assert rather than a skip -- a failure here means the finding and the board
+// disagree, which no legitimate path produces.
+bool act_on_xychain(Board &board, const XYChainFinding &entry) {
     bool did_act = false;
 
-    // For each cell that can see the other end of the chain, eliminate the chain value
-    for (const auto &cell : chain_front_set) {
-        // is this a note cell?
-        if (!cell.isNote()) continue;
-
-        // yes! but is it a candidate for the entry's value?
-        if (!cell.check(entry.value)) continue;
-
-        // yes! but is it on the chain?
-        if (std::find(entry.chain.begin(), entry.chain.end(), cell.coord()) != entry.chain.end()) continue;
-
-        // no! but can it see the other end of the chain?
-        if (!board.see_each_other(cell.coord(), entry.chain.back())) continue;
-
-        // yes! ELIMINATE!
-        std::cout << "[XY] " << cell.coord() << " x" << entry.value
+    for (const auto &coord : entry.eliminations) {
+        std::cout << "[XY] " << coord << " x" << entry.value
                   << " ({" << entry.chain.front() << ":..:" << entry.chain.back() << "}#" << entry.value << ")" << std::endl;
-        board.clear_note_at(cell.coord(), entry.value);
-        did_act = true;
+        bool cleared = board.clear_note_at(coord, entry.value);
+        assert(cleared);
+        did_act |= cleared;
     }
 
     return did_act;
@@ -251,44 +264,15 @@ void XYChainFinding::print(std::ostream &outs) const {
         outs << chain[i];
     }
     outs << "}#" << value
-         << "x" << num_elim;
+         << "x" << eliminations.size();
 }
 
-bool XYChainTechnique::record_if_best(FindingList &out, const XYChainFinding &candidate) {
-    // `out` holds at most one chain: the most desirable offered so far.
-    if (!out.empty()) {
-        assert(out.size() == 1);
-        auto const &best = bucket_cast<XYChainFinding>(*out.front());
-
-        // is the same chain already recorded (same value, same endpoints)?
-        // then keep the one found first.
-        if (best == candidate) return false;
-
-        // no! but is the candidate strictly more desirable? `!(candidate < best)`
-        // also rejects the equally-desirable case (same elimination count, same
-        // length): a tie leaves the incumbent in place.
-        if (!(candidate < best)) return false;
-    }
-
-    // Copy `candidate` before dropping the incumbent, and clear only on the path
-    // that immediately refills (clearing an empty vector is a no-op, so the
-    // first-recording path pays nothing). Were `candidate` ever to alias the
-    // incumbent, clearing first would drop the last reference to it and leave
-    // the copy below reading a destroyed object. No caller can reach that today
-    // -- an alias trips the `best == candidate` gate above, operator== being
-    // reflexive -- but that makes this function's safety rest on a property of a
-    // gate two lines up, which is not where a reader would look for it.
-    auto finding = std::make_shared<const XYChainFinding>(candidate);
-    if (sVerbose) { std::cout << "  [fXY] "; finding->print(std::cout); std::cout << std::endl; }
-    out.clear();
-    out.push_back(finding);
-    return true;
-}
-
-bool XYChainTechnique::find_xychain(const Board &board, const Cell &cell, const Value &value, FindingList &out) {
+bool XYChainTechnique::find_xychain(const Board &board, const Cell &cell, const Value &value, size_t max_len, FindingList &out) {
     assert(cell.isNote());
     assert(cell.notes().count() == 2);
     assert(cell.check(value));
+
+    if (!out.empty()) return false;   // already found; find()'s sweep is over
 
     ChainCells chain;
     std::unordered_set<Coord> visited;
@@ -296,7 +280,7 @@ bool XYChainTechnique::find_xychain(const Board &board, const Cell &cell, const 
     chain.push_back(&cell);
     visited.insert(cell.coord());
 
-    return extend_chain(board, cell, value, chain, visited, out);
+    return extend_chain(board, cell, value, chain, visited, out, max_len);
 }
 
 // https://www.sudokuwiki.org/XY_Chains
@@ -305,42 +289,66 @@ bool XYChainTechnique::find_xychain(const Board &board, const Cell &cell, const 
 // If the chain starts and ends with the same candidate, that candidate
 // can be eliminated from cells that can see both chain ends.
 //
-// For this heuristic, we will find all chains, rank them by number of
-// eliminations (greater is better) and length (shorter is better), and act
-// only on the most desirable chain.
+// For this heuristic we look for the SHORTEST actionable chain on the board and
+// act on that one, which makes XY-chain a first-hit technique like the fish and
+// simple coloring: acting on one finding moves the state forward, and
+// SolverState::act re-runs analyze(), so a second chain is found against the board
+// as it will then be rather than as it is now.
+//
+// The sweep is iterative-deepening: try every chain of length 2, then every chain
+// of length 3, and stop at the first length that yields something actionable. The
+// length loop is OUTSIDE the anchor loop on purpose -- inside it, "shortest" would
+// mean shortest from whichever anchor came first, which is not the same thing and
+// is not a property of the board.
+//
+// Why length-ordered rather than exhaustive-then-ranked (which is what this did
+// before, and what issue #36 first proposed replacing it with -- see the reversal
+// comment there): on a reduced grid nearly every unsolved cell is bi-value, so the
+// chains form one dense web and enumerating it yields dozens of long chains whose
+// eliminations are all sound and none of which a person would trace. Searching
+// short-first finds a *better* chain, not merely fewer: on the issue's worked
+// board it acts on 5 cells where exhaustive ranking reached for 17.
+//
+// Nothing is forbidden by this. A long chain is still found -- just not while a
+// shorter one exists. That is the difference between ordering the search and
+// capping it: a cap would lose the boards whose only chain is long.
 bool XYChainTechnique::find(const Board &board, FindingList &out) const {
     assert(out.empty());
-    bool did_find = false;
 
-    for (const auto &cell : board.cells()) {
-        // is this a note cell?
-        if (!cell.isNote()) continue;
+    // A chain visits distinct bi-value cells, so it cannot be longer than there are
+    // of them. That bound is what the sweep costs when the board has no actionable
+    // chain at all, which is the common case, so it is worth counting rather than
+    // running to 81.
+    size_t bivalue = 0;
+    for (const auto &cell : board.cells())
+        if (cell.isNote() && cell.notes().count() == 2) bivalue++;
 
-        // yes! but does it have only two candidates?
-        if (cell.notes().count() != 2) continue;
+    for (size_t max_len = 2; max_len <= bivalue && out.empty(); max_len++) {
+        for (const auto &cell : board.cells()) {
+            // is this a note cell?
+            if (!cell.isNote()) continue;
 
-        // yes! attempt to build chains from this cell for each candidate value
-        auto values = cell.notes().values();
-        did_find |= find_xychain(board, cell, values[0], out);
-        did_find |= find_xychain(board, cell, values[1], out);
+            // yes! but does it have only two candidates?
+            if (cell.notes().count() != 2) continue;
+
+            // yes! attempt to build chains from this cell for each candidate value
+            auto values = cell.notes().values();
+            if (find_xychain(board, cell, values[0], max_len, out)) break;
+            if (find_xychain(board, cell, values[1], max_len, out)) break;
+        }
     }
 
-    return did_find;
+    assert(out.size() <= 1);
+    return !out.empty();
 }
 
 bool XYChainTechnique::apply(Board &board, FindingList &mine) const {
     if (mine.empty()) return false;
     assert(mine.size() == 1);
 
-    auto const &entry = bucket_cast<XYChainFinding>(*mine.front());
+    bool did_act = act_on_xychain(board, bucket_cast<XYChainFinding>(*mine.front()));
 
-    bool did_act = false;
-
-    did_act |= act_on_xychain(board, entry, board.row(entry.chain.front()));
-    did_act |= act_on_xychain(board, entry, board.column(entry.chain.front()));
-    did_act |= act_on_xychain(board, entry, board.nonet(entry.chain.front()));
-
-    // `entry` refers into the bucket; it must not be touched past this point.
+    // the finding refers into the bucket; it must not be touched past this point.
     mine.clear();
 
     assert(did_act);

@@ -37,6 +37,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -302,18 +303,24 @@ void test_xychain_detect_and_act() {
 
     XYChainTechnique xy;  // needed for apply() below; find_xychain is static
     FindingList found;
-    check(XYChainTechnique::find_xychain(board, cell_at(board, 0, 0), kOne, found),
+    check(XYChainTechnique::find_xychain(board, cell_at(board, 0, 0), kOne, 3, found),
           "XY-chain detected starting from (0,0) on value 1");
-    check(found.size() == 1, "exactly one chain retained");
+    check(found.size() == 1, "exactly one chain recorded");
     auto const *f = only<XYChainFinding>(found);
     check(f, "the recorded finding is an XYChainFinding");
     if (f) {
         check(f->value == kOne, "chain value is 1");
         check(f->chain.size() == 3, "chain has length 3");
-        check(f->num_elim == 1, "chain counts exactly one elimination");
+        check(f->eliminations == std::set<Coord>{Coord(0,3)},
+              "the chain's effect is exactly {(0,3)}");
         check(f->chain.front() == Coord(0,0) && f->chain.back() == Coord(0,2),
               "chain runs (0,0)..(0,2)");
     }
+
+    // The elimination check below can only fail if (0,3) holds candidate 1 going
+    // in; assert that first, so a board edit that quietly removed it would show up
+    // here rather than turning that check into a tautology.
+    check(has_candidate(board, 0, 3, kOne), "(0,3) holds candidate 1 before apply");
 
     bool acted = xy.apply(board, found);
     check(acted, "apply reports an elimination");
@@ -323,44 +330,136 @@ void test_xychain_detect_and_act() {
           "chain-end cells kept candidate 1");
 }
 
-// The selection invariant: of the chains offered to a bucket, the one retained
-// has the most eliminations, ties broken by the shorter chain, and a chain that
-// is merely as good as the incumbent does not displace it. Offered to
-// record_if_best directly rather than found on a board: it takes several
-// competing chains to exercise, and which chains a crafted board yields is not
-// something the case can dictate.
-void test_xychain_best_selection() {
-    std::cout << "[xy-chain] the most-eliminations / shortest chain is retained\n";
-    auto mkchain = [](std::initializer_list<std::pair<size_t,size_t>> cs) {
-        std::vector<Coord> v;
-        for (auto const &c : cs) v.emplace_back(c.first, c.second);
-        return v;
-    };
+// The same chain will not be found at a length below its own.
+void test_xychain_length_bound() {
+    std::cout << "[xy-chain] a chain is invisible below its own length\n";
+    Board board = empty_board();
+    set_candidates(board, 0, 0, {1, 2});
+    set_candidates(board, 0, 1, {2, 3});
+    set_candidates(board, 0, 2, {1, 3});
+    set_candidates(board, 0, 3, {1, 4});
+    confine_value(board, kOne, { {0,0}, {0,2}, {0,3} });
 
-    FindingList bucket;
-    check(XYChainTechnique::record_if_best(bucket, {kOne, mkchain({{0,0},{0,1},{0,2},{0,3}}), 2}),
-          "the first chain offered is recorded");                     // 2 elim, length 4
-    check(!XYChainTechnique::record_if_best(bucket, {kTwo, mkchain({{1,0},{1,1},{1,2}}), 1}),
-          "a chain with fewer eliminations is rejected");             // 1 elim, length 3
-    check(XYChainTechnique::record_if_best(bucket, {kThree, mkchain({{2,0},{2,1},{2,2}}), 2}),
-          "an equal-elimination shorter chain displaces it");         // 2 elim, length 3 <- best
+    FindingList found;
+    check(!XYChainTechnique::find_xychain(board, cell_at(board, 0, 0), kOne, 2, found),
+          "the length-3 chain is not reported when only length 2 is searched");
+    check(found.empty(), "nothing recorded at length 2");
+}
 
-    // Isolate the two remaining rejection gates against that incumbent. The
-    // first would be strictly better on its own terms (three eliminations beats
-    // two), so only the same-value-same-endpoints dedup can reject it; the
-    // second is neither better nor worse, so only the strict-improvement rule
-    // can.
-    check(!XYChainTechnique::record_if_best(bucket, {kThree, mkchain({{2,0},{3,1},{2,2}}), 3}),
-          "a rediscovered chain -- same value and endpoints -- is rejected even with more eliminations");
-    check(!XYChainTechnique::record_if_best(bucket, {kFour, mkchain({{4,0},{4,1},{4,2}}), 2}),
-          "an equally desirable but distinct chain does not displace the incumbent");
+// Direction canonicalization (issue #53). A chain and its reverse are the same
+// deduction, so XYChainFinding stores whichever direction runs front() < back().
+//
+// Driven from the *high* end, which is the direction the constructor has to flip.
+// That choice is what isolates the gate: find() anchors on every cell and so meets
+// both directions of every chain, and normalizing is the only reason which anchor
+// it met first cannot be read off the output.
+void test_xychain_canonical_direction() {
+    std::cout << "[xy-chain] the recorded chain is stored in canonical direction\n";
+    Board board = empty_board();
+    set_candidates(board, 0, 0, {1, 2});
+    set_candidates(board, 0, 1, {2, 3});
+    set_candidates(board, 0, 2, {1, 3});
+    set_candidates(board, 0, 3, {1, 4});
+    confine_value(board, kOne, { {0,0}, {0,2}, {0,3} });
 
-    auto const *best = only<XYChainFinding>(bucket);
-    check(best, "the bucket holds exactly one XYChainFinding");
-    if (best) {
-        check(best->num_elim == 2,     "winner has the most eliminations");
-        check(best->chain.size() == 3, "ties broken toward the shorter chain");
-        check(best->value == kThree,   "winner is the 2-elim length-3 chain");
+    FindingList found;
+    check(XYChainTechnique::find_xychain(board, cell_at(board, 0, 2), kOne, 3, found),
+          "the same chain is detected when anchored at its high end (0,2)");
+    auto const *f = only<XYChainFinding>(found);
+    check(f, "one chain recorded");
+    if (f) {
+        check(f->chain.front() == Coord(0,0) && f->chain.back() == Coord(0,2),
+              "walked (0,2)..(0,0), it is stored (0,0)..(0,2)");
+        check(f->chain == std::vector<Coord>{Coord(0,0), Coord(0,1), Coord(0,2)},
+              "the whole sequence is reversed, not just its ends");
+    }
+}
+
+// Shortest-first: find() sweeps chain lengths upward and stops at the first that
+// yields, so the chain it acts on is the shortest actionable one on the *board* --
+// not the first one a depth-first walk completes.
+//
+// The board is built so those two answers differ. A 4-cell chain on value 5 sits in
+// row 0, ahead of everything in anchor order; a 3-cell chain on value 1 sits in row
+// 4. A depth-first walk from the first anchor completes the 4-cell chain and stops
+// there. Sweeping by length finds the 3-cell one first, from an anchor it reaches
+// later.
+void test_xychain_shortest_first() {
+    std::cout << "[xy-chain] the shortest actionable chain wins, not the first completed\n";
+    Board board = empty_board();
+    // long chain, value 5, length 4, in row 0 -- earlier in anchor order
+    set_candidates(board, 0, 0, {5, 6});
+    set_candidates(board, 0, 1, {6, 7});
+    set_candidates(board, 0, 2, {7, 8});
+    set_candidates(board, 0, 3, {8, 5});
+    set_candidates(board, 0, 4, {5, 9});   // its target
+    confine_value(board, kFive, { {0,0}, {0,3}, {0,4} });
+    // short chain, value 1, length 3, in row 4 -- later in anchor order
+    set_candidates(board, 4, 0, {1, 2});
+    set_candidates(board, 4, 1, {2, 3});
+    set_candidates(board, 4, 2, {3, 1});
+    set_candidates(board, 4, 3, {1, 4});   // its target
+    confine_value(board, kOne, { {4,0}, {4,2}, {4,3} });
+
+    XYChainTechnique xy;
+    FindingList found;
+    check(xy.find(board, found), "find reports a chain");
+    check(found.size() == 1, "exactly one chain, this being a first-hit technique");
+    auto const *f = only<XYChainFinding>(found);
+    check(f, "one XYChainFinding recorded");
+    if (f) {
+        check(f->chain.size() == 3, "the 3-cell chain is taken, not the 4-cell one");
+        check(f->value == kOne, "and so its value is 1, not 5");
+        check(f->chain == std::vector<Coord>{Coord(4,0), Coord(4,1), Coord(4,2)},
+              "the chain is the row-4 one");
+        check(f->eliminations == std::set<Coord>{Coord(4,3)}, "its effect is {(4,3)}");
+    }
+    // Acting proves the point on the board rather than only in the finding: the
+    // short chain's target loses its candidate and the long chain's does not.
+    // Asserting it before apply keeps the second check from being a tautology.
+    check(has_candidate(board, 4, 3, kOne) && has_candidate(board, 0, 4, kFive),
+          "both targets hold their candidate before apply");
+    check(xy.apply(board, found), "apply reports an elimination");
+    check(!has_candidate(board, 4, 3, kOne), "the short chain's target lost candidate 1");
+    check(has_candidate(board, 0, 4, kFive), "the long chain's target keeps candidate 5, untouched");
+}
+
+// Visit order within a frame (issue #53). Where several equal-length chains are
+// reachable from one anchor, the search takes candidates in ascending coord order,
+// so the recorded chain is the coord-least of them.
+//
+// (0,0){1,2} can continue on 2 into any of (0,4){2,3}, (0,5){2,4}, (0,6){2,5};
+// each of those closes back on 1 through one further cell in row 1, giving three
+// distinct 3-cell chains for value 1 with the same effect. The coord-least
+// continuation is (0,4).
+//
+// What this pins, precisely: that the order is coord-*ascending*. Reversing the
+// comparator fails it. Deleting the sort altogether leaves the outcome unspecified
+// rather than wrong, so that mutation may pass by coincidence -- no test can compel
+// an unordered container to disagree with coord order. The comment in extend_chain
+// says the same.
+void test_xychain_visit_order() {
+    std::cout << "[xy-chain] equal-length continuations are taken in coord order\n";
+    Board board = empty_board();
+    set_candidates(board, 0, 0, {1, 2});   // the anchor
+    set_candidates(board, 0, 4, {2, 3});
+    set_candidates(board, 0, 5, {2, 4});
+    set_candidates(board, 0, 6, {2, 5});
+    set_candidates(board, 1, 4, {1, 3});   // closes the (0,4) branch
+    set_candidates(board, 1, 5, {1, 4});   // closes the (0,5) branch
+    set_candidates(board, 1, 6, {1, 5});   // closes the (0,6) branch
+    set_candidates(board, 1, 0, {1, 9});   // sees the anchor and all three far ends
+    confine_value(board, kOne, { {0,0}, {1,4}, {1,5}, {1,6}, {1,0} });
+
+    FindingList found;
+    check(XYChainTechnique::find_xychain(board, cell_at(board, 0, 0), kOne, 3, found),
+          "a chain is found from the anchor at length 3");
+    auto const *f = only<XYChainFinding>(found);
+    check(f, "one chain recorded");
+    if (f) {
+        check(f->chain == std::vector<Coord>{Coord(0,0), Coord(0,4), Coord(1,4)},
+              "the (0,4) branch is taken -- the coord-least of the three");
+        check(f->eliminations == std::set<Coord>{Coord(1,0)}, "its effect is {(1,0)}");
     }
 }
 
@@ -1416,7 +1515,10 @@ int main() {
     test_swordfish_row_based();
     test_swordfish_no_elimination();
     test_xychain_detect_and_act();
-    test_xychain_best_selection();
+    test_xychain_length_bound();
+    test_xychain_canonical_direction();
+    test_xychain_shortest_first();
+    test_xychain_visit_order();
     test_ywing_detect_and_act();
     test_ywing_rejects_non_patterns();
     test_notes_set_ops();

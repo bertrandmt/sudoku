@@ -746,7 +746,7 @@ This is the *second* finned Swordfish the board needs, and the one that breaks i
 
 The Sudoku Wiki [explainer page](https://www.sudokuwiki.org/XY_Chains) on XY-Chains describes a chain of bivalue cells (cells with exactly two candidates) in which each cell shares one candidate with the next. Label the chain's starting candidate `X`. Following the alternating "if this end is not `X`, then its other value is forced, which forces the next link, ..." logic along the chain, one of the two chain ends is guaranteed to be `X`. Therefore any cell off the chain that can see *both* ends cannot be a candidate for `X`.
 
-Because many chains may exist at once, the solver scores them by number of eliminations (more is better) and length (shorter is better), and acts only on the single most desirable one.
+Because many chains may exist at once, the solver looks for the **shortest** one that has an effect: it searches for chains of length 2, then length 3, and so on, and acts on the first actionable chain it finds. Nothing longer is ruled out, it is simply not looked at while something shorter is available, which is roughly how a person reads a grid. Acting on one chain is enough to move the state forward, and analysis restarts afterwards, so a second chain is found against the board as it is by then.
 
 For example:
 ```
