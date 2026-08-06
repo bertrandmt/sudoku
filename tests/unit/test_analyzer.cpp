@@ -1117,6 +1117,62 @@ void test_finnedswordfish_eliminations_on_two_cover_lines() {
           "every base candidate kept candidate 7");
 }
 
+// The fin *order* the header documents, which the case above records but cannot
+// discriminate. Fins come out base-line-major: outer loop over base lines, inner
+// walk over each line's candidates. For a row-based pattern that coincides with
+// row-major board order -- base rows ascend outermost, so the case above would
+// assert the same two coordinates in the same sequence under either rule, and a
+// walk rewritten to emit board order passes it. Only a column-based position tells
+// them apart, because there base columns ascend outermost while rows descend
+// within each.
+//
+// Base columns 0, 3 and 4; cover rows 1, 3 and 8; fins at (5,3) from base column 3
+// and (4,4) from base column 4, sharing the nonet rows 3-5 / columns 3-5.
+// Base-line-major records (5,3) then (4,4); board order would give (4,4) first, so
+// sorting the recorded fins into board order fails this case and nothing else. (The
+// case above does catch a straight *reversal*, so the two are not redundant: it
+// rejects reorderings in general, this one rejects the specific plausible rewrite.)
+// Neither is backed up by a golden -- no README dump block or run.sh expectation
+// carries a multi-fin pattern.
+//
+// Anchoring on (1,0) exercises the column orientation the same way
+// test_finnedswordfish_column_based does: row 1 holds a single 7, so the row search
+// bails on the two-per-base-line floor before the column search runs. Column 0
+// carries no fin of its own, which is what leaves the two fins in the *later* base
+// columns and so lets their rows descend against the walk.
+//
+// The sole eliminable cell is (3,5): in the fin's nonet, on cover row 3, outside all
+// three base columns. (3,3) and (3,4) meet the first two conditions but sit on base
+// columns, so this case leans on the base-line exclusion as well.
+void test_finnedswordfish_fin_order_is_not_board_order() {
+    std::cout << "[finned swordfish] a column-based pattern records fins in discovery order, not board order\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {1,0},{3,0},{8,0}, {3,3},{5,3}, {3,4},{4,4}, {3,5} });
+
+    FinnedSwordfishTechnique fs;
+    FindingList found;
+    check(FinnedSwordfishTechnique::find_finned_swordfish(board, cell_at(board, 1, 0), V, found),
+          "column finned Swordfish detected with anchor (1,0)");
+    auto const *f = only<FinnedSwordfishFinding>(found);
+    check(f, "the recorded finding is a FinnedSwordfishFinding");
+    if (f) {
+        check(!f->is_row_based, "recorded pattern is column-based");
+        check(f->fins.size() == 2, "both fins recorded");
+        check(f->fins.size() == 2 && f->fins[0] == Coord(5, 3) && f->fins[1] == Coord(4, 4),
+              "fins in base-line-major order: (5,3) from column 3 before (4,4) from column 4, "
+              "where board order would put (4,4) first");
+    }
+
+    bool acted = fs.apply(board, found);
+    check(acted, "apply reports an elimination");
+    check(!has_candidate(board, 3, 5, V), "stray 7 at (3,5) eliminated");
+    check(has_candidate(board, 5, 3, V) && has_candidate(board, 4, 4, V),
+          "both fins survive: they sit in base columns");
+    check(has_candidate(board, 3, 3, V) && has_candidate(board, 3, 4, V),
+          "(3,3) and (3,4) survive: in the fin's nonet on a cover row, but on base columns");
+}
+
 // The first cover term inside `find`'s has-eliminations scan, which the case above
 // cannot reach. That scan stops at the first cell it likes, so with eliminable cells
 // on two cover lines, dropping the first term still leaves the second to satisfy it
@@ -1301,6 +1357,7 @@ int main() {
     test_finnedswordfish_no_elimination();
     test_finnedswordfish_first_base_line_not_a_target();
     test_finnedswordfish_eliminations_on_two_cover_lines();
+    test_finnedswordfish_fin_order_is_not_board_order();
     test_finnedswordfish_sole_elimination_on_first_cover_line();
     test_finnedswordfish_sole_elimination_on_second_cover_line();
     test_finnedswordfish_plain_swordfish_not_reported();

@@ -43,7 +43,11 @@ struct FinnedXWingFinding : Finding {
     // column-based pattern -- base columns ascend outermost while cells descend
     // within each -- and it is the same convention FinnedSwordfishFinding
     // documents at three base lines. No case here carries two fins, so nothing
-    // pins the order on this side of the pair; the finned Swordfish cases do.
+    // pins the order on this side of the pair, and no golden observes it either:
+    // it is deterministic but unwitnessed. The finned Swordfish side is pinned, by
+    // test_finnedswordfish_fin_order_is_not_board_order, and #58 -- which unifies
+    // the two walks -- is where one witness starts covering both rather than this
+    // side needing a transposed copy of that case.
     //
     // Unlike the plain fish, this one cannot be left to apply()'s recomputation:
     // act_on_xwing rebuilds its cover as every cross line the base lines touch,

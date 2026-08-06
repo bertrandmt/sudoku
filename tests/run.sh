@@ -135,10 +135,9 @@ S_fx="95124638776438195228397514651769382462941873543852761937516249889273456114
 # cells inside the nonet and outside the base columns: R4C5 and R4C6. Only R4C5 still
 # carries candidate 8 (R4C6's notes are 13567), which is why the block below is one
 # line -- the candidate distribution, not the geometry alone. Either branch kills it:
-# with the fin false the
-# three base columns' 8s fill R1/R4/R9 one apiece and a true Swordfish clears the
-# rest of those rows; with the fin true the nonet already holds its 8. The solution
-# has R4C5=5.
+# with the fin false the three base columns' 8s fill R1/R4/R9 one apiece and a true
+# Swordfish clears the rest of those rows; with the fin true the nonet already holds
+# its 8. The solution has R4C5=5.
 #
 # Step 5's pattern is the one issue #6 analyses (base rows R2/R5/R7, cover columns
 # C2/C4/C9, fin R7C5, striking 2 from R8C4). README documents that one, because it

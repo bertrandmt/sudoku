@@ -47,11 +47,14 @@ struct FinnedSwordfishFinding : Finding {
     // The fins, in discovery order: base line by base line, and within each line
     // in the order its candidates are walked. That is *not* board order for a
     // column-based pattern -- base columns ascend outermost while cells descend
-    // within each, so fins at (5,3) and (3,4) are recorded in that order where
-    // board order would give (3,4) first. Deterministic either way, and print()
-    // emits it, so it is a contract:
-    // test_finnedswordfish_eliminations_on_two_cover_lines asserts it. No README
-    // block or run.sh golden does, every one of those carrying a single fin.
+    // within each, so fins at (5,3) and (4,4) are recorded in that order where
+    // board order would give (4,4) first. Deterministic either way, and print()
+    // emits it, so it is a contract, pinned by two cases that need each other:
+    // test_finnedswordfish_eliminations_on_two_cover_lines rejects a reordering,
+    // and only test_finnedswordfish_fin_order_is_not_board_order distinguishes
+    // this rule from board order -- being row-based, the first would assert the
+    // same sequence under either. No README block or run.sh golden observes the
+    // order at all, every one of those carrying a single fin.
     //
     // Unlike the plain fish, this one cannot be left to apply()'s recomputation:
     // act_on_swordfish rebuilds its cover as every cross line the base lines
