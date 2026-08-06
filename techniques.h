@@ -6,7 +6,7 @@
 // Analyzer::registry() (in analyzer.cpp) can construct each one directly.
 // Listed in cascade order.
 //
-// Adding a technique is ELEVEN sites. Each is followed by what catches it if you
+// Adding a technique is TWELVE sites. Each is followed by what catches it if you
 // forget:
 //   1. analyzer-<name>.h and analyzer-<name>.cpp  -- two new files    [compile]
 //   2. a `src =` entry in the Makefile (explicit list, no glob)          [link]
@@ -40,6 +40,12 @@
 //      in (8) -- locked candidates carries no whitebox cases at all and so
 //      needs no seam -- so what is mandatory is *deciding*, and recording
 //      that decision in (10), not writing cases either way        [nothing]
+//  12. notes.txt, in two parts. Its per-board annotations lay the techniques out
+//      in fixed 4-character columns indexed by cascade position, so a technique
+//      inserted anywhere but the end silently misaligns every tag to its right
+//      (Finned X-Wing shifted [XY] by one column, Finned Swordfish by another),
+//      and a board the new technique fires on wants its own tag added. Reference
+//      data, deliberately not asserted by tier [6], hence unguarded  [nothing]
 // (4) and (5) cross-check each other: the assert compares the built registry's
 // size and names against kCascade, so getting exactly one of them wrong aborts.
 // (7a) and (7b) read what they expect out of the binary rather than hardcoding
@@ -62,11 +68,16 @@
 // exists. (6) is the awkward one: its count fails the unit suite, but the prose
 // naming the techniques beside it does not.
 //
-// The remaining five -- (7c), (8), (9), (10), (11) -- are unguarded, for one
-// shared reason: each is coverage or prose *for* the new technique, and nothing
-// can know that a technique deserves a test, a section, or a seam it does not yet
-// have. Those five are what this list is really for; the loud six would announce
-// themselves without it.
+// The remaining six -- (7c), (8), (9), (10), (11), (12) -- are unguarded. Five of
+// them share one reason: each is coverage or prose *for* the new technique, and
+// nothing can know that a technique deserves a test, a section, or a seam it does
+// not yet have. (12) is unguarded for a different reason -- it is reference data
+// about real puzzles, which the suite reads for boards and deliberately does not
+// trust for annotations. Those six are what this list is really for; the loud six
+// would announce themselves without it.
+//
+// The count grows as sites are *recognised*, not as they are created; see #7 for the
+// accounting.
 //
 // Two lessons are baked into the wording above, both learned by getting it wrong.
 // (8) through (11) were missing entirely until Finned X-Wing needed all four, so
@@ -85,4 +96,5 @@
 #include "analyzer-ywing.h"
 #include "analyzer-swordfish.h"
 #include "analyzer-finnedxwing.h"
+#include "analyzer-finnedswordfish.h"
 #include "analyzer-xychain.h"

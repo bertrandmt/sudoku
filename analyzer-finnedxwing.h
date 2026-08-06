@@ -38,13 +38,24 @@ struct FinnedXWingFinding : Finding {
     // get the base lines back. An anchor may itself be a fin; it identifies a
     // line, nothing more.
     std::array<Coord, 2> anchors;
-    // The fins, in board order. Unlike the plain fish, this one cannot be left
-    // to apply()'s recomputation: act_on_xwing rebuilds its cover as every cross
-    // line the base lines touch, which for a finned position would drag in the
-    // fin's own line and drop the mandatory fin-nonet restriction. Recording the
-    // fins pins both down -- the cover is what the non-fin candidates lie on,
-    // and the nonet is the one every fin shares -- so a single field replaces two
-    // that could disagree with each other.
+    // The fins, in discovery order: base line by base line, and within each line
+    // in the order its candidates are walked. That is *not* board order for a
+    // column-based pattern -- base columns ascend outermost while cells descend
+    // within each -- and it is the same convention FinnedSwordfishFinding
+    // documents at three base lines. No case here carries two fins, so nothing
+    // pins the order on this side of the pair, and no golden observes it either:
+    // it is deterministic but unwitnessed. The finned Swordfish side is pinned, by
+    // test_finnedswordfish_fin_order_is_not_board_order, and #58 -- which unifies
+    // the two walks -- is where one witness starts covering both rather than this
+    // side needing a transposed copy of that case.
+    //
+    // Unlike the plain fish, this one cannot be left to apply()'s recomputation:
+    // act_on_xwing rebuilds its cover as every cross line the base lines touch,
+    // which for a finned position would drag in the fin's own line and drop the
+    // mandatory fin-nonet restriction. Recording the fins pins both down -- the
+    // cover is what the non-fin candidates lie on, and the nonet is the one every
+    // fin shares -- so a single field replaces two that could disagree with each
+    // other.
     std::vector<Coord> fins;
     bool is_row_based;  // true if rows hold the pattern, false if columns do
 
