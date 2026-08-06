@@ -76,15 +76,8 @@
 // trust for annotations. Those six are what this list is really for; the loud six
 // would announce themselves without it.
 //
-// A note on the number, because it is now large enough to be misread as a cost the
-// technique registry (issue #7) introduced. It is not. The list grows because sites
-// are being *recognised*, not created: notes.txt, tests/run.sh and
-// docs/test-predicate-idiom.md all predate the first registry commit, and each was
-// already work an author had to do and this list failed to name. Meanwhile the two
-// sites the registry did create, (4) and (5), replaced five silent ones -- a member
-// vector, a clear() in analyze(), a find-chain entry, an act-chain entry and a
-// print_section line -- with two that cross-check each other and abort. Against the
-// pre-registry status quo this is neutral at worst, and better on the loud sites.
+// The count grows as sites are *recognised*, not as they are created; see #7 for the
+// accounting.
 //
 // Two lessons are baked into the wording above, both learned by getting it wrong.
 // (8) through (11) were missing entirely until Finned X-Wing needed all four, so

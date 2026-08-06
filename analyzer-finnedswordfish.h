@@ -44,13 +44,22 @@ struct FinnedSwordfishFinding : Finding {
     // calls line_of on them to get the base lines back. An anchor may itself be a
     // fin; it identifies a line, nothing more.
     std::array<Coord, 3> anchors;
-    // The fins, in board order. Unlike the plain fish, this one cannot be left to
-    // apply()'s recomputation: act_on_swordfish rebuilds its cover as every cross
-    // line the base lines touch, which for a finned position would drag in the
-    // fin's own line and drop the mandatory fin-nonet restriction. Recording the
-    // fins pins both down -- the cover is what the non-fin candidates lie on, and
-    // the nonet is the one every fin shares -- so a single field replaces two that
-    // could disagree with each other.
+    // The fins, in discovery order: base line by base line, and within each line
+    // in the order its candidates are walked. That is *not* board order for a
+    // column-based pattern -- base columns ascend outermost while cells descend
+    // within each, so fins at (5,3) and (3,4) are recorded in that order where
+    // board order would give (3,4) first. Deterministic either way, and print()
+    // emits it, so it is a contract:
+    // test_finnedswordfish_eliminations_on_two_cover_lines asserts it. No README
+    // block or run.sh golden does, every one of those carrying a single fin.
+    //
+    // Unlike the plain fish, this one cannot be left to apply()'s recomputation:
+    // act_on_swordfish rebuilds its cover as every cross line the base lines
+    // touch, which for a finned position would drag in the fin's own line and
+    // drop the mandatory fin-nonet restriction. Recording the fins pins both
+    // down -- the cover is what the non-fin candidates lie on, and the nonet is
+    // the one every fin shares -- so a single field replaces two that could
+    // disagree with each other.
     std::vector<Coord> fins;
     bool is_row_based;  // true if rows hold the pattern, false if columns do
 

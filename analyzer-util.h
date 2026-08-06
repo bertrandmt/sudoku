@@ -8,11 +8,11 @@
 #include <vector>
 
 // Helpers shared by the fish techniques (X-Wing, Swordfish and their finned
-// variants). Both are pure
-// mappings over the board with no per-technique state, so they live here
-// rather than being copy-pasted into each technique's translation unit. They
-// are wrapped in a named namespace so these collision-prone generic names do
-// not land at global scope for every TU that includes this header.
+// variants). Both are pure mappings over the board with no per-technique
+// state, so they live here rather than being copy-pasted into each
+// technique's translation unit. They are wrapped in a named namespace so
+// these collision-prone generic names do not land at global scope for every
+// TU that includes this header.
 namespace analyzer_util {
 
 // The cells of `set` that still hold `value` as a note.

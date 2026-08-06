@@ -46,6 +46,14 @@ bool find_finned_swordfish(const Board &board, const Cell &cell, const Value &va
     // strictly cheaper deduction that fires much earlier in the cascade. The fish
     // family starts at two per base line.
     //
+    // No test pins this floor, and none can through the solver: "exactly one
+    // candidate for v in this line" *is* the hidden-single condition, so if it held
+    // anywhere, HS would have fired and this technique would never have run. The
+    // floor is unreachable-by-construction redundancy rather than a live gate, which
+    // is why relaxing it to `< 1` leaves both suites green. A whitebox case could
+    // reach it through the seam below, on a position the cascade cannot produce; that
+    // is deliberately not done.
+    //
     // Note what is deliberately *absent*: the plain Swordfish's upper bound of
     // three candidates per base line (analyzer-swordfish.cpp:50). That bound is
     // not an independent rule, it is the confinement requirement in disguise --

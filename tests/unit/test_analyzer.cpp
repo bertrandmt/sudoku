@@ -791,7 +791,7 @@ void test_finnedxwing_column_based() {
 
     bool acted = fx.apply(board, found);
     check(acted, "apply reports an elimination");
-    check(!has_candidate(board, 5, 5, V), "stray 7 at (5,5) eliminated");
+    check(!has_candidate(board, 5, 4, V), "stray 7 at (5,4) eliminated");
     check(has_candidate(board, 3, 3, V), "the fin at (3,3) survives: it sits in a base column");
     check(has_candidate(board, 1, 0, V) && has_candidate(board, 5, 0, V) && has_candidate(board, 5, 3, V),
           "the three fish cells kept candidate 7");
@@ -922,7 +922,7 @@ void test_finnedswordfish_row_based() {
 
     bool acted = fs.apply(board, found);
     check(acted, "apply reports an elimination");
-    check(!has_candidate(board, 5, 4, V), "stray 7 at (5,4) eliminated");
+    check(!has_candidate(board, 5, 5, V), "stray 7 at (5,5) eliminated");
     check(has_candidate(board, 4, 3, V), "the fin at (4,3) survives: it sits in a base row");
     check(has_candidate(board, 3, 5, V),
           "(3,5) survives: in the fin's nonet on a cover column, but on the second base row");
@@ -1070,6 +1070,96 @@ void test_finnedswordfish_first_base_line_not_a_target() {
     check(found.empty(), "nothing recorded");
 }
 
+// The cover terms in `act`, and the first one in `find`'s has-eliminations scan.
+// Both accept cases above put their eliminable cell on the *last* cover line
+// recovered, so neither witnesses the earlier terms: a cell lies on exactly one
+// cover line, so a case witnesses exactly the index its eliminable cell sits on.
+// This position puts eliminable cells on two of them.
+//
+// Base rows 0, 3 and 4; cover columns 3, 4 and 0; fins at (3,5) and (4,5), which
+// share the nonet rows 3-5 / columns 3-5. That nonet meets cover columns 3 and 4,
+// at (5,3) and (5,4), and both are struck. `act` recovers the cover by walking the
+// base lines' non-fin candidates in order, so row 0's two cells fix `cover[0]` = c3
+// and `cover[1]` = c4, and row 3's (3,0) fixes `cover[2]` = c0. Drop either of the
+// first two terms and one of the two strikes goes missing.
+//
+// Note the geometry caps this at two: every cover line that meets the fin's nonet
+// must lie in that nonet's three-column band, and the fin itself occupies one of
+// those columns without being a cover column, so at most two cover lines can hold
+// an eliminable cell. Three cases are therefore the minimum for three terms, and
+// the sole-elimination variant below is the third.
+void test_finnedswordfish_eliminations_on_two_cover_lines() {
+    std::cout << "[finned swordfish] eliminations on the first two recovered cover lines\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,3},{0,4}, {3,0},{3,5}, {4,0},{4,5}, {5,3},{5,4} });
+
+    FinnedSwordfishTechnique fs;
+    FindingList found;
+    check(FinnedSwordfishTechnique::find_finned_swordfish(board, cell_at(board, 0, 3), V, found),
+          "finned Swordfish detected with anchor (0,3)");
+    auto const *f = only<FinnedSwordfishFinding>(found);
+    check(f, "the recorded finding is a FinnedSwordfishFinding");
+    if (f) {
+        check(f->is_row_based, "recorded pattern is row-based");
+        check(f->fins.size() == 2 && f->fins[0] == Coord(3, 5) && f->fins[1] == Coord(4, 5),
+              "both fins recorded, in discovery order");
+    }
+
+    bool acted = fs.apply(board, found);
+    check(acted, "apply reports an elimination");
+    check(!has_candidate(board, 5, 3, V), "stray 7 at (5,3) eliminated -- pins cover[0]");
+    check(!has_candidate(board, 5, 4, V), "stray 7 at (5,4) eliminated -- pins cover[1]");
+    check(has_candidate(board, 3, 5, V) && has_candidate(board, 4, 5, V),
+          "both fins survive: they sit in base rows");
+    check(has_candidate(board, 0, 3, V) && has_candidate(board, 0, 4, V)
+       && has_candidate(board, 3, 0, V) && has_candidate(board, 4, 0, V),
+          "every base candidate kept candidate 7");
+}
+
+// The first cover term inside `find`'s has-eliminations scan, which the case above
+// cannot reach. That scan stops at the first cell it likes, so with eliminable cells
+// on two cover lines, dropping the first term still leaves the second to satisfy it
+// and the pattern is found anyway. Here the position above loses (5,4), so the sole
+// eliminable cell is (5,3), on the first cover line the scan tests. Drop that term
+// and no cover triple satisfies the scan, so nothing is reported at all.
+void test_finnedswordfish_sole_elimination_on_first_cover_line() {
+    std::cout << "[finned swordfish] a sole elimination on the first cover line is still found\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,3},{0,4}, {3,0},{3,5}, {4,0},{4,5}, {5,3} });
+
+    FinnedSwordfishTechnique fs;
+    FindingList found;
+    check(FinnedSwordfishTechnique::find_finned_swordfish(board, cell_at(board, 0, 3), V, found),
+          "finned Swordfish detected when only the first cover line has anything to strike");
+    bool acted = fs.apply(board, found);
+    check(acted, "apply reports an elimination");
+    check(!has_candidate(board, 5, 3, V), "stray 7 at (5,3) eliminated");
+}
+
+// The same, one term along. Dropping the *second* cover term needs its own case for
+// the same short-circuit reason: with the sole eliminable cell on the first cover
+// line the scan is satisfied before it ever tests the second. So this is the previous
+// position with (5,3) removed instead of (5,4), leaving (5,4) -- on cover column 4,
+// the second line the scan tests -- as the only cell to strike. The third term is
+// already pinned by test_finnedswordfish_row_based, whose sole eliminable (5,5) sits
+// on the last cover line tested.
+void test_finnedswordfish_sole_elimination_on_second_cover_line() {
+    std::cout << "[finned swordfish] a sole elimination on the second cover line is still found\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,3},{0,4}, {3,0},{3,5}, {4,0},{4,5}, {5,4} });
+
+    FinnedSwordfishTechnique fs;
+    FindingList found;
+    check(FinnedSwordfishTechnique::find_finned_swordfish(board, cell_at(board, 0, 3), V, found),
+          "finned Swordfish detected when only the second cover line has anything to strike");
+    bool acted = fs.apply(board, found);
+    check(acted, "apply reports an elimination");
+    check(!has_candidate(board, 5, 4, V), "stray 7 at (5,4) eliminated");
+}
+
 // The `crosses < 4` early-out, isolated. Rows 0, 3 and 6 hold 7 only in columns 1,
 // 4 and 7 -- a fully confined, finless triple, i.e. a *plain* Swordfish, with a
 // stray at (1,4) for it to eliminate. Swordfish runs ahead of this technique in the
@@ -1210,6 +1300,9 @@ int main() {
     test_finnedswordfish_uncovered_base_line_rejected();
     test_finnedswordfish_no_elimination();
     test_finnedswordfish_first_base_line_not_a_target();
+    test_finnedswordfish_eliminations_on_two_cover_lines();
+    test_finnedswordfish_sole_elimination_on_first_cover_line();
+    test_finnedswordfish_sole_elimination_on_second_cover_line();
     test_finnedswordfish_plain_swordfish_not_reported();
     test_colorchain_rule2_contradiction();
     test_colorchain_benign_not_actionable();

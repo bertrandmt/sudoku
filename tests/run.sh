@@ -131,8 +131,11 @@ S_fx="95124638776438195228397514651769382462941873543852761937516249889273456114
 # {R1,R4}. That is *four* cross rows, which is exactly why plain Swordfish cannot
 # see the position -- it rejects unless the union is three -- and the fourth row is
 # where the fin lives. Cover {R1,R4,R9}, fin R5C4, whose nonet (rows 4-6, cols 4-6)
-# meets a cover row only at R4, so the sole cell in that nonet, on a cover row and
-# outside the base columns, is R4C5. Either branch kills it: with the fin false the
+# meets a cover row only at R4, so the cells both branches vouch for are that row's
+# cells inside the nonet and outside the base columns: R4C5 and R4C6. Only R4C5 still
+# carries candidate 8 (R4C6's notes are 13567), which is why the block below is one
+# line -- the candidate distribution, not the geometry alone. Either branch kills it:
+# with the fin false the
 # three base columns' 8s fill R1/R4/R9 one apiece and a true Swordfish clears the
 # rest of those rows; with the fin true the nonet already holds its 8. The solution
 # has R4C5=5.
