@@ -750,7 +750,19 @@ void test_finnedxwing_row_based() {
     bool acted = fx.apply(board, found);
     check(acted, "apply reports an elimination");
     check(!has_candidate(board, 4, 1, V), "stray 7 at (4,1) eliminated");
-    check(has_candidate(board, 3, 2, V), "the fin at (3,2) survives: it sits in a base row");
+    // On the fin-survival checks here and in every other finned case: a fin
+    // is spared twice over, and neither reason is the whole one. It is off the
+    // cover -- being off the chosen cover is what *makes* a candidate a fin -- and
+    // it is a base line's own candidate. `eliminable` tests the cover first, so
+    // that is the gate which actually rejects it, but delete either gate and the
+    // other still holds: probed both ways, and no fin-survival check in the suite
+    // fails under either removal. So read these as regression statements about
+    // what apply() leaves alone, not as witnesses for either gate. What does
+    // witness the base-line exclusion is the checks on *non-fin* base-line cells
+    // that sit on the cover, such as the (3,3) check in
+    // test_finnedxwing_fin_order_is_not_board_order -- those cells are reachable
+    // by the base-line test, and they fail when it is broken.
+    check(has_candidate(board, 3, 2, V), "the fin at (3,2) survives: off the cover, and on a base row");
     check(has_candidate(board, 0, 1, V) && has_candidate(board, 0, 5, V)
        && has_candidate(board, 3, 1, V) && has_candidate(board, 3, 5, V),
           "all four fish corners kept candidate 7");
@@ -792,7 +804,7 @@ void test_finnedxwing_column_based() {
     bool acted = fx.apply(board, found);
     check(acted, "apply reports an elimination");
     check(!has_candidate(board, 5, 4, V), "stray 7 at (5,4) eliminated");
-    check(has_candidate(board, 3, 3, V), "the fin at (3,3) survives: it sits in a base column");
+    check(has_candidate(board, 3, 3, V), "the fin at (3,3) survives: off the cover, and on a base column");
     check(has_candidate(board, 1, 0, V) && has_candidate(board, 5, 0, V) && has_candidate(board, 5, 3, V),
           "the three fish cells kept candidate 7");
 }
@@ -863,7 +875,7 @@ void test_finnedxwing_fin_order_is_not_board_order() {
     check(acted, "apply reports an elimination");
     check(!has_candidate(board, 3, 5, V), "stray 7 at (3,5) eliminated");
     check(has_candidate(board, 5, 3, V) && has_candidate(board, 4, 4, V),
-          "both fins survive: they sit in base columns");
+          "both fins survive: off the cover, and on base columns");
     check(has_candidate(board, 3, 3, V), "(3,3) survives: in the fin's nonet on a cover row, but on a base column");
 }
 
@@ -993,7 +1005,7 @@ void test_finnedswordfish_row_based() {
     bool acted = fs.apply(board, found);
     check(acted, "apply reports an elimination");
     check(!has_candidate(board, 5, 5, V), "stray 7 at (5,5) eliminated");
-    check(has_candidate(board, 4, 3, V), "the fin at (4,3) survives: it sits in a base row");
+    check(has_candidate(board, 4, 3, V), "the fin at (4,3) survives: off the cover, and on a base row");
     check(has_candidate(board, 3, 5, V),
           "(3,5) survives: in the fin's nonet on a cover column, but on the second base row");
     check(has_candidate(board, 4, 5, V),
@@ -1043,7 +1055,7 @@ void test_finnedswordfish_column_based() {
     bool acted = fs.apply(board, found);
     check(acted, "apply reports an elimination");
     check(!has_candidate(board, 3, 5, V), "stray 7 at (3,5) eliminated");
-    check(has_candidate(board, 4, 4, V), "the fin at (4,4) survives: it sits in a base column");
+    check(has_candidate(board, 4, 4, V), "the fin at (4,4) survives: off the cover, and on a base column");
     check(has_candidate(board, 5, 3, V),
           "(5,3) survives: in the fin's nonet on a cover row, but on the first base column");
     check(has_candidate(board, 3, 4, V),
@@ -1181,7 +1193,7 @@ void test_finnedswordfish_eliminations_on_two_cover_lines() {
     check(!has_candidate(board, 5, 3, V), "stray 7 at (5,3) eliminated -- pins cover[0]");
     check(!has_candidate(board, 5, 4, V), "stray 7 at (5,4) eliminated -- pins cover[1]");
     check(has_candidate(board, 3, 5, V) && has_candidate(board, 4, 5, V),
-          "both fins survive: they sit in base rows");
+          "both fins survive: off the cover, and on base rows");
     check(has_candidate(board, 0, 3, V) && has_candidate(board, 0, 4, V)
        && has_candidate(board, 3, 0, V) && has_candidate(board, 4, 0, V),
           "every base candidate kept candidate 7");
@@ -1238,7 +1250,7 @@ void test_finnedswordfish_fin_order_is_not_board_order() {
     check(acted, "apply reports an elimination");
     check(!has_candidate(board, 3, 5, V), "stray 7 at (3,5) eliminated");
     check(has_candidate(board, 5, 3, V) && has_candidate(board, 4, 4, V),
-          "both fins survive: they sit in base columns");
+          "both fins survive: off the cover, and on base columns");
     check(has_candidate(board, 3, 3, V) && has_candidate(board, 3, 4, V),
           "(3,3) and (3,4) survive: in the fin's nonet on a cover row, but on base columns");
 }

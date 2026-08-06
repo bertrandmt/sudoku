@@ -168,6 +168,15 @@ std::vector<const EliminationSet *> crosses_of(const Board &board,
 // guess. For a plain fish `fins` is empty and the cover is simply every cross
 // line the base candidates touch.
 //
+// That assert is a bound, not a restatement: the std::copy below writes into a
+// fixed-size array, so a cover that came back larger than N would overflow it. It
+// cannot -- find() required exactly N cross lines on this same board, and
+// SolverState re-analyzes after every mutation, so a finding is always applied to
+// the board its find ran on -- but the assert is the only thing standing between
+// that reasoning and a stack write, and asserts ship here (no -DNDEBUG). Left as
+// std::copy rather than copy_n deliberately: bounding the write would trade an
+// abort for a silent truncation, which is worse to debug.
+//
 // Note what is *not* done: sweeping every cross line for a *finned* fish, without
 // subtracting the fins, would drag in the line the fin sits on, which the fish
 // says nothing about.
@@ -322,6 +331,12 @@ bool find_plain_fish(const Board &board, const Cell &cell, const Value &value,
         // sharing two cross lines, say. Vacuous at N=2 -- a first base line of
         // exactly two candidates touches two cross lines and the prune keeps it
         // there -- and a live gate at N=3.
+        //
+        // Deliberately recomputed rather than carried out of `accept`, which
+        // evaluated the same walk one call earlier to test `<= N`. Handing the
+        // cover back would mean `accept` returning a value instead of a verdict,
+        // complicating extend_bases' contract for both families to save a walk over
+        // at most nine cells, and it does not show up in a corpus benchmark.
         auto cover = crosses_of<EliminationSet>(board, b, N);
         if (cover.size() != N) return false;
 
@@ -499,6 +514,13 @@ bool act_on_plain_fish(Board &board, const Value &value, const std::array<Coord,
     const auto bases = bases_of<EliminationSet>(board, anchors, value);
     const auto cover = cover_of<EliminationSet>(board, bases, {});
 
+    // This sweeps each cover line *live* while clearing notes in it, where the
+    // pre-#58 X-Wing swept a vector snapshot of the line's candidates taken before
+    // any elimination. Equivalent, and it rests on two facts from elsewhere:
+    // Board::clear_note_at strikes one candidate in one cell and cascades nothing,
+    // and Cell::operator== compares coordinates only, so contains() is a coord
+    // test unaffected by notes changing under it. A future elimination that
+    // cascades would break this loop and not obviously.
     bool did_act = false;
     for (const auto *line : cover)
         for (auto const &cell : *line) {
