@@ -175,13 +175,19 @@ bool extend_chain(const Board &board, const Cell &cell, Value incoming_link_valu
     //
     // test_xychain_visit_order pins it (tests/unit/test_analyzer.cpp): a crafted
     // board offering several equal-length continuations, asserting the coord-least
-    // is the one recorded. Reversing this comparator fails that case, and so does
-    // deleting the sort -- on libc++, where the case's candidates come out of the
-    // bucket in an order that is not coord order. That second half is a coincidence
-    // of one hash table and cannot be relied on: with no sort the result is
-    // unspecified rather than wrong, and no test can compel an unordered container
-    // to disagree with coord order. Deleting the sort changes no board in the
-    // corpus, on either toolchain, so the black-box suite cannot see it at all.
+    // is the one recorded. What it pins is the *direction* of this ordering, and it
+    // pins that on every toolchain -- reversing the comparator sorts descending, and
+    // since a standard library varies the candidate set's iteration order but not its
+    // contents, and coords within it are unique, the reversed result is identical
+    // everywhere.
+    //
+    // What no test can pin is that a sort happens at all. Delete it and the order
+    // becomes unspecified rather than wrong, so the case may pass by coincidence. It
+    // does fail on libc++, where this board's candidates leave the bucket in a
+    // non-coord order, but that is one hash table's behaviour and not something to
+    // rest on. Deleting it changes no corpus board on this toolchain either, so the
+    // black-box suite cannot see it. That asymmetry is inherent, and it is what #53
+    // closes against rather than something left undone.
     //
     // `candidates` outlives every recursive call made from this frame, so the
     // pointers pushed below stay valid for as long as they are on the chain,

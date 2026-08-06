@@ -185,12 +185,16 @@ places is exactly what went stale when the cascade last grew:
   single finding chosen by arrival, **the traversal order inside a frame is a result,
   not a presentation detail** — it decides which of several equal-length chains is
   recorded. That is what issue #53 asked to have pinned, and
-  `test_xychain_visit_order` does it. It fails if the coord comparator is reversed,
-  and on libc++ it also fails if the sort is deleted — but only because that board's
-  candidates happen to leave the bucket in a non-coord order, which is a property of
-  one hash table rather than of the test. With no sort the result is unspecified
-  rather than wrong, and no test can compel an unordered container to disagree with
-  coord order.
+  `test_xychain_visit_order` does it, and the two obvious mutations are not equally
+  catchable, which is worth stating rather than glossing. Reversing the comparator is
+  caught on **every** toolchain: the reversed sort is descending, a standard library
+  varies the candidate set's iteration order but not its contents, and coords within
+  it are unique, so the result is identical everywhere. Deleting the sort is caught on
+  **no** toolchain by guarantee — the order becomes unspecified rather than wrong, so
+  the case may pass by coincidence. It happens to fail on libc++, but that is one hash
+  table's bucket order, not a property of the test. So the pinned property is
+  "candidates are visited in coord-ascending order", not "a sort exists", and nothing
+  can pin the latter.
 
 ## A note on templates
 
