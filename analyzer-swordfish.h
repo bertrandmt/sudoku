@@ -13,6 +13,12 @@
 // for that value, whose cross lines union to exactly three. Every other
 // candidate for the value on those three cross lines can then be eliminated.
 //
+// Since #58 that widening is a template argument rather than a second copy of the
+// rule: the search is analyzer_fish::find_plain_fish at N=3, the same worker
+// X-Wing instantiates at N=2. Note the "two or three candidates" above is not a
+// separate rule the worker has to be told -- it falls out of confinement to three
+// cover lines; analyzer-fish.h has the argument.
+//
 // Swordfish is *scan-fused* (docs/test-predicate-idiom.md), like its sibling
 // X-Wing: the second and third base lines are discovered by the validating scan
 // rather than handed in, so there is no separable test_ predicate. The seam is
@@ -49,7 +55,10 @@ struct SwordfishFinding : Finding {
 
 class SwordfishTechnique : public Technique {
 public:
-    const char *name() const override { return "SF"; }
+    // Written once, for the reason XWingTechnique::kName gives.
+    static constexpr const char *kName = "SF";
+
+    const char *name() const override { return kName; }
     Tier        tier() const override { return Tier::Advanced; }
     bool  brace_each() const override { return true; }
 

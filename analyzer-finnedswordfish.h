@@ -26,10 +26,15 @@
 // that shape too.
 //
 // The relationship to FinnedXWingTechnique is the same one SwordfishTechnique has
-// to XWingTechnique: the same rule at N=3 rather than N=2, written out separately.
-// Unifying all four fish on one base-line-count-parameterized worker is #58; until
-// then treat FX and FS as structural twins, and pair an algorithm change to one
-// with the other in the same PR.
+// to XWingTechnique: the same rule at N=3 rather than N=2 -- and since #58 the two
+// are not written out separately but share one worker,
+// analyzer_fish::find_finned_fish, instantiated at N=3 here and at N=2 there.
+//
+// That retires most of the twin rule these two were under: an algorithm change now
+// has one place to be made and reaches both fish by construction. What still needs
+// pairing is what stayed per-technique -- the Finding, the record callback, the
+// whitebox cases, and prose like this paragraph -- so a change to one fish's
+// *glue* is still a prompt to look at the other's.
 //
 // Finned Swordfish is *scan-fused* (docs/test-predicate-idiom.md), like every
 // other fish: the second and third base lines, the cover triple and the fin set
@@ -54,15 +59,17 @@ struct FinnedSwordfishFinding : Finding {
     // and only test_finnedswordfish_fin_order_is_not_board_order distinguishes
     // this rule from board order -- being row-based, the first would assert the
     // same sequence under either. No README block or run.sh golden observes the
-    // order at all, every one of those carrying a single fin.
+    // order at all, every one of those carrying a single fin. Since #58 the walk
+    // itself is shared, so FinnedXWingFinding's fins come out of the same code and
+    // test_finnedxwing_fin_order_is_not_board_order pins it at two base lines.
     //
     // Unlike the plain fish, this one cannot be left to apply()'s recomputation:
-    // act_on_swordfish rebuilds its cover as every cross line the base lines
-    // touch, which for a finned position would drag in the fin's own line and
-    // drop the mandatory fin-nonet restriction. Recording the fins pins both
-    // down -- the cover is what the non-fin candidates lie on, and the nonet is
-    // the one every fin shares -- so a single field replaces two that could
-    // disagree with each other.
+    // recovering the cover as every cross line the base lines touch, which is what
+    // a plain fish does and analyzer_fish::cover_of still does when handed no fins,
+    // would for a finned position drag in the fin's own line and drop the mandatory
+    // fin-nonet restriction. Recording the fins pins both down -- the cover is what
+    // the non-fin candidates lie on, and the nonet is the one every fin shares --
+    // so a single field replaces two that could disagree with each other.
     std::vector<Coord> fins;
     bool is_row_based;  // true if rows hold the pattern, false if columns do
 
@@ -88,7 +95,10 @@ struct FinnedSwordfishFinding : Finding {
 
 class FinnedSwordfishTechnique : public Technique {
 public:
-    const char *name() const override { return "FS"; }
+    // Written once, for the reason XWingTechnique::kName gives.
+    static constexpr const char *kName = "FS";
+
+    const char *name() const override { return kName; }
     Tier        tier() const override { return Tier::Advanced; }
     bool  brace_each() const override { return true; }
 
