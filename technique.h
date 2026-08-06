@@ -72,9 +72,10 @@ public:
     // default. Some stop at the first hit instead, which loses nothing: acting
     // on one is enough to move the state forward, and SolverState::act re-runs
     // analyze() after a successful act, so the rest are re-derived from the
-    // board that has changed under them. XY-chain is the one that searches
-    // exhaustively and then keeps only its best finding -- a real deviation from
-    // the greedy default, under review in issue #36.
+    // board that has changed under them. XY-chain searches exhaustively and then
+    // discards the findings whose eliminations another finding already covers,
+    // which is the greedy default too: what it drops is redundant rather than
+    // deferred (#36).
     //
     // const in the Board: find is a pure query.
     virtual bool find(const Board &, FindingList &out) const = 0;

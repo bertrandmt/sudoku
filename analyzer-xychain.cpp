@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cassert>
 #include <memory>
+#include <set>
 #include <unordered_set>
 #include <vector>
 
@@ -52,11 +53,16 @@ bool on_chain(const ChainCells &chain, const Coord &coord) {
 }
 
 // Score `chain`: validate that it links up and that the far end's candidate is
-// also a candidate for the initial cell, then count the off-chain cells that
-// would lose `value`. Zero means "not actionable" -- either the chain does not
-// close or it eliminates nothing, a distinction the caller does not need.
-// File-local because no whitebox case calls it (see analyzer-xychain.h).
-size_t test_xychain(const Board &board, const Value &value, const ChainCells &chain) {
+// also a candidate for the initial cell, then collect the off-chain cells that
+// would lose `value`. An empty set means "not actionable" -- either the chain
+// does not close or it eliminates nothing, a distinction the caller does not
+// need. File-local because no whitebox case calls it (see analyzer-xychain.h).
+//
+// Collecting the coords rather than counting them is what lets a finding carry
+// its own effect: the retention rule compares effects, and apply() replays this
+// set instead of rediscovering it against a board that other findings have
+// meanwhile changed.
+std::set<Coord> test_xychain(const Board &board, const Value &value, const ChainCells &chain) {
     // validate that the chain chains properly, and that the end candidate value is also a
     // candidate for the initial cell.
     Value other_value = value;
@@ -65,14 +71,14 @@ size_t test_xychain(const Board &board, const Value &value, const ChainCells &ch
 
         assert(cell->isNote());
         assert(cell->notes().count() == 2);
-        if (!cell->check(this_value)) return 0;
+        if (!cell->check(this_value)) return {};
         other_value = cell->other_value(this_value);
     }
     // is the last "other_value" is the incoming candidate value
-    if (other_value != value) return 0;
+    if (other_value != value) return {};
 
-    // yes! count eliminations
-    size_t num_elim = 0;
+    // yes! collect eliminations
+    std::set<Coord> eliminations;
     for (const auto &cell : board.cells()) {
         // is this a note cell?
         if (!cell.isNote()) continue;
@@ -87,11 +93,11 @@ size_t test_xychain(const Board &board, const Value &value, const ChainCells &ch
         if (!board.see_each_other(cell.coord(), chain.front()->coord())) continue;
         if (!board.see_each_other(cell.coord(), chain.back()->coord())) continue;
 
-        // yes! count it
-        num_elim++;
+        // yes! collect it
+        eliminations.insert(cell.coord());
     }
 
-    return num_elim;
+    return eliminations;
 }
 
 template<class Set>
@@ -121,7 +127,7 @@ void select_chain_candidates(const Cell &current, Value value, const Set &set, c
 }
 
 // Extend `chain` by one cell in every direction it can go, offering each
-// actionable chain met along the way to record_if_best, and recurse.
+// actionable chain met along the way to record_if_maximal, and recurse.
 // `incoming_link_value` is the candidate the previous link resolved into `cell`,
 // so the chain continues on `cell`'s *other* candidate. Returns whether any
 // offer was accepted.
@@ -150,55 +156,38 @@ bool extend_chain(const Board &board, const Cell &cell, Value incoming_link_valu
     select_chain_candidates(cell, common_link_value, board.column(cell), visited, candidates);
     select_chain_candidates(cell, common_link_value, board.nonet(cell), visited, candidates);
 
-    // Walk the candidates coord-sorted, not in the set's own order. Two
-    // reasons, and the second is the load-bearing one:
+    // `candidates` is an unordered_set and this walks it in its own order, which
+    // is unspecified and differs between standard libraries. That is deliberate,
+    // and it is safe here only because nothing downstream of this loop depends on
+    // the order offers arrive in:
     //
-    //  - `candidates` is an unordered_set, so its iteration order is
-    //    unspecified and differs between standard libraries. It reaches
-    //    stdout: the chain is recorded in traversal order, so it fixes both
-    //    the "{c1:c2:..}" dump and the order of apply()'s [XY] lines.
-    //  - record_if_best keeps ONE chain and rejects ties, so whichever
-    //    equally-desirable chain is *offered first* wins. Discovery order is
-    //    therefore part of the result, not just of the presentation.
+    //  - which chains are retained is order-independent by construction
+    //    (record_if_maximal), and
+    //  - the order they are emitted in is fixed by find()'s canonical sort, not
+    //    by the order they were found.
     //
-    // Measured over the 34-board corpus (31 in notes.txt plus run.sh's 9
-    // fixtures, 6 of which are the same boards), removing the sort changes the
-    // output of two boards, neither of them in its final grid, and it changes them
-    // differently: on one the recorded winner flips to the same chain walked from
-    // the other end, while on the other the winner and its eliminations are
-    // untouched and only the trace of superseded offers moves. So what this buys
-    // is a reproducible transcript rather than a correct one -- nothing the solver
-    // concludes on any board we have depends on it. It is not a proof
-    // for all boards -- two genuinely different chains tied on (elimination count,
-    // length) would still be resolved by whoever is offered first -- which is one
-    // more reason to prefer issue #36's greedy-on-all-distinct-effects rewrite
-    // over this trim-to-one.
-    //
-    // No test pins this: neither suite fails with the sort removed, because the
-    // final grids are unchanged and that is all the black-box tiers compare. See
-    // #53.
+    // A coord-sort used to stand here for exactly the reasons those two bullets
+    // now cover: the recorded chain reached stdout in traversal order, and
+    // trim-to-one let whichever equally-desirable chain arrived first win. It is
+    // gone because it no longer protects anything -- verified by replaying the
+    // whole board corpus with the sort restored and diffing the transcripts, which
+    // are byte-identical. Restoring it as insurance would re-introduce a mechanism
+    // that no test can fail, which is the state #53 filed.
     //
     // `candidates` outlives every recursive call made from this frame, so the
-    // pointers pushed below stay valid for as long as they are on the chain,
-    // and `ordered` only holds pointers into it.
-    std::vector<const Cell *> ordered;
-    ordered.reserve(candidates.size());
-    for (const Cell &c : candidates) ordered.push_back(&c);
-    std::sort(ordered.begin(), ordered.end(),
-              [](const Cell *a, const Cell *b) { return a->coord() < b->coord(); });
-
-    for (const auto *next_cell_ptr : ordered) {
-        const Cell &next_cell = *next_cell_ptr;
+    // pointers pushed below stay valid for as long as they are on the chain.
+    for (const Cell &next_cell : candidates) {
         // proactively extend the chain with next_cell
         chain.push_back(&next_cell);
         visited.insert(next_cell.coord());
 
         // is the chain valid and would acting on it have an impact
         Value next_link_value = next_cell.other_value(common_link_value);
-        size_t num_elim = test_xychain(board, next_link_value, chain);
-        if (num_elim > 0) {
-            // yes! offer it; only a strictly more desirable chain is kept
-            did_find |= XYChainTechnique::record_if_best(out, XYChainFinding{next_link_value, coords_of(chain), num_elim});
+        std::set<Coord> eliminations = test_xychain(board, next_link_value, chain);
+        if (!eliminations.empty()) {
+            // yes! offer it; retained unless an already-recorded effect covers it
+            did_find |= XYChainTechnique::record_if_maximal(
+                out, XYChainFinding{next_link_value, coords_of(chain), std::move(eliminations)});
         }
 
         // recurse
@@ -212,30 +201,29 @@ bool extend_chain(const Board &board, const Cell &cell, Value incoming_link_valu
     return did_find;
 }
 
-// Clear `entry.value` from every cell of `chain_front_set` that sees the far end
-// of the chain and is not on the chain itself.
-template<class Set>
-bool act_on_xychain(Board &board, const XYChainFinding &entry, const Set &chain_front_set) {
+// Clear `entry.value` from every cell of the effect `entry` recorded.
+//
+// The set is replayed rather than rediscovered. Rediscovering it -- rescanning
+// one chain end's units and re-testing `see_each_other` against the other, which
+// is what this used to do -- reads a board that earlier findings in the same
+// apply() have already changed, and re-derives from scratch the answer find()
+// had in hand. Replaying also means the emission order is the set's own (Coord
+// order) rather than a scan order that depended on which chain end came first.
+//
+// clear_note_at is the guard for the one way two retained effects can interact:
+// non-nesting effects may still overlap, so a cell a previous chain already
+// cleared reports false here and is skipped, printing nothing. That is why the
+// shared elimination shows up once and not once per justification.
+bool act_on_xychain(Board &board, const XYChainFinding &entry) {
     bool did_act = false;
 
-    // For each cell that can see the other end of the chain, eliminate the chain value
-    for (const auto &cell : chain_front_set) {
-        // is this a note cell?
-        if (!cell.isNote()) continue;
+    for (const auto &coord : entry.eliminations) {
+        // has an earlier finding in this same apply() already cleared it?
+        if (!board.clear_note_at(coord, entry.value)) continue;
 
-        // yes! but is it a candidate for the entry's value?
-        if (!cell.check(entry.value)) continue;
-
-        // yes! but is it on the chain?
-        if (std::find(entry.chain.begin(), entry.chain.end(), cell.coord()) != entry.chain.end()) continue;
-
-        // no! but can it see the other end of the chain?
-        if (!board.see_each_other(cell.coord(), entry.chain.back())) continue;
-
-        // yes! ELIMINATE!
-        std::cout << "[XY] " << cell.coord() << " x" << entry.value
+        // no! ELIMINATE!
+        std::cout << "[XY] " << coord << " x" << entry.value
                   << " ({" << entry.chain.front() << ":..:" << entry.chain.back() << "}#" << entry.value << ")" << std::endl;
-        board.clear_note_at(cell.coord(), entry.value);
         did_act = true;
     }
 
@@ -244,6 +232,24 @@ bool act_on_xychain(Board &board, const XYChainFinding &entry, const Set &chain_
 
 } // namespace
 
+bool XYChainFinding::subsumes(const XYChainFinding &other) const {
+    if (value != other.value) return false;
+    return std::includes(eliminations.begin(), eliminations.end(),
+                         other.eliminations.begin(), other.eliminations.end());
+}
+
+bool XYChainFinding::tighter_than(const XYChainFinding &other) const {
+    assert(value == other.value && eliminations == other.eliminations);
+    if (chain.size() != other.chain.size()) return chain.size() < other.chain.size();
+    return chain < other.chain;
+}
+
+bool XYChainFinding::precedes(const XYChainFinding &other) const {
+    if (value != other.value) return value < other.value;
+    if (eliminations != other.eliminations) return eliminations < other.eliminations;
+    return chain < other.chain;
+}
+
 void XYChainFinding::print(std::ostream &outs) const {
     outs << "{";
     for (size_t i = 0; i < chain.size(); i++) {
@@ -251,37 +257,47 @@ void XYChainFinding::print(std::ostream &outs) const {
         outs << chain[i];
     }
     outs << "}#" << value
-         << "x" << num_elim;
+         << "x" << eliminations.size();
 }
 
-bool XYChainTechnique::record_if_best(FindingList &out, const XYChainFinding &candidate) {
-    // `out` holds at most one chain: the most desirable offered so far.
-    if (!out.empty()) {
-        assert(out.size() == 1);
-        auto const &best = bucket_cast<XYChainFinding>(*out.front());
-
-        // is the same chain already recorded (same value, same endpoints)?
-        // then keep the one found first.
-        if (best == candidate) return false;
-
-        // no! but is the candidate strictly more desirable? `!(candidate < best)`
-        // also rejects the equally-desirable case (same elimination count, same
-        // length): a tie leaves the incumbent in place.
-        if (!(candidate < best)) return false;
+bool XYChainTechnique::record_if_maximal(FindingList &out, const XYChainFinding &candidate) {
+    // Does some retained effect already cover this one? Then this finding adds
+    // nothing to act on -- with one exception: an entry with an *identical* effect
+    // covers the candidate and is covered by it, so that pair would reject on
+    // either arrival order and the tie has to be settled on the chains instead.
+    for (auto const &recorded : out) {
+        auto const &entry = bucket_cast<XYChainFinding>(*recorded);
+        if (!entry.subsumes(candidate)) continue;
+        if (entry.eliminations != candidate.eliminations) return false;
+        if (!candidate.tighter_than(entry)) return false;
     }
 
-    // Copy `candidate` before dropping the incumbent, and clear only on the path
-    // that immediately refills (clearing an empty vector is a no-op, so the
-    // first-recording path pays nothing). Were `candidate` ever to alias the
-    // incumbent, clearing first would drop the last reference to it and leave
-    // the copy below reading a destroyed object. No caller can reach that today
-    // -- an alias trips the `best == candidate` gate above, operator== being
-    // reflexive -- but that makes this function's safety rest on a property of a
-    // gate two lines up, which is not where a reader would look for it.
+    // No. Copy the candidate before disturbing `out`: it may itself be a
+    // reference into the bucket, and an entry dropped below could be the last
+    // owner of it.
     auto finding = std::make_shared<const XYChainFinding>(candidate);
-    if (sVerbose) { std::cout << "  [fXY] "; finding->print(std::cout); std::cout << std::endl; }
-    out.clear();
-    out.push_back(finding);
+
+    // Drop everything the newcomer covers -- both the strictly narrower effects
+    // and the looser chain for an identical one. `out` therefore never holds a
+    // finding covered by another, whatever order the search offered them in.
+    std::erase_if(out, [&finding](const auto &recorded) {
+        return finding->subsumes(bucket_cast<XYChainFinding>(*recorded));
+    });
+
+    // Insert at the canonical position rather than appending. Keeping `out` sorted
+    // here, instead of sorting it once the search is done, is what makes the
+    // emission order part of this function's tested contract: a separate sort at
+    // the end of find() is a single statement that no whitebox case can reach, and
+    // deleting it changes the output of boards the black-box suite does not
+    // compare line-for-line -- the same shape of unpinned output dependency #53
+    // filed against the traversal sort this replaces. Erasing preserves sort
+    // order and so does inserting here, so the invariant holds inductively.
+    auto at = std::lower_bound(out.begin(), out.end(), finding,
+                               [](const auto &a, const auto &b) {
+                                   return bucket_cast<XYChainFinding>(*a)
+                                       .precedes(bucket_cast<XYChainFinding>(*b));
+                               });
+    out.insert(at, finding);
     return true;
 }
 
@@ -305,12 +321,21 @@ bool XYChainTechnique::find_xychain(const Board &board, const Cell &cell, const 
 // If the chain starts and ends with the same candidate, that candidate
 // can be eliminated from cells that can see both chain ends.
 //
-// For this heuristic, we will find all chains, rank them by number of
-// eliminations (greater is better) and length (shorter is better), and act
-// only on the most desirable chain.
+// For this heuristic, we will find all chains and act on every distinct
+// elimination effect among them, keeping the inclusion-maximal ones. Each
+// elimination is a sound deduction from this one board snapshot -- candidate `v`
+// provably cannot occupy a cell seeing both ends of its chain -- and eliminations
+// only remove possibilities, so a set of them derived from one snapshot is jointly
+// valid and can be applied together. Acting on one and discarding the rest, which
+// is what this used to do, threw away sound deductions and re-derived them on
+// later passes (#36).
+//
+// (Another chain's elimination can break a *different* chain's structural
+// precondition, its interior cells being bi-value. That invalidates the structure,
+// not the conclusion already drawn from it, which stays true. `see_each_other` is
+// purely geometric and is unaffected.)
 bool XYChainTechnique::find(const Board &board, FindingList &out) const {
     assert(out.empty());
-    bool did_find = false;
 
     for (const auto &cell : board.cells()) {
         // is this a note cell?
@@ -321,26 +346,44 @@ bool XYChainTechnique::find(const Board &board, FindingList &out) const {
 
         // yes! attempt to build chains from this cell for each candidate value
         auto values = cell.notes().values();
-        did_find |= find_xychain(board, cell, values[0], out);
-        did_find |= find_xychain(board, cell, values[1], out);
+        find_xychain(board, cell, values[0], out);
+        find_xychain(board, cell, values[1], out);
     }
 
-    return did_find;
+    // `out` is already in canonical order: record_if_maximal keeps it that way as
+    // it goes, which is the only thing deciding what order the findings are emitted
+    // and applied in. The search itself walks unordered containers and is free to
+    // discover them in any order (see extend_chain).
+
+    // The [fXY] trace is emitted here, once the list has settled, rather than at
+    // each offer the way every other technique emits at each recording. Offers are
+    // not findings here: an offer can be dropped later by a broader one, so tracing
+    // at offer time would report chains the technique does not go on to act on, and
+    // would put the search's discovery order back into the output.
+    if (sVerbose) {
+        for (auto const &finding : out) {
+            std::cout << "  [fXY] "; finding->print(std::cout); std::cout << std::endl;
+        }
+    }
+
+    return !out.empty();
 }
 
 bool XYChainTechnique::apply(Board &board, FindingList &mine) const {
     if (mine.empty()) return false;
-    assert(mine.size() == 1);
-
-    auto const &entry = bucket_cast<XYChainFinding>(*mine.front());
 
     bool did_act = false;
 
-    did_act |= act_on_xychain(board, entry, board.row(entry.chain.front()));
-    did_act |= act_on_xychain(board, entry, board.column(entry.chain.front()));
-    did_act |= act_on_xychain(board, entry, board.nonet(entry.chain.front()));
+    // Accumulated, not assigned: a finding whose cells are all covered by the
+    // *union* of earlier ones clears nothing, and the assert below asks whether
+    // anything happened at all. The first finding always acts -- find() saw its
+    // effect on this same board -- so the assert holds, but only because every
+    // result is folded in.
+    for (auto const &finding : mine) {
+        did_act |= act_on_xychain(board, bucket_cast<XYChainFinding>(*finding));
+    }
 
-    // `entry` refers into the bucket; it must not be touched past this point.
+    // The findings refer into the bucket; none must be touched past this point.
     mine.clear();
 
     assert(did_act);

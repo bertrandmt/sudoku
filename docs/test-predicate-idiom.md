@@ -38,9 +38,10 @@ Mapping every technique in the cascade:
   operations. `find_xychain` *builds* a chain by following links;
   `test_xychain` separately *scores* the eliminations that chain would make. The
   chain is a first-class value, so it is clean to pass to a predicate.
-  (`test_xychain` returns the elimination count rather than a `bool`, because
-  XY-chain also uses that count to rank competing chains. It is still a pure
-  predicate over a materialized object; "actionable" is just `> 0`.)
+  (`test_xychain` returns the eliminated coords rather than a `bool`, because
+  XY-chain compares competing chains by the effect they would have and its
+  `apply` replays that effect. It is still a pure predicate over a materialized
+  object; "actionable" is just "non-empty".)
 
 - **Scan-fused**: the act of checking the pattern condition *is* the act of
   discovering which cells belong to it. A locked candidate is "every candidate
@@ -157,31 +158,32 @@ places is exactly what went stale when the cascade last grew:
   `analyzer-xychain.cpp`. It is *not* promoted, because no whitebox case calls
   it: promoting it would advertise a tested contract nothing tests. What the
   cases do drive is the per-anchor search `XYChainTechnique::find_xychain` and
-  the best-chain selection `XYChainTechnique::record_if_best`, so those are the
+  the retention rule `XYChainTechnique::record_if_maximal`, so those are the
   public statics, and `XYChainFinding` is in the header because a case reads the
   recorded chain's fields. The seam shape follows what the tests reach for, not
   the technique's class — the same "exposed exactly when the test must read it"
   rule that governs the findings.
 
-  `record_if_best` is the one seam here with no analogue in any other technique.
-  XY-chain is the solver's only find-many/act-one technique: it ranks every chain
-  it discovers and applies just the most desirable one, so the ranking rule is a
-  contract in its own right, and one a crafted board cannot isolate (it takes
-  several competing chains, and which chains a board yields is not the case's to
-  dictate). The case offers them to the selector directly instead.
+  `record_if_maximal` is the one seam here with no analogue in any other
+  technique. Every other technique either records each occurrence unconditionally
+  or stops at the first, so there is no rule to test; XY-chain searches
+  exhaustively and then has to decide which of many overlapping findings are worth
+  keeping. That rule is a contract in its own right, and one a crafted board
+  cannot isolate (it takes several competing chains with chosen effects, and which
+  chains a board yields is not the case's to dictate). The case offers them to it
+  directly instead.
 
-  That shape is described here, not endorsed. The design intent for the cascade
-  is that the cheapest firing technique is applied *as greedily as possible*, and
-  XY-chain is the one tier that isn't — **issue #36** is open to make it act on
-  every distinct elimination effect. That would delete `record_if_best` and the
-  finding's `operator==` (endpoint equivalence being only an inexact proxy for
-  "same elimination set"), and would have `test_xychain` collect the eliminated
-  coords rather than count them. It would *not* necessarily touch `operator<`:
-  #36's open question is whether to keep the coverage-maximal chain, which is
-  what this comparator already ranks first, or the shortest chain per
-  elimination, and it is deliberately left undecided there. The port preserved
-  existing behavior byte-for-byte, so it promoted that behavior into a named
-  seam; that is a consequence of the port's terms, not a ruling on #36.
+  The seam used to be `record_if_best`, a trim to the single most desirable chain,
+  and it was described here as shape rather than endorsed: the design intent for
+  the cascade is that the cheapest firing technique is applied *as greedily as
+  possible*, and XY-chain was the one tier that wasn't. Issue #36 closed that gap.
+  `record_if_best` and the finding's `operator==` are gone (endpoint equivalence
+  being only an inexact proxy for "same elimination set"), `test_xychain` collects
+  the eliminated coords rather than counting them, and the desirability
+  `operator<` is gone with the ranking it existed to express — #36's open question
+  (coverage-maximal versus shortest-per-elimination) was settled toward
+  inclusion-maximal effects, each represented by its shortest chain, which needs
+  subsumption and a tie-break rather than a total ranking.
 
 ## A note on templates
 

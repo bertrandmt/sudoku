@@ -8,9 +8,9 @@
 // Several intricate paths are hard to provoke that way: a solve exercises only
 // whichever path its position happens to take, leaving both a technique's
 // rejections and its less-travelled acceptances dark. The Swordfish
-// no-eliminations rejection is the first kind; the XY-chain "best chain"
-// selection and simple coloring's Rule 2 contradiction (black-box only ever
-// exercises Rule 4) are the second.
+// no-eliminations rejection is the first kind; the XY-chain retention rule and
+// simple coloring's Rule 2 contradiction (black-box only ever exercises Rule 4)
+// are the second.
 // These tests construct a candidate grid (or an analyzer result) directly and
 // drive one technique's entry points, on a position designed for it. Every
 // technique reaches those entry points through a public static seam, so the
@@ -37,6 +37,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -71,8 +72,8 @@ struct AnalyzerTest {
     // No hooks: XY is a standalone Technique. It is materialized-object shaped
     // (see docs/test-predicate-idiom.md), but unlike simple coloring its cases
     // do not drive its scoring predicate; they drive the per-anchor search
-    // XYChainTechnique::find_xychain and the best-chain selection
-    // XYChainTechnique::record_if_best, both public statics, and read the
+    // XYChainTechnique::find_xychain and the retention rule
+    // XYChainTechnique::record_if_maximal, both public statics, and read the
     // recorded XYChainFinding (visible via analyzer-xychain.h). No friendship.
 
     // --- y-wing ---
@@ -150,8 +151,9 @@ const Cell &cell_at(const Board &board, size_t r, size_t c) {
 // recorded something other than exactly one finding, or one of another type.
 // Used by the cases that read a lone recorded finding's concrete fields. Why
 // there is only one differs: X-Wing and Swordfish stop at the first hit, XY-chain
-// retains only the most desirable chain, and Y-Wing records every pattern it
-// finds but its case crafts a board bearing exactly one. Not every hooked
+// retains one finding per distinct elimination effect and its cases craft boards
+// yielding exactly one, and Y-Wing records every pattern it finds but its case
+// crafts a board bearing exactly one. Not every hooked
 // technique wants it -- simple coloring's cases judge chains they build
 // themselves through the promoted test_color_chain static, and never downcast a
 // bucket. The entry is an `F` by construction, for the reason technique.h's
@@ -164,6 +166,28 @@ const F *only(const FindingList &out) {
     if (out.size() != 1) return nullptr;
     return dynamic_cast<const F *>(out.front().get());
 }
+
+// Capture what an apply() writes to stdout, for the one case whose subject *is*
+// the printed line rather than the resulting board: when two findings would clear
+// the same cell, the second must print nothing, and the board looks the same
+// either way. Restores the original buffer on destruction so a failing check
+// inside the scope cannot leave the suite's own output redirected.
+class CapturedCout {
+public:
+    CapturedCout() : mSaved(std::cout.rdbuf(mBuffer.rdbuf())) { }
+    ~CapturedCout() { std::cout.rdbuf(mSaved); }
+    std::string str() const { return mBuffer.str(); }
+    size_t lines_matching(const std::string &needle) const {
+        size_t n = 0;
+        std::istringstream in(mBuffer.str());
+        for (std::string line; std::getline(in, line); )
+            if (line.find(needle) != std::string::npos) ++n;
+        return n;
+    }
+private:
+    std::ostringstream mBuffer;
+    std::streambuf *mSaved;
+};
 
 // ===========================================================================
 // Swordfish
@@ -310,10 +334,16 @@ void test_xychain_detect_and_act() {
     if (f) {
         check(f->value == kOne, "chain value is 1");
         check(f->chain.size() == 3, "chain has length 3");
-        check(f->num_elim == 1, "chain counts exactly one elimination");
+        check(f->eliminations == std::set<Coord>{Coord(0,3)},
+              "the chain's effect is exactly {(0,3)}");
         check(f->chain.front() == Coord(0,0) && f->chain.back() == Coord(0,2),
               "chain runs (0,0)..(0,2)");
     }
+
+    // The elimination check below can only fail if (0,3) holds candidate 1 going
+    // in; assert that first, so a board edit that quietly removed it would show up
+    // here rather than turning that check into a tautology.
+    check(has_candidate(board, 0, 3, kOne), "(0,3) holds candidate 1 before apply");
 
     bool acted = xy.apply(board, found);
     check(acted, "apply reports an elimination");
@@ -323,45 +353,242 @@ void test_xychain_detect_and_act() {
           "chain-end cells kept candidate 1");
 }
 
-// The selection invariant: of the chains offered to a bucket, the one retained
-// has the most eliminations, ties broken by the shorter chain, and a chain that
-// is merely as good as the incumbent does not displace it. Offered to
-// record_if_best directly rather than found on a board: it takes several
-// competing chains to exercise, and which chains a crafted board yields is not
-// something the case can dictate.
-void test_xychain_best_selection() {
-    std::cout << "[xy-chain] the most-eliminations / shortest chain is retained\n";
+// Direction canonicalization (issue #53). A chain and its reverse are the same
+// deduction, so XYChainFinding stores whichever direction runs front() < back().
+//
+// Driven through find_xychain from the *high* end, which is the direction the
+// constructor has to flip. That choice is what isolates the gate: find() anchors
+// on every cell and so offers both directions of every chain, and the retention
+// rule's lexicographic tie-break would then pick the canonical one on its own --
+// it compares chain sequences, and for a reversed pair "lexicographically
+// smaller" and "front < back" are the same test. Offering one direction only
+// leaves normalization as the sole thing that can deliver the invariant.
+void test_xychain_canonical_direction() {
+    std::cout << "[xy-chain] the recorded chain is stored in canonical direction\n";
+    Board board = empty_board();
+    set_candidates(board, 0, 0, {1, 2});
+    set_candidates(board, 0, 1, {2, 3});
+    set_candidates(board, 0, 2, {1, 3});
+    set_candidates(board, 0, 3, {1, 4});
+    confine_value(board, kOne, { {0,0}, {0,2}, {0,3} });
+
+    FindingList found;
+    check(XYChainTechnique::find_xychain(board, cell_at(board, 0, 2), kOne, found),
+          "the same chain is detected when anchored at its high end (0,2)");
+    auto const *f = only<XYChainFinding>(found);
+    check(f, "one chain recorded");
+    if (f) {
+        check(f->chain.front() == Coord(0,0) && f->chain.back() == Coord(0,2),
+              "walked (0,2)..(0,0), it is stored (0,0)..(0,2)");
+        check(f->chain == std::vector<Coord>{Coord(0,0), Coord(0,1), Coord(0,2)},
+              "the whole sequence is reversed, not just its ends");
+    }
+
+    // Offering the other direction as well must not add a second finding: after
+    // normalization the two are the same object, so the retention rule sees an
+    // identical effect and an identical chain.
+    check(!XYChainTechnique::find_xychain(board, cell_at(board, 0, 0), kOne, found),
+          "the reverse walk is not retained a second time");
+    check(found.size() == 1, "still exactly one chain for the one deduction");
+}
+
+// The retention rule: `out` keeps the inclusion-maximal elimination effects, one
+// finding per distinct effect, and the outcome does not depend on the order the
+// offers arrive in. Offered to record_if_maximal directly rather than found on a
+// board: it takes several competing chains to exercise, and which chains a
+// crafted board yields is not something the case can dictate.
+void test_xychain_retention() {
+    std::cout << "[xy-chain] inclusion-maximal effects are retained, one per effect\n";
     auto mkchain = [](std::initializer_list<std::pair<size_t,size_t>> cs) {
         std::vector<Coord> v;
         for (auto const &c : cs) v.emplace_back(c.first, c.second);
         return v;
     };
+    auto mkelim = [](std::initializer_list<std::pair<size_t,size_t>> cs) {
+        std::set<Coord> s;
+        for (auto const &c : cs) s.emplace(c.first, c.second);
+        return s;
+    };
+    // Effect sets used below, all on value 1 unless stated:
+    //   AB   = {(8,0),(8,1)}      A = {(8,0)}      ABC = {(8,0),(8,1),(8,2)}
+    //   BC   = {(8,1),(8,2)}   -- overlaps AB without nesting either way
+    auto A   = mkelim({{8,0}});
+    auto AB  = mkelim({{8,0},{8,1}});
+    auto BC  = mkelim({{8,1},{8,2}});
+    auto ABC = mkelim({{8,0},{8,1},{8,2}});
 
     FindingList bucket;
-    check(XYChainTechnique::record_if_best(bucket, {kOne, mkchain({{0,0},{0,1},{0,2},{0,3}}), 2}),
-          "the first chain offered is recorded");                     // 2 elim, length 4
-    check(!XYChainTechnique::record_if_best(bucket, {kTwo, mkchain({{1,0},{1,1},{1,2}}), 1}),
-          "a chain with fewer eliminations is rejected");             // 1 elim, length 3
-    check(XYChainTechnique::record_if_best(bucket, {kThree, mkchain({{2,0},{2,1},{2,2}}), 2}),
-          "an equal-elimination shorter chain displaces it");         // 2 elim, length 3 <- best
+    check(XYChainTechnique::record_if_maximal(bucket, {kOne, mkchain({{0,0},{0,1},{0,2}}), AB}),
+          "the first effect offered is retained");
+    check(!XYChainTechnique::record_if_maximal(bucket, {kOne, mkchain({{1,0},{1,1}}), A}),
+          "an effect already covered is dropped, even from a shorter chain");
+    check(bucket.size() == 1, "the covered offer added nothing");
 
-    // Isolate the two remaining rejection gates against that incumbent. The
-    // first would be strictly better on its own terms (three eliminations beats
-    // two), so only the same-value-same-endpoints dedup can reject it; the
-    // second is neither better nor worse, so only the strict-improvement rule
-    // can.
-    check(!XYChainTechnique::record_if_best(bucket, {kThree, mkchain({{2,0},{3,1},{2,2}}), 3}),
-          "a rediscovered chain -- same value and endpoints -- is rejected even with more eliminations");
-    check(!XYChainTechnique::record_if_best(bucket, {kFour, mkchain({{4,0},{4,1},{4,2}}), 2}),
-          "an equally desirable but distinct chain does not displace the incumbent");
+    // Non-nesting overlap: BC shares (8,1) with AB but covers neither. Both are
+    // maximal, so both are kept -- the case #36 declines to special-case.
+    check(XYChainTechnique::record_if_maximal(bucket, {kOne, mkchain({{2,0},{2,1},{2,2}}), BC}),
+          "an overlapping but non-nesting effect is retained alongside");
+    check(bucket.size() == 2, "both maximal effects are held");
 
-    auto const *best = only<XYChainFinding>(bucket);
-    check(best, "the bucket holds exactly one XYChainFinding");
-    if (best) {
-        check(best->num_elim == 2,     "winner has the most eliminations");
-        check(best->chain.size() == 3, "ties broken toward the shorter chain");
-        check(best->value == kThree,   "winner is the 2-elim length-3 chain");
+    // Same coords, different value: a different effect, not a duplicate.
+    check(XYChainTechnique::record_if_maximal(bucket, {kTwo, mkchain({{3,0},{3,1},{3,2}}), AB}),
+          "the same cells for a different value is a distinct effect");
+    check(bucket.size() == 3, "value is part of the effect");
+
+    // A superset displaces everything it covers, and only that: ABC covers the
+    // value-1 AB and BC, and leaves the value-2 AB alone.
+    check(XYChainTechnique::record_if_maximal(bucket, {kOne, mkchain({{4,0},{4,1},{4,2},{4,3}}), ABC}),
+          "a broader effect is retained");
+    check(bucket.size() == 2, "it displaced both value-1 effects it covers");
+
+    // Identical effect: the shorter chain is the tighter justification and wins,
+    // whichever order the two arrive in. Both directions are exercised because
+    // one order goes through the reject path and the other through the displace
+    // path, and neither implies the other.
+    check(XYChainTechnique::record_if_maximal(bucket, {kOne, mkchain({{5,0},{5,1},{5,2}}), ABC}),
+          "an identical effect on a shorter chain displaces the incumbent");
+    check(!XYChainTechnique::record_if_maximal(bucket, {kOne, mkchain({{6,0},{6,1},{6,2},{6,3}}), ABC}),
+          "an identical effect on a longer chain is dropped");
+    check(bucket.size() == 2, "neither changed how many effects are held");
+
+    // Equal length and identical effect: settled by comparing the chains, so the
+    // survivor is the same whichever arrives first. Nothing prefers one chain
+    // here; the point is that the search's discovery order does not decide it.
+    check(XYChainTechnique::record_if_maximal(bucket, {kOne, mkchain({{0,7},{1,7},{2,7}}), ABC}),
+          "an equal-length chain that compares smaller displaces the incumbent");
+    check(!XYChainTechnique::record_if_maximal(bucket, {kOne, mkchain({{5,0},{5,1},{5,2}}), ABC}),
+          "re-offering the displaced equal-length chain does not win it back");
+
+    // One last offer, positioned so its canonical slot is in the *middle*: a
+    // value-1 effect that nests neither way with ABC, and that sorts after ABC
+    // (its first cell is later) but before anything on value 2.
+    auto D = mkelim({{8,4}});
+    check(XYChainTechnique::record_if_maximal(bucket, {kOne, mkchain({{7,0},{7,1},{7,2}}), D}),
+          "a second non-nesting value-1 effect is retained");
+
+    // The bucket is held in canonical order, not arrival order. That matters
+    // beyond tidiness: this order is the one apply() emits its [XY] lines in, and
+    // it is the whole reason the search is free to walk unordered containers.
+    // Arrival order distinguishes all three positions -- the value-2 effect
+    // arrived before the value-1 effect that sorts first, and the last offer
+    // belongs between them -- so appending, prepending and sorting are three
+    // different answers here.
+    check(bucket.size() == 3, "three effects held at the end");
+    const XYChainFinding *held[3] = {nullptr, nullptr, nullptr};
+    if (bucket.size() == 3)
+        for (size_t i = 0; i < 3; ++i) held[i] = dynamic_cast<const XYChainFinding *>(bucket[i].get());
+    check(held[0] && held[1] && held[2], "all three are XYChainFindings");
+    if (held[0] && held[1] && held[2]) {
+        check(held[0]->value == kOne && held[0]->eliminations == ABC,
+              "the broad value-1 effect sorts first, though it arrived late");
+        check(held[0]->chain == mkchain({{0,7},{1,7},{2,7}}),
+              "represented by the chain the comparison picks, not the one offered first");
+        check(held[1]->value == kOne && held[1]->eliminations == D,
+              "the later value-1 effect sorts second, though it arrived last");
+        check(held[2]->value == kTwo && held[2]->eliminations == AB,
+              "the value-2 effect sorts last and is untouched throughout");
     }
+}
+
+// Overlapping retained effects. Two maximal effects can share a cell without
+// either covering the other, and #36 chose not to special-case that: the shared
+// elimination is justified twice, and apply() must make it once. The board cannot
+// show this -- clearing a candidate twice leaves it in the same state -- so the
+// printed lines are the subject here.
+//
+// The findings are built by hand rather than found: only apply() is under test, it
+// reads nothing from a chain but its two ends (for the message), and no board can
+// be relied on to yield two chains with a chosen overlap. Two of the four XY
+// applications in the notes.txt corpus do hit this path, so it is not a
+// hypothetical -- but neither of those boards has its XY lines compared
+// line-for-line by tests/run.sh, which is why the guard needs a case here.
+void test_xychain_overlapping_effects() {
+    std::cout << "[xy-chain] a doubly-justified elimination is made once\n";
+    Board board = empty_board();
+    confine_value(board, kOne, { {0,0}, {0,2}, {0,3}, {0,4}, {0,5} });
+
+    // Two effects overlapping on (0,4), neither covering the other.
+    auto mk = [](std::initializer_list<std::pair<size_t,size_t>> chain,
+                 std::initializer_list<std::pair<size_t,size_t>> elim) {
+        std::vector<Coord> c;
+        for (auto const &x : chain) c.emplace_back(x.first, x.second);
+        std::set<Coord> e;
+        for (auto const &x : elim) e.emplace(x.first, x.second);
+        return std::make_shared<const XYChainFinding>(kOne, c, e);
+    };
+    FindingList mine;
+    mine.push_back(mk({{0,0},{0,2}}, {{0,3},{0,4}}));
+    mine.push_back(mk({{1,0},{1,2}}, {{0,4},{0,5}}));
+
+    check(has_candidate(board, 0, 3, kOne) && has_candidate(board, 0, 4, kOne) &&
+          has_candidate(board, 0, 5, kOne),
+          "all three target cells hold candidate 1 before apply");
+
+    XYChainTechnique xy;
+    bool acted;
+    size_t printed;
+    {
+        CapturedCout captured;
+        acted = xy.apply(board, mine);
+        printed = captured.lines_matching("[XY] ");
+    }
+    check(acted, "apply reports eliminations");
+    check(printed == 3, "three lines for three distinct cells, not four for four justifications");
+    check(!has_candidate(board, 0, 3, kOne) && !has_candidate(board, 0, 4, kOne) &&
+          !has_candidate(board, 0, 5, kOne),
+          "every justified cell lost candidate 1");
+}
+
+// The emission order (XYChainFinding::precedes). find() sorts the retained
+// findings by it, and that sort is the only thing deciding what order the [fXY]
+// and [XY] lines come out in -- the search itself walks unordered containers.
+//
+// Checked term by term on constructed findings rather than on a board, because a
+// board cannot make the terms disagree on demand: on the run.sh fixture the
+// value, the effect and the chain all happen to rank the two chains the same way,
+// so a fixture can only ever pin the order as a whole. Each check below arranges
+// for exactly one term to decide, and for the terms below it to point the other
+// way, so it fails if that term is dropped.
+void test_xychain_emission_order() {
+    std::cout << "[xy-chain] emission order is decided by value, then effect, then chain\n";
+    auto mkchain = [](std::initializer_list<std::pair<size_t,size_t>> cs) {
+        std::vector<Coord> v;
+        for (auto const &c : cs) v.emplace_back(c.first, c.second);
+        return v;
+    };
+    auto mkelim = [](std::initializer_list<std::pair<size_t,size_t>> cs) {
+        std::set<Coord> s;
+        for (auto const &c : cs) s.emplace(c.first, c.second);
+        return s;
+    };
+    auto low_chain  = mkchain({{0,0},{0,1}});
+    auto high_chain = mkchain({{7,0},{7,1}});
+    auto low_elim   = mkelim({{8,0}});
+    auto high_elim  = mkelim({{8,7}});
+
+    // Value decides, with the effect and the chain both favouring the other one.
+    XYChainFinding low_value {kOne, high_chain, high_elim};
+    XYChainFinding high_value{kTwo, low_chain,  low_elim};
+    check(low_value.precedes(high_value),   "the lower value comes first");
+    check(!high_value.precedes(low_value),  "and the higher one does not");
+
+    // Effect decides, values equal, chain favouring the other one.
+    XYChainFinding low_effect {kOne, high_chain, low_elim};
+    XYChainFinding high_effect{kOne, low_chain,  high_elim};
+    check(low_effect.precedes(high_effect),  "at equal value, the earlier effect comes first");
+    check(!high_effect.precedes(low_effect), "and the later effect does not");
+
+    // Chain decides: same value, same effect. The retention rule never lets two
+    // such findings coexist, so this term exists to make the order total without
+    // depending on that -- which means only a direct check can reach it.
+    XYChainFinding low_tail {kOne, low_chain,  low_elim};
+    XYChainFinding high_tail{kOne, high_chain, low_elim};
+    check(low_tail.precedes(high_tail),  "at equal value and effect, the earlier chain comes first");
+    check(!high_tail.precedes(low_tail), "and the later chain does not");
+
+    // Irreflexive, as a strict weak ordering must be: std::sort on a comparator
+    // that reports an element as preceding itself is undefined behaviour.
+    check(!low_tail.precedes(low_tail), "a finding does not precede itself");
 }
 
 // ===========================================================================
@@ -1416,7 +1643,10 @@ int main() {
     test_swordfish_row_based();
     test_swordfish_no_elimination();
     test_xychain_detect_and_act();
-    test_xychain_best_selection();
+    test_xychain_canonical_direction();
+    test_xychain_retention();
+    test_xychain_overlapping_effects();
+    test_xychain_emission_order();
     test_ywing_detect_and_act();
     test_ywing_rejects_non_patterns();
     test_notes_set_ops();

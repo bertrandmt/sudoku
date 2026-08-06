@@ -459,10 +459,9 @@ echo "[7] Per-technique precision: each advanced analyzer's first application el
 # applies exactly one technique, so a step is one coherent application.
 #
 # Lines are compared as a sorted *set*: act_on_* applies every found instance
-# (NP/LC/HP/XW/YW) or a single colour-swap-invariant chain (SC), so the set is
+# (NP/LC/HP/XW/YW/XY) or a single colour-swap-invariant chain (SC), so the set is
 # independent of hash-table iteration order -- which differs between libstdc++
-# and libc++; only the print order does, and LC_ALL=C sort absorbs that. (XY
-# picks the best chain from an ordered set; unique for this fixture.) These
+# and libc++; only the print order does, and LC_ALL=C sort absorbs that. These
 # goldens are regression locks, not an independent oracle: their *soundness* is
 # guaranteed by tiers [2]/[6], which solve the same fixtures, so a wrong
 # elimination could never be locked in here -- it would fail there first. If a
@@ -530,7 +529,17 @@ prec_check "finned swordfish"  FS "$P_fs"    "[FS] [4, 5] x8 [r]"
 prec_check "simple coloring"   SC "$P_color" "[SC] [9, 5] x4 [👀🟩🟥]"
 prec_check "y-wing"            YW "$P_yw1" "[YW] [1, 5] x9
 [YW] [2, 8] x9"
-prec_check "xy-chain"          XY "$P_xy2" "[XY] [5, 5] x2 ({[5, 8]:..:[6, 4]}#2)
+# XY-chain, first application on P_xy2: two chains for value 2 with disjoint
+# effects, so both are retained and both applied. The block is tight in the way
+# the others are: a retention rule that dropped a maximal effect loses two of
+# these four lines, and one that kept a covered effect adds lines for
+# eliminations another chain already made. It is also where a lost
+# canonicalization shows: each chain is printed from its lower-numbered end, so
+# a chain recorded in the direction the search happened to walk it flips the
+# "{front:..:back}" of its two lines.
+prec_check "xy-chain"          XY "$P_xy2" "[XY] [4, 7] x2 ({[4, 3]:..:[5, 8]}#2)
+[XY] [4, 9] x2 ({[4, 3]:..:[5, 8]}#2)
+[XY] [5, 5] x2 ({[5, 8]:..:[6, 4]}#2)
 [XY] [6, 7] x2 ({[5, 8]:..:[6, 4]}#2)"
 
 echo "[8] Editing and singles-only commands: =, x and s"

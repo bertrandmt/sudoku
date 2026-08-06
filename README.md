@@ -746,7 +746,7 @@ This is the *second* finned Swordfish the board needs, and the one that breaks i
 
 The Sudoku Wiki [explainer page](https://www.sudokuwiki.org/XY_Chains) on XY-Chains describes a chain of bivalue cells (cells with exactly two candidates) in which each cell shares one candidate with the next. Label the chain's starting candidate `X`. Following the alternating "if this end is not `X`, then its other value is forced, which forces the next link, ..." logic along the chain, one of the two chain ends is guaranteed to be `X`. Therefore any cell off the chain that can see *both* ends cannot be a candidate for `X`.
 
-Because many chains may exist at once, the solver scores them by number of eliminations (more is better) and length (shorter is better), and acts only on the single most desirable one.
+Because many chains may exist at once, the solver acts on every distinct *elimination effect* among them. Each chain's effect is the set of cells that lose the chain value; the solver keeps the inclusion-maximal effects, dropping any chain whose eliminations another chain already covers, and represents each surviving effect by the shortest chain that achieves it. Every elimination is a sound deduction from the same board state, so applying them together is safe.
 
 For example:
 ```
@@ -800,21 +800,29 @@ Notes remaining: 139
 [SF](0) {}
 [FX](0) {}
 [FS](0) {}
-[XY](1) {{{[5, 8]:[5, 2]:[6, 1]:[6, 4]}#2x2}}
+[XY](2) {{{[4, 3]:[6, 3]:[6, 4]:[6, 1]:[5, 2]:[5, 8]}#2x2}, {{[5, 8]:[5, 2]:[6, 1]:[6, 4]}#2x2}}
 ```
-This indicates one XY-Chain for value 2 with two eliminations (the `x2` suffix), running `[5, 8]` -> `[5, 2]` -> `[6, 1]` -> `[6, 4]`. Those cells carry candidates `{2, 3}`, `{3, 5}`, `{4, 5}` and `{2, 4}` respectively; each consecutive pair shares exactly one value (3, then 5, then 4), and both ends carry the chain value 2. Cells `[5, 5]` and `[6, 7]` each see both ends of the chain and so lose candidate 2.
+This indicates two XY-Chains for value 2, each with two eliminations (the `x2` suffix).
 
-The summary lists the full chain as `{c1:c2:..:cn}#value`, suffixed with `x` and the elimination count. Each action line abbreviates the chain to `{front:..:back}#value`:
+The second is the shorter one, running `[5, 8]` -> `[5, 2]` -> `[6, 1]` -> `[6, 4]`. Those cells carry candidates `{2, 3}`, `{3, 5}`, `{4, 5}` and `{2, 4}` respectively; each consecutive pair shares exactly one value (3, then 5, then 4), and both ends carry the chain value 2. Cells `[5, 5]` and `[6, 7]` each see both ends of the chain and so lose candidate 2.
+
+The first runs `[4, 3]` -> `[6, 3]` -> `[6, 4]` -> `[6, 1]` -> `[5, 2]` -> `[5, 8]`, over candidates `{2, 9}`, `{2, 9}`, `{2, 4}`, `{4, 5}`, `{3, 5}` and `{2, 3}`, sharing 9, then 2, then 4, then 5, then 3. Its ends are `[4, 3]` and `[5, 8]`, and the cells seeing both are `[4, 7]` and `[4, 9]`, which lose candidate 2.
+
+The two overlap as paths -- the shorter chain is the first four cells of the longer one read backwards -- but their *effects* are disjoint, because they end on different cells and so are seen by different cells. Neither covers the other, so both are kept and both are acted on. Had one chain's eliminations been a subset of the other's, only the covering chain would appear here.
+
+The summary lists each full chain as `{c1:c2:..:cn}#value`, suffixed with `x` and the elimination count, ordered by value and then by the cells they clear. A chain is always printed from its lower-numbered end, since a chain and its reverse are the same deduction. Each action line abbreviates the chain to `{front:..:back}#value`:
 ```
 λ >
-Step #9:
+Step #11:
+[XY] [4, 7] x2 ({[4, 3]:..:[5, 8]}#2)
+[XY] [4, 9] x2 ({[4, 3]:..:[5, 8]}#2)
 [XY] [5, 5] x2 ({[5, 8]:..:[6, 4]}#2)
 [XY] [6, 7] x2 ({[5, 8]:..:[6, 4]}#2)
 ```
 
 ## Order of analysis and resolution
 
-The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring, Swordfish, Finned X-Wing, Finned Swordfish and XY-Chain.
+The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs, Y-Wing and XY-Chain, and on only the first possible action for X-Wing, Simple Coloring, Swordfish, Finned X-Wing and Finned Swordfish.
 
 # Editing the table
 
