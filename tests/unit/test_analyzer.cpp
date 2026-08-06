@@ -29,6 +29,7 @@
 #include "analyzer-ywing.h"
 #include "analyzer-swordfish.h"
 #include "analyzer-finnedxwing.h"
+#include "analyzer-finnedswordfish.h"
 #include "analyzer-xychain.h"
 #include "cell.h"
 #include "coord.h"
@@ -83,15 +84,18 @@ struct AnalyzerTest {
     // static and YWingFinding is declared in analyzer-ywing.h -- both without
     // friendship.
 
-    // --- x-wing / swordfish / naked pair / hidden pair ---
-    // No hooks: all four are standalone Techniques. Naked pair and hidden pair
-    // are given-tuple shaped, so their test_naked_pair / test_hidden_pair are
-    // public statics the whitebox cases call directly. The two fish are
+    // --- the fish / naked pair / hidden pair ---
+    // No hooks: every one of them is a standalone Technique. Naked pair and
+    // hidden pair are given-tuple shaped, so their test_naked_pair /
+    // test_hidden_pair are public statics the whitebox cases call directly. The
+    // fish -- plain X-Wing and Swordfish, and their finned variants -- are all
     // scan-fused (no test_ predicate -- see docs/test-predicate-idiom.md); the
-    // cases drive XWingTechnique::find_xwing /
-    // SwordfishTechnique::find_swordfish on crafted boards and inspect the
-    // recorded XWingFinding / SwordfishFinding (visible via analyzer-xwing.h /
-    // analyzer-swordfish.h). Either way: no friendship.
+    // cases drive each one's per-anchor entry (XWingTechnique::find_xwing,
+    // SwordfishTechnique::find_swordfish,
+    // FinnedXWingTechnique::find_finned_xwing,
+    // FinnedSwordfishTechnique::find_finned_swordfish) on crafted boards and
+    // inspect the recorded finding, which each fish declares in its own header
+    // for that reason. Either way: no friendship.
 
     // --- simple coloring ---
     // No hooks: SC is a standalone Technique. It is materialized-object shaped
@@ -787,7 +791,7 @@ void test_finnedxwing_column_based() {
 
     bool acted = fx.apply(board, found);
     check(acted, "apply reports an elimination");
-    check(!has_candidate(board, 5, 4, V), "stray 7 at (5,4) eliminated");
+    check(!has_candidate(board, 5, 5, V), "stray 7 at (5,5) eliminated");
     check(has_candidate(board, 3, 3, V), "the fin at (3,3) survives: it sits in a base column");
     check(has_candidate(board, 1, 0, V) && has_candidate(board, 5, 0, V) && has_candidate(board, 5, 3, V),
           "the three fish cells kept candidate 7");
@@ -862,6 +866,236 @@ void test_finnedxwing_no_elimination() {
 }
 
 // ===========================================================================
+// Finned Swordfish
+// ===========================================================================
+
+// A row-based finned Swordfish on value 7. Rows 0, 3 and 4 are the base sets,
+// columns 1, 4 and 5 the cover. Row 4 carries one extra 7, the fin at (4,3),
+// inside the nonet rows 3-5 / columns 3-5. Only cells in that nonet, on a cover
+// column and outside the base rows, are eliminable -- so the stray at (5,5) goes
+// and nothing else does. The position is invisible to plain Swordfish: the base
+// rows span four columns, not three.
+//
+//        c1 c3 c4 c5
+//   r0    7     7        <- clean base row
+//   r3    7        7     <- base row; (3,5) is in the fin's nonet on a cover column
+//   r4    7  7     7     <- base row, plus the fin at c3
+//   r5             7     <- cover column, fin's nonet, not a base row: eliminated
+//
+// Two of the three base rows have a cell inside the fin's nonet on a cover column
+// -- (3,5) and (4,5) -- and both must survive. That is deliberate, and it is what
+// gives this case teeth against the base-line exclusion in the elimination scan:
+// drop `cset3`/`b3` from those three-way tests and (4,5) is struck, which is
+// unsound rather than merely wrong. Only two can ever be witnessed at once: the
+// nonet's band holds three rows, one of which must be a non-base row for anything
+// to be eliminable, so the base rows inside it are adjacent in the anchor order.
+// (3,5) covers `b2` here and test_finnedswordfish_column_based covers `b1`.
+//
+// The fin sits at column 3 rather than at a column below the cover so that the
+// cover {c1,c4,c5} is the *first* triple the search tries: cross lines are
+// collected in first-encounter order, so a fin left of the cover would put its
+// line ahead of a cover line and make some other triple first. That matters for
+// test isolation, not for the technique -- it keeps this case's outcome
+// independent of the has-eliminations gate, which
+// test_finnedswordfish_no_elimination owns. With the fin at c2 instead, breaking
+// that gate changed *which* pattern this case records, so this case failed and
+// aborted the run before the dedicated one was ever reached.
+void test_finnedswordfish_row_based() {
+    std::cout << "[finned swordfish] row-based detection, action\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,1},{0,4}, {3,1},{3,5}, {4,1},{4,3},{4,5}, {5,5} });
+
+    FinnedSwordfishTechnique fs;  // needed for apply() below; find_finned_swordfish is static
+    FindingList found;
+    check(FinnedSwordfishTechnique::find_finned_swordfish(board, cell_at(board, 0, 1), V, found),
+          "row finned Swordfish detected with anchor (0,1)");
+    check(found.size() == 1, "exactly one finned Swordfish recorded");
+    auto const *f = only<FinnedSwordfishFinding>(found);
+    check(f, "the recorded finding is a FinnedSwordfishFinding");
+    if (f) {
+        check(f->is_row_based, "recorded pattern is row-based");
+        check(f->value == V, "recorded pattern is for value 7");
+        check(f->fins.size() == 1 && f->fins[0] == Coord(4, 3),
+              "the fin at (4,3) is recorded -- apply() cannot re-derive the cover without it");
+    }
+
+    bool acted = fs.apply(board, found);
+    check(acted, "apply reports an elimination");
+    check(!has_candidate(board, 5, 4, V), "stray 7 at (5,4) eliminated");
+    check(has_candidate(board, 4, 3, V), "the fin at (4,3) survives: it sits in a base row");
+    check(has_candidate(board, 3, 5, V),
+          "(3,5) survives: in the fin's nonet on a cover column, but on the second base row");
+    check(has_candidate(board, 4, 5, V),
+          "(4,5) survives: same, on the third base row -- the exclusion must cover all three");
+    check(has_candidate(board, 0, 1, V) && has_candidate(board, 0, 4, V)
+       && has_candidate(board, 3, 1, V) && has_candidate(board, 4, 1, V),
+          "every other base candidate kept candidate 7");
+}
+
+// The transpose: a column-based finned Swordfish on value 7, base columns 3, 4 and
+// 8, cover rows 3, 5 and 8, fin at (4,4) in the nonet rows 3-5 / columns 3-5. The
+// sole eliminable cell is (3,5) -- in that nonet, on cover row 3, outside the base
+// columns.
+//
+// Anchoring on (5,3) exercises the column orientation because row 5 holds a single
+// 7: the row search bails on the two-per-base-line floor before the column search
+// runs. (For plain X-Wing the same effect comes from a row with three; here extra
+// candidates are the point, so the bail has to come from below.)
+//
+// This is the case that witnesses `b1`: (5,3) lies in the fin's nonet on cover row
+// 5 and on the *first* base column, so it survives only because the elimination
+// scan excludes every base line. (3,4) witnesses `b2` again.
+//
+//        c3 c4 c5 c8
+//   r3       7  7  7     <- cover row; (3,5) is eliminated, (3,4) is a base cell
+//   r4       7           <- the fin
+//   r5    7              <- cover row; base column cell inside the fin's nonet
+//   r8    7  7     7     <- cover row
+void test_finnedswordfish_column_based() {
+    std::cout << "[finned swordfish] column-based detection, action\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {5,3},{8,3}, {3,4},{4,4},{8,4}, {3,8},{8,8}, {3,5} });
+
+    FinnedSwordfishTechnique fs;  // needed for apply() below; find_finned_swordfish is static
+    FindingList found;
+    check(FinnedSwordfishTechnique::find_finned_swordfish(board, cell_at(board, 5, 3), V, found),
+          "column finned Swordfish detected with anchor (5,3)");
+    check(found.size() == 1, "exactly one finned Swordfish recorded");
+    auto const *f = only<FinnedSwordfishFinding>(found);
+    check(f, "the recorded finding is a FinnedSwordfishFinding");
+    if (f) {
+        check(!f->is_row_based, "recorded pattern is column-based");
+        check(f->fins.size() == 1 && f->fins[0] == Coord(4, 4), "the fin at (4,4) is recorded");
+    }
+
+    bool acted = fs.apply(board, found);
+    check(acted, "apply reports an elimination");
+    check(!has_candidate(board, 3, 5, V), "stray 7 at (3,5) eliminated");
+    check(has_candidate(board, 4, 4, V), "the fin at (4,4) survives: it sits in a base column");
+    check(has_candidate(board, 5, 3, V),
+          "(5,3) survives: in the fin's nonet on a cover row, but on the first base column");
+    check(has_candidate(board, 3, 4, V),
+          "(3,4) survives: same, on the second base column");
+}
+
+// The one-nonet rule, isolated. Row 4 gets a second fin at (4,7), in a different
+// nonet from (4,3), so the cover that the accept case above settles on is rejected.
+// Delete the (4,7) entry and the row-based pattern of that case is found again,
+// which is what makes this a test of the one-nonet gate specifically.
+//
+// The second fin goes to the *right* of the cover, not the left, and that is what
+// makes the gate decisive rather than incidental. Fins are recorded in board order,
+// so with (4,7) the first fin is still (4,3) and the nonet apply() would use is
+// still rows 3-5 / columns 3-5 -- the one holding the eliminable (5,5). Disable the
+// one-nonet gate and this position is therefore *accepted*, striking (5,5) on the
+// authority of a fin at (4,7) that does not see it. With the second fin at (4,0)
+// instead, the recorded nonet became rows 3-5 / columns 0-2, which holds nothing to
+// strike, so the position was rejected by the has-eliminations gate whether the
+// one-nonet gate ran or not -- and the case passed with that gate broken.
+void test_finnedswordfish_fins_in_two_nonets_rejected() {
+    std::cout << "[finned swordfish] fins spread across two nonets are not a pattern\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,1},{0,4}, {3,1},{3,5}, {4,1},{4,3},{4,5},{4,7}, {5,5} });
+
+    FindingList found;
+    check(!FinnedSwordfishTechnique::find_finned_swordfish(board, cell_at(board, 0, 1), V, found),
+          "no finned Swordfish reported when the fins occupy two nonets");
+    check(found.empty(), "nothing recorded");
+}
+
+// The base-coverage rule, isolated. Row 4's 7s are at (4,0) and (4,2), neither on a
+// cover column, so choosing columns 1, 4 and 5 as the cover makes row 4 *all* fins.
+// Both fins do share one nonet, and that nonet does meet cover column 1 at an
+// eliminable (5,1) -- so without the gate this position records a finding and
+// strikes a true candidate. It is not a fish: with every fin false, row 4 would
+// hold no 7 at all, which is a contradiction rather than a confinement, and a
+// different (stronger) deduction than this technique makes.
+//
+//        c0 c1 c2 c4 c5
+//   r0       7     7        <- base row with cover candidates
+//   r3       7        7     <- base row with cover candidates
+//   r4    7     7           <- no cover candidate: all fins
+//   r5       7              <- what the missing gate would wrongly eliminate
+void test_finnedswordfish_uncovered_base_line_rejected() {
+    std::cout << "[finned swordfish] a base line with no cover candidate is not a pattern\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,1},{0,4}, {3,1},{3,5}, {4,0},{4,2}, {5,1} });
+
+    FindingList found;
+    check(!FinnedSwordfishTechnique::find_finned_swordfish(board, cell_at(board, 0, 1), V, found),
+          "no finned Swordfish reported when a base line lies entirely outside the cover");
+    check(found.empty(), "nothing recorded");
+}
+
+// The has-eliminations rule, isolated: test_finnedswordfish_row_based's position
+// with the stray at (5,5) removed. The pattern is still there and still sound, but
+// its eliminable set is empty, and a technique that reports a finding it cannot act
+// on would trip apply()'s did_act assert. Nothing else about the position changes.
+void test_finnedswordfish_no_elimination() {
+    std::cout << "[finned swordfish] a sound pattern with nothing to eliminate is not reported\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,1},{0,4}, {3,1},{3,5}, {4,1},{4,3},{4,5} });
+
+    FindingList found;
+    check(!FinnedSwordfishTechnique::find_finned_swordfish(board, cell_at(board, 0, 1), V, found),
+          "no finned Swordfish reported when the fin's nonet holds nothing to strike");
+    check(found.empty(), "nothing recorded");
+}
+
+// The has-eliminations rule again, from the other side, and the reason it names
+// *every* base line: test_finnedswordfish_column_based's position with the
+// eliminable (3,5) removed. What is left in the fin's nonet on a cover row is
+// (5,3), on the *first* base column, and (3,4), on the second -- both part of the
+// pattern, neither a target. So the position must be rejected.
+//
+// This is the case that pins the `cset` term specifically. The two accept cases
+// cannot: has_eliminations stops at the first cell it likes, so with a genuine
+// elimination present a spurious extra one changes no outcome. Here there is no
+// genuine one, so dropping `cset` makes find report a pattern that act then cannot
+// act on, and apply()'s did_act assert fires.
+void test_finnedswordfish_first_base_line_not_a_target() {
+    std::cout << "[finned swordfish] a fin-nonet cover cell on a base line is not an elimination\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {5,3},{8,3}, {3,4},{4,4},{8,4}, {3,8},{8,8} });
+
+    FindingList found;
+    check(!FinnedSwordfishTechnique::find_finned_swordfish(board, cell_at(board, 5, 3), V, found),
+          "no finned Swordfish reported when only base-line cells sit in the fin's nonet");
+    check(found.empty(), "nothing recorded");
+}
+
+// The `crosses < 4` early-out, isolated. Rows 0, 3 and 6 hold 7 only in columns 1,
+// 4 and 7 -- a fully confined, finless triple, i.e. a *plain* Swordfish, with a
+// stray at (1,4) for it to eliminate. Swordfish runs ahead of this technique in the
+// cascade and owns this position; a finned Swordfish needs a fourth cross line for
+// a fin to live on, and reporting one here would mean claiming a fin that does not
+// exist. Drop the early-out and the assert(!fins.empty()) below it fires, which is
+// the shape of the failure this case pins.
+//
+//        c1 c4 c7
+//   r0    7  7           <- base row
+//   r1       7           <- the plain Swordfish's stray, not a fin: c4 is a cover column
+//   r3       7  7        <- base row
+//   r6    7     7        <- base row
+void test_finnedswordfish_plain_swordfish_not_reported() {
+    std::cout << "[finned swordfish] a confined (finless) triple belongs to plain Swordfish\n";
+    Board board = empty_board();
+    const Value V = kSeven;
+    confine_value(board, V, { {0,1},{0,4}, {1,4}, {3,4},{3,7}, {6,1},{6,7} });
+
+    FindingList found;
+    check(!FinnedSwordfishTechnique::find_finned_swordfish(board, cell_at(board, 0, 1), V, found),
+          "no finned Swordfish reported for a fully confined triple");
+    check(found.empty(), "nothing recorded");
+}
+
+// ===========================================================================
 // Simple coloring
 // ===========================================================================
 
@@ -932,8 +1166,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 11, "eleven registry buckets (NS, HS, NP, LC, HP, XW, SC, YW, SF, FX, XY)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC/YW/SF/FX/XY short-circuited)");
+    check(AnalyzerTest::findings_bucket_count(a) == 12, "twelve registry buckets (NS, HS, NP, LC, HP, XW, SC, YW, SF, FX, FS, XY)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC/YW/SF/FX/FS/XY short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.
@@ -970,6 +1204,13 @@ int main() {
     test_finnedxwing_fins_in_two_nonets_rejected();
     test_finnedxwing_uncovered_base_line_rejected();
     test_finnedxwing_no_elimination();
+    test_finnedswordfish_row_based();
+    test_finnedswordfish_column_based();
+    test_finnedswordfish_fins_in_two_nonets_rejected();
+    test_finnedswordfish_uncovered_base_line_rejected();
+    test_finnedswordfish_no_elimination();
+    test_finnedswordfish_first_base_line_not_a_target();
+    test_finnedswordfish_plain_swordfish_not_reported();
     test_colorchain_rule2_contradiction();
     test_colorchain_benign_not_actionable();
     test_rebinding_ctor_carries_findings();

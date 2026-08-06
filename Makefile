@@ -40,6 +40,7 @@ src = coord.cpp \
 	  analyzer-xwing.cpp \
 	  analyzer-finnedxwing.cpp \
 	  analyzer-swordfish.cpp \
+	  analyzer-finnedswordfish.cpp \
 	  analyzer-colorchain.cpp \
 	  analyzer-ywing.cpp \
 	  analyzer-xychain.cpp \

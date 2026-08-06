@@ -21,13 +21,13 @@ and validating them are the same operation.
 
 ## The three classes
 
-Mapping all eleven techniques:
+Mapping every technique in the cascade:
 
 | Class | Pattern identity | Techniques | `test_`? |
 |-------|------------------|------------|----------|
 | **Given-tuple** | a small fixed-arity tuple the `find_` loop enumerates | naked single (1 cell), hidden single (cell+value), naked pair (2 cells), **hidden pair (2 cells + 2 values)**, Y-Wing (3 cells) | yes — natural |
 | **Materialized-object** | a standalone object built by an independent discovery step | simple coloring (`ColorChain`), XY-chain (chain vector) | yes — natural |
-| **Scan-fused** | membership emerges only from the validating scan; no tuple, no separable object | locked candidates, X-Wing, Swordfish, finned X-Wing | no — inline |
+| **Scan-fused** | membership emerges only from the validating scan; no tuple, no separable object | locked candidates, and all four fish: X-Wing, Swordfish, finned X-Wing, finned Swordfish | no — inline |
 
 - **Given-tuple**: `find_` enumerates tuples (`for` over cells / value pairs);
   `test_` judges each. The would-act / confinement scan inside `test_` operates
@@ -72,8 +72,11 @@ call `find_`, inspect the recorded pattern).
 
 ## Current state vs. the rule
 
-The partition the rule predicts is 7 with `test_` (5 given-tuple + 2
-materialized-object) and 4 inline (the 4 scan-fused). The codebase matches:
+The partition the rule predicts is seven with `test_` (five given-tuple + two
+materialized-object) and the rest inline: every scan-fused technique, which is
+locked candidates plus all four fish. The codebase matches. The totals are spelled
+out once, here, rather than restated per class — a bare count repeated in several
+places is exactly what went stale when the cascade last grew:
 
 - **Hidden pair is correctly factored.** It is given-tuple shaped (identity is
   `(c1, c2, v1, v2)`; the "no other cell in the unit carries v1 or v2" condition
@@ -119,9 +122,24 @@ materialized-object) and 4 inline (the 4 scan-fused). The codebase matches:
   validating it, it discovers *which two cross lines the pattern is even about*.
   The cover is chosen from the union rather than derived from it, so there is no
   candidate identity to hand a predicate -- not even the ambiguous one X-Wing
-  could re-derive. It takes the same scan-fused seam shape as the other two fish
+  could re-derive. It takes the same scan-fused seam shape as its fellow fish
   (`FinnedXWingTechnique::find_finned_xwing` public `static`, `FinnedXWingFinding`
   in `analyzer-finnedxwing.h`) because its whitebox cases read the recorded fins.
+
+- **Finned Swordfish is that same technique one size up, and takes that same seam.**
+  Scan-fused for the same sharper reason: the cover is *chosen*, as a three-line
+  subset of the union rather than derived from it, so there is no candidate identity
+  to hand a predicate. Seam:
+  `FinnedSwordfishTechnique::find_finned_swordfish` public `static`, and
+  `FinnedSwordfishFinding` in `analyzer-finnedswordfish.h` because its whitebox cases
+  read the recorded fins. Its cases carry one wrinkle the other fish's do not. At
+  three base lines the elimination scan must exclude *three* base lines, and only two
+  of them can have a cell inside the fin's nonet at once — the nonet's band is three
+  lines wide and one of those lines must be a non-base line for anything to be
+  eliminable. So the duty is split: the row-based accept case witnesses the second and
+  third base lines, the column-based one the first and second, and a third case covers
+  the first base line inside the has-eliminations scan, where a genuine elimination
+  would otherwise short-circuit the check before the base-line test is reached.
 
 - **XY-chain has a `test_`, and keeps it private.** It is materialized-object
   shaped like simple coloring, so `test_xychain` is the right factoring and

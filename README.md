@@ -179,10 +179,11 @@ Notes remaining: 210
 [YW](0) {}
 [SF](0) {}
 [FX](0) {}
+[FS](0) {}
 [XY](0) {}
 ```
 
-There are currently eleven implemented heuristics: 
+The implemented heuristics are: 
 
 1. `naked-single`, denoted as `[NS]`,
 1. `hidden-single`, denoted as `[HS]`,
@@ -193,7 +194,8 @@ There are currently eleven implemented heuristics:
 1. `simple-coloring`, denoted as `[SC]`,
 1. `y-wing`, denoted as `[YW]`,
 1. `swordfish`, denoted as `[SF]`,
-1. `finned-x-wing`, denoted as `[FX]`, and
+1. `finned-x-wing`, denoted as `[FX]`,
+1. `finned-swordfish`, denoted as `[FS]`, and
 1. `XY-chain`, denoted as `[XY]`.
 
 For each heuristic, the number of available actions associated with the heuristic appears in parentheses, followed by a summary description of such actions.
@@ -300,6 +302,7 @@ Notes remaining: 178
 [YW](0) {}
 [SF](0) {}
 [FX](0) {}
+[FS](0) {}
 [XY](0) {}
 ```
 This indicates there is one X-Wing structure in the board, with top-left and bottom-right corners as cells at row 5, column 5 and row 9, column 8 respectively, for candidate value 2.
@@ -381,6 +384,7 @@ Notes remaining: 49
 [YW](0) {}
 [SF](0) {}
 [FX](0) {}
+[FS](0) {}
 [XY](0) {}
 ```
 This indicates there is a simple color chain for candidate value 4, running via `[4, 8]`, `[9, 8]`, `[8, 7]`, `[6, 7]` and `[6, 5]`.
@@ -440,6 +444,7 @@ Notes remaining: 47
 [YW](0) {}
 [SF](0) {}
 [FX](0) {}
+[FS](0) {}
 [XY](0) {}
 ```
 However, `[9, 5]` is colored red, but sees `[9, 8]` also colored red. Per "Rule 2", all reds from the chain can be eliminated:
@@ -509,6 +514,7 @@ Notes remaining: 73
 [YW](2) {{[3, 3]Y{[1, 2],[3, 6]}#9}, {[3, 3]Y{[2, 2],[3, 8]}#9}}
 [SF](0) {}
 [FX](0) {}
+[FS](0) {}
 [XY](0) {}
 ```
 This indicates two Y-Wings, both pivoting on `[3, 3]` (candidates `{1, 6}`) for elimination value 9. The first uses wings `[1, 2]` (candidates `{6, 9}`, sharing 6 with the pivot) and `[3, 6]` (candidates `{1, 9}`, sharing 1 with the pivot); the value common to both wings but absent from the pivot is 9. The second Y-Wing pivots on the same cell, with wings `[2, 2]` and `[3, 8]`.
@@ -578,6 +584,7 @@ Notes remaining: 95
 [YW](0) {}
 [SF](1) {{{[2, 1],[2, 5],[2, 7]}#8[^r]}}
 [FX](0) {}
+[FS](0) {}
 [XY](0) {}
 ```
 This indicates one Swordfish for candidate value 8. The three anchor cells `[2, 1]`, `[2, 5]` and `[2, 7]` identify the three base sets, here columns 1, 5 and 7 (each anchor is the first candidate cell encountered in its base set). The `[^r]` tag, echoing the Locked Candidates notation, indicates that eliminations fall in the *rows*, making this a column-based Swordfish. Candidate 8 appears in columns 1, 5 and 7 only within rows 2, 3 and 4, so it can be removed from those three rows wherever it appears in any other column.
@@ -650,6 +657,7 @@ Notes remaining: 86
 [YW](0) {}
 [SF](0) {}
 [FX](1) {{{[1, 2],[1, 4]}+{[4, 2]}#5[^r]}}
+[FS](0) {}
 [XY](0) {}
 ```
 This indicates one finned X-Wing for candidate value 5. The two anchor cells `[1, 2]` and `[1, 4]` identify the base sets, here columns 2 and 4 (each anchor is the first candidate cell encountered in its base set, as for the Swordfish). After the `+` comes the fin, `[4, 2]`. The `[^r]` tag indicates that eliminations fall in the *rows*, making this a column-based pattern. Candidate 5 appears in columns 2 and 4 only within rows 1 and 6, save for that one fin; because the fin lies in the middle-left nonet, the sole cell both branches of the case split cover is `[6, 1]`.
@@ -661,6 +669,78 @@ Step #16:
 [FX] [6, 1] x5 [r]
 ```
 A second finned X-Wing -- same two base columns, same fin, this time on candidate 3 -- is found on the very next step and strikes the other candidate from `[6, 1]`, leaving a naked 4 there that carries the rest of the solve.
+
+## Finned Swordfish
+
+The Sudoku Wiki [explainer page](https://www.sudokuwiki.org/Finned_Swordfish) on the Finned Swordfish applies the fin relaxation one size up from the Finned X-Wing. A plain Swordfish needs a candidate's appearances in three base sets to fall entirely within the same three cross sets. A finned Swordfish tolerates appearances outside those three cross sets -- the *fins* -- provided every fin sits in a single nonet.
+
+The case split is the same one, and so is its price. If every fin is false, the candidate is confined to the three cross sets after all, and a plain Swordfish eliminates it from them. If some fin is true, its nonet already holds the value. Only the cells vouched for by both branches can be eliminated: those on a cross set, inside the fin's nonet, and outside the three base sets. Sashimi again needs no separate treatment, for the same reason as at two base sets.
+
+For example, on the board from issue #6, at a point where every cheaper heuristic has gone dry:
+```
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[    *|*   *|    *][     |*    |     ][*   *|     |    *]
+[*    |     |*    ][  5  |*   *|  2  ][*   *|     |*   *]
+[* *  |*   *|* * *][     |*    |     ][  *  |* *  |*    ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |* *  |     ][*   *|*    |*   *][*    |     |  *  ]
+[  6  |  *  |* *  ][*    |*    |*    ][* *  |  9  |*    ]
+[     |*    |* *  ][*    |*    |*    ][  *  |     |*    ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[  * *|* * *|    *][     |*    |     ][*   *|  *  |  * *]
+[* *  |  *  |* *  ][  9  |*   *|  8  ][* * *|  *  |*   *]
+[*    |*    |*    ][     |*    |     ][     |*    |*    ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[    *|     |     ][*   *|*    |*   *][    *|     |    *]
+[  *  |  4  |  2  ][     |  *  |  * *][  * *|  *  |    *]
+[*   *|     |     ][* *  |*    |*    ][  *  |* *  |*   *]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|    *|    *][  * *|     |    *][    *|     |  * *]
+[  *  |  * *|  * *][*    |  9  |* *  ][* *  |  1  |*    ]
+[*    |*    |*    ][* *  |     |*    ][  *  |     |*    ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|     |     ][  * *|  *  |    *][    *|  *  |  * *]
+[  *  |  8  |  1  ][*    |* *  |* * *][* * *|  *  |*   *]
+[*   *|     |     ][*    |*    |*    ][     |*    |*   *]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |  * *|    *][     |  *  |     ][     |    *|     ]
+[  1  |     |*    ][  6  |     |*    ][  9  |*    |  5  ]
+[     |*    |* *  ][     |  *  |*    ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[  *  |  *  |     ][* *  |     |*    ][     |     |     ]
+[* *  |  * *|* * *][     |  3  |  *  ][  7  |*   *|  8  ]
+[     |    *|    *][     |     |    *][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|    *|    *][     |     |     ][     |    *|     ]
+[* *  |  * *|* * *][*    |  *  |  *  ][  2  |*   *|  1  ]
+[* *  |*   *|* * *][*    |  *  |    *][     |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+Left to solve:   60
+Notes remaining: 227
+[NS](0) {}
+[HS](0) {}
+[NP](0) {}
+[LC](0) {}
+[HP](0) {}
+[XW](0) {}
+[SC](0) {}
+[YW](0) {}
+[SF](0) {}
+[FX](0) {}
+[FS](1) {{{[2, 2],[5, 4],[7, 2]}+{[7, 5]}#2[^c]}}
+[XY](0) {}
+```
+This indicates one finned Swordfish for candidate value 2. The three anchor cells `[2, 2]`, `[5, 4]` and `[7, 2]` identify the base sets, here rows 2, 5 and 7 (each anchor is the first candidate cell encountered in its base set, as for the Swordfish and the Finned X-Wing). After the `+` comes the fin, `[7, 5]`. The `[^c]` tag indicates that eliminations fall in the *columns*, making this a row-based pattern.
+
+Candidate 2 appears in those three rows at columns {2,9}, {4,9} and {2,5} -- four columns between them, which is precisely why plain Swordfish cannot see the position: it rejects unless the union is exactly three. Take columns 2, 4 and 9 as the cover and the leftover `[7, 5]` is the fin. It lies in the bottom-middle nonet, whose only cover column is column 4, so the cells both branches vouch for are that column's cells inside the nonet and outside the base rows: `[8, 4]` and `[9, 4]`. Only `[8, 4]` still carries candidate 2.
+
+On execution, the solver acts on this single pattern:
+```
+λ >
+Step #5:
+[FS] [8, 4] x2 [c]
+```
+This is the *second* finned Swordfish the board needs, and the one that breaks it open. The first -- value 8, base columns 1, 4 and 8, fin at `[5, 4]` -- fires three steps earlier, and all it buys is another Locked Candidates elimination and a naked pair; no digit is placed. After the elimination above, `[8, 4]` is a naked single, and singles carry the rest of the grid. Neither firing alone is enough: without this heuristic the solver places nothing at all on this puzzle, stopping with all 60 non-given cells unsolved.
 
 ## XY-Chain
 
@@ -719,6 +799,7 @@ Notes remaining: 139
 [YW](0) {}
 [SF](0) {}
 [FX](0) {}
+[FS](0) {}
 [XY](1) {{{[5, 8]:[5, 2]:[6, 1]:[6, 4]}#2x2}}
 ```
 This indicates one XY-Chain for value 2 with two eliminations (the `x2` suffix), running `[5, 8]` -> `[5, 2]` -> `[6, 1]` -> `[6, 4]`. Those cells carry candidates `{2, 3}`, `{3, 5}`, `{4, 5}` and `{2, 4}` respectively; each consecutive pair shares exactly one value (3, then 5, then 4), and both ends carry the chain value 2. Cells `[5, 5]` and `[6, 7]` each see both ends of the chain and so lose candidate 2.
@@ -733,7 +814,7 @@ Step #9:
 
 ## Order of analysis and resolution
 
-The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring, Swordfish, Finned X-Wing and XY-Chain.
+The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring, Swordfish, Finned X-Wing, Finned Swordfish and XY-Chain.
 
 # Editing the table
 

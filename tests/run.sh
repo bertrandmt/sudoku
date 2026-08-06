@@ -113,6 +113,40 @@ S_sf="52941876371659384284327615945238197663795421819862753438516942727483569196
 P_fx="9...4....7.4.8..5..8....1....76..82.62.4............19...1.2...89.7.........5...3"
 S_fx="951246387764381952283975146517693824629418735438527619375162498892734561146859273"
 
+# The board from issue #6, and the sharpest load-bearing fixture in this file. The
+# pre-Finned-Swordfish solver placed *nothing at all* on it: Locked Candidates
+# strikes 23 candidates at step 1, and then every technique in the cascade goes dry
+# at step 2 with all 60 non-given cells still unsolved. So this fixture is
+# load-bearing rather than merely reachable -- unregister FinnedSwordfishTechnique
+# and tier [1] fails here with "did not reach SOLVED!".
+#
+# The two firings are three steps apart, and both are needed:
+#   step 2   FS, value 8, column-based -- the only move available at the stall
+#   step 3   LC (1)  \  re-enabled by that elimination, but still no placement
+#   step 4   NP (8)  /
+#   step 5   FS, value 2, row-based -- the pattern issue #6 works out
+#   step 6   NS -- the first digit placed on this board; singles carry the rest
+#
+# Step 2's pattern: base columns C1/C4/C8 hold 8 in rows {R1,R9}, {R4,R5,R9} and
+# {R1,R4}. That is *four* cross rows, which is exactly why plain Swordfish cannot
+# see the position -- it rejects unless the union is three -- and the fourth row is
+# where the fin lives. Cover {R1,R4,R9}, fin R5C4, whose nonet (rows 4-6, cols 4-6)
+# meets a cover row only at R4, so the sole cell in that nonet, on a cover row and
+# outside the base columns, is R4C5. Either branch kills it: with the fin false the
+# three base columns' 8s fill R1/R4/R9 one apiece and a true Swordfish clears the
+# rest of those rows; with the fin true the nonet already holds its 8. The solution
+# has R4C5=5.
+#
+# Step 5's pattern is the one issue #6 analyses (base rows R2/R5/R7, cover columns
+# C2/C4/C9, fin R7C5, striking 2 from R8C4). README documents that one, because it
+# is the firing the first placement follows; tier [7] below can only see a *first*
+# application, so it documents step 2 instead.
+#
+# S_fs was computed by an independent brute-force solver, which also confirmed the
+# puzzle has exactly one completion; the solver's own grid agrees with it.
+P_fs="...5.2...6......9....9.8....42..........9..1..81......1..6..9.5....3.7.8......2.1"
+S_fs="893542176625713894417968523942351687576894312381276459138627945254139768769485231"
+
 echo "[0] Fixture sanity: puzzles and solutions are well-formed before they gate the solver"
 # A typo in a fixture would make a *correct* solver look broken, or mask a real
 # bug behind a "wrong grid" that is actually the fixture's fault. So validate the
@@ -171,7 +205,7 @@ fixture_ok() { # $1 = name, $2 = puzzle, $3 = solution
     why="$(consistent "$2" "$3")";    if [ -n "$why" ]; then bad "$1: solution contradicts a puzzle clue" "$why"; return; fi
     ok "$1: puzzle and solution are well-formed and consistent"
 }
-for name in easy med clm adv sf fx; do
+for name in easy med clm adv sf fx fs; do
     pvar="P_$name"; svar="S_$name"
     fixture_ok "$name" "${!pvar}" "${!svar}"
 done
@@ -182,7 +216,7 @@ done
 fixture_ok "hard" "$P_hard" "$S_hard"
 
 echo "[1] Full-solve correctness"
-for name in easy med clm adv sf fx; do
+for name in easy med clm adv sf fx fs; do
     pvar="P_$name"; svar="S_$name"
     out="$(printf 'n.%s\nr\np\n' "${!pvar}" | run_solver 2>&1)"
     got="$(printf '%s' "$out" | extract_grids | tail -1)"
@@ -242,7 +276,7 @@ elim_check() { # $1 = name, $2 = puzzle, $3 = solution
     else                           ok  "$1: every candidate grid still lists the solution's digits"
     fi
 }
-for name in easy med clm adv sf fx; do
+for name in easy med clm adv sf fx fs; do
     pvar="P_$name"; svar="S_$name"
     elim_check "$name" "${!pvar}" "${!svar}"
 done
@@ -271,6 +305,8 @@ vout_sf="$(printf 'v\nn.%s\nr\n' "$P_sf" | run_solver 2>&1)"
 check_tech "$vout_sf" SF "Swordfish (full-solve fixture)"
 vout_fx="$(printf 'v\nn.%s\nr\n' "$P_fx" | run_solver 2>&1)"
 check_tech "$vout_fx" FX "Finned X-Wing"
+vout_fs="$(printf 'v\nn.%s\nr\n' "$P_fs" | run_solver 2>&1)"
+check_tech "$vout_fs" FS "Finned Swordfish"
 vout_adv="$(printf 'v\nn.%s\nr\n' "$P_adv" | run_solver 2>&1)"
 check_tech "$vout_adv" SC "Simple Coloring"
 check_tech "$vout_adv" YW "Y-Wing"
@@ -479,6 +515,16 @@ prec_check "swordfish"         SF "$P_hard" "[SF] [2, 8] x8 [c]
 # the fin's own row, or an elimination not restricted to the fin box, would show
 # up here as extra lines rather than as a missing one.
 prec_check "finned x-wing"     FX "$P_fx"    "[FX] [6, 1] x5 [r]"
+# Finned Swordfish, first application on the issue #6 board: value 8,
+# column-based, base columns {1,4,8}, cover rows {1,4,9}, fin at [5, 4] in the
+# centre nonet. R4 is that nonet's only cover row and C5 its only non-base column
+# there, so this one elimination is the whole pattern's yield -- which makes the
+# block tight in the same way the finned x-wing one above is: a cover recomputed
+# over every cross row the base columns touch, or an elimination not confined to
+# the fin's nonet, shows up here as extra lines. The *second* application on this
+# board is the value-2 pattern issue #6 describes; first_app cannot see it, so
+# README's worked example is what documents that one.
+prec_check "finned swordfish"  FS "$P_fs"    "[FS] [4, 5] x8 [r]"
 prec_check "simple coloring"   SC "$P_color" "[SC] [9, 5] x4 [👀🟩🟥]"
 prec_check "y-wing"            YW "$P_yw1" "[YW] [1, 5] x9
 [YW] [2, 8] x9"
@@ -601,7 +647,7 @@ contains_block() {
 
 # Tag-sequence check: every full dump block lists the whole cascade, in order.
 # The expected tags are read out of the binary rather than hardcoded, so this
-# tracks the registry by construction -- register an eleventh technique and any
+# tracks the registry by construction -- register one more technique and any
 # block that was not regenerated fails, without editing this file.
 cascade=$(printf 'n.%s\n' "$P_easy" | run_solver 2>&1 \
           | grep -E '^\[[A-Z]{2}\]\(' | sed -E 's/^\[([A-Z]{2})\].*/\1/' | tr '\n' ' ' | sed 's/ $//')
@@ -705,6 +751,7 @@ Simple Coloring (value 5)|## Simple Coloring|2|$P_color
 Y-Wing|## Y-Wing|1|$P_yw1
 Swordfish|## Swordfish|1|$P_sf
 Finned X-Wing|## Finned X-Wing|1|$P_fx
+Finned Swordfish|## Finned Swordfish|1|$P_fs
 XY-Chain|## XY-Chain|1|$P_xy2
 EOF
 
