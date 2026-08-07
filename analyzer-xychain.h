@@ -35,11 +35,17 @@ struct XYChainFinding : Finding {
     // so `other_value` is an involution: if walking c1..cn from v exits at v, then
     // walking cn..c1 from v does too).
     //
-    // This is what stops the *anchor* loop from reaching the output. find() tries
-    // every bi-value cell as an anchor, so it meets a chain and its reverse from
-    // two different anchors, and whichever it reaches first is the one it acts on.
-    // Normalizing means both produce the same object, so which anchor won cannot
-    // be read off the printed chain (#53).
+    // What this buys is a canonical *representation*, not determinism. find() tries
+    // every bi-value cell as an anchor, so it meets a chain and its reverse from two
+    // different anchors and acts on whichever it reaches first; normalizing means both
+    // produce the same object, so the printed chain no longer encodes which anchor
+    // that was. That anchor order was never in question -- `board.cells()` is a
+    // vector, so it is the same on every standard library -- and direction reaches
+    // nothing else: apply() replays a coord-ordered set, so neither the cells cleared
+    // nor the order of the [XY] lines depends on it. Only "{front:..:back}" does.
+    //
+    // The unspecified-order problem #53 filed is a different one and is pinned
+    // elsewhere: see the sort in extend_chain.
     XYChainFinding(Value v, std::vector<Coord> c, std::set<Coord> e)
         : value(v), chain(std::move(c)), eliminations(std::move(e)) {
         if (chain.size() > 1 && chain.back() < chain.front())

@@ -152,6 +152,13 @@ bool extend_chain(const Board &board, const Cell &cell, Value incoming_link_valu
     assert(cell.notes().count() == 2);
     assert(out.empty());
 
+    // Structural depth bound. It is *unreachable* as the code stands: the recursive
+    // call below is made only from the `else` of `chain.size() == max_len`, so it
+    // always arrives with room to spare, and find_xychain asserts max_len >= 2 so the
+    // initial one-cell chain clears it too. Kept rather than deleted because it is
+    // the bound a reader looks for, and because a refactor that moved the length test
+    // out of the loop would need it back immediately -- without it, a max_len of 1
+    // would enumerate every path while testing none of them.
     if (chain.size() >= max_len) return false;
 
     // select cells that can see current cell and share its "other" value
@@ -277,6 +284,7 @@ bool XYChainTechnique::find_xychain(const Board &board, const Cell &cell, const 
     assert(cell.isNote());
     assert(cell.notes().count() == 2);
     assert(cell.check(value));
+    assert(max_len >= 2);   // a one-cell chain cannot close; see extend_chain's bound
 
     if (!out.empty()) return false;   // already found; find()'s sweep is over
 
@@ -329,6 +337,12 @@ bool XYChainTechnique::find(const Board &board, FindingList &out) const {
     for (const auto &cell : board.cells())
         if (cell.isNote() && cell.notes().count() == 2) bivalue++;
 
+    // Starting at 2 costs one anchor scan that cannot yield, and says so more
+    // plainly than starting at 3 would. A two-cell chain needs c1 = {X,a} and
+    // c2 = {a,X} mutually visible -- identical candidate pairs sharing a unit, which
+    // is a naked pair, and whose eliminations are a superset of the chain's. Naked
+    // pair is cheaper in the cascade and analyze() stops at the first firing
+    // technique, so a board that offers one never reaches here.
     for (size_t max_len = 2; max_len <= bivalue && out.empty(); max_len++) {
         for (const auto &cell : board.cells()) {
             // is this a note cell?

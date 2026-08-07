@@ -72,9 +72,12 @@ struct AnalyzerTest {
     // No hooks: XY is a standalone Technique. It is materialized-object shaped
     // (see docs/test-predicate-idiom.md), but unlike simple coloring its cases
     // do not drive its scoring predicate; they drive the per-anchor search
-    // XYChainTechnique::find_xychain and the best-chain selection
-    // XYChainTechnique::record_if_best, both public statics, and read the
+    // XYChainTechnique::find_xychain -- the one public static -- and read the
     // recorded XYChainFinding (visible via analyzer-xychain.h). No friendship.
+    // There is no selection seam: XY is first-hit, so nothing chooses between
+    // findings. What find_xychain does carry, alone among the per-anchor seams, is
+    // a max_len bound, because find() sweeps chain lengths upward and a case has to
+    // say how long to look.
 
     // --- y-wing ---
     // No hooks: YW is a standalone Technique. It is given-tuple shaped (see
@@ -346,13 +349,17 @@ void test_xychain_length_bound() {
     check(found.empty(), "nothing recorded at length 2");
 }
 
-// Direction canonicalization (issue #53). A chain and its reverse are the same
-// deduction, so XYChainFinding stores whichever direction runs front() < back().
+// Direction canonicalization. A chain and its reverse are the same deduction, so
+// XYChainFinding stores whichever direction runs front() < back(). This is about
+// the chain's printed *representation*, not about determinism -- the anchor order
+// that decides which direction is met first is a vector walk and was never
+// stdlib-dependent, and direction reaches no output but "{front:..:back}". The
+// determinism #53 filed about is pinned by test_xychain_visit_order.
 //
 // Driven from the *high* end, which is the direction the constructor has to flip.
 // That choice is what isolates the gate: find() anchors on every cell and so meets
-// both directions of every chain, and normalizing is the only reason which anchor
-// it met first cannot be read off the output.
+// both directions of every chain, so only offering one direction leaves
+// normalization as the sole thing that can deliver the invariant.
 void test_xychain_canonical_direction() {
     std::cout << "[xy-chain] the recorded chain is stored in canonical direction\n";
     Board board = empty_board();
