@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege for the GITHUB_TOKEN, applied to every job below. The only
+# token consumer here is actions/checkout, which needs 'contents: read';
+# actions/upload-artifact authenticates to the artifact service with the
+# runner's own token, not this one. Stating it explicitly keeps the scope
+# pinned even if the repository or organization default is later widened.
+permissions:
+  contents: read
+
 jobs:
   build:
     # Build with -Werror and run the correctness suite across multiple
