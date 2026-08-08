@@ -338,13 +338,17 @@ bool XYChainTechnique::find(const Board &board, FindingList &out) const {
     // walks can cost, and they cost it rarely. XY is last in the cascade and analyze()
     // stops at the first technique that fires, so a sweep that finds nothing means
     // nothing cheaper did either and the solver is done: at most one such sweep per
-    // solve, never a per-step tax. Counted over the corpus, one board per load: 6
-    // sweeps found a chain, 35 did not, and every one of those 35 was its board's last
-    // analyze(). On 33 of them the board was solved by then, so the count was 0 and the
-    // loop was empty; only the two boards that stall with candidates left pay anything,
-    // over 10 and 4 bi-value cells. A dense board that stalls would pay more, but the
-    // corpus has none -- a dense bi-value graph almost always holds an actionable
-    // chain, which is a hit, not a sweep.
+    // solve, never a per-step tax. Counted over the corpus with hit/miss counters in
+    // this function: a no-hit sweep happens exactly once per board that loads, and on
+    // every board that *solves* it is empty -- a solved board has no bi-value cells to
+    // count, so the loop below does not run. Only a board that stalls with candidates
+    // left pays anything, and there over a graph small enough to walk by hand. A dense
+    // board that stalls would pay more, but the corpus has none: a dense bi-value graph
+    // almost always holds an actionable chain, which is a hit, not a sweep.
+    //
+    // Tallies deliberately omitted. They were here, and they were corpus-sized, so they
+    // would have expired exactly the way the count in analyzer-ywing.cpp's sort comment
+    // did (#63). Re-derive with the same counters if the figures matter.
     size_t bivalue = 0;
     for (const auto &cell : board.cells())
         if (cell.isNote() && cell.notes().count() == 2) bivalue++;
