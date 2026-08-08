@@ -174,12 +174,23 @@ bool YWingTechnique::find_ywing(const Board &board, const Cell &pivot, FindingLi
     //
     // The elimination *set* does not depend on any of it: find() records every
     // Y-Wing and apply() acts on all of them, so sorting is free of behavioral
-    // cost while still changing printed output on a handful of corpus boards --
-    // delete the sort, rebuild, and diff full transcripts to see which. Stated
-    // without the arithmetic on purpose: the corpus grows with every technique
-    // that brings a fixture, so an "N of M" here expires on its own, which is how
-    // the previous wording came to cite a corpus two boards smaller than the one
-    // it was describing.
+    // cost while still changing printed output on a handful of corpus boards. To see
+    // which, *reverse* this comparator rather than deleting the sort: reversal is
+    // deterministic on every standard library, while with no sort the order is
+    // unspecified and the set you get is your hash table's. The two need not agree,
+    // and on this corpus they do not.
+    //
+    // Reversing it is caught -- run.sh's README Y-Wing worked example compares live
+    // output text. Deleting it is caught by nothing: measured, both suites stay green,
+    // because unspecified is not the same as wrong. So a green `make test` after
+    // deleting this sort is not evidence that the sort is unnecessary. Same asymmetry
+    // analyzer-xychain.cpp records for its own sort, except that there the deletion
+    // probe does happen to fail, on libc++ only.
+    //
+    // Counts stated without arithmetic on purpose: the corpus grows with every
+    // technique that brings a fixture, so an "N of M" here expires on its own, which
+    // is how the previous wording came to cite a corpus two boards smaller than the
+    // one it described (#63).
     // (Contrast XY-chain, where discovery order selects *which* chain is kept, so
     // the two are not the same case; see analyzer-xychain.cpp.)
     std::vector<const Cell *> ordered;
