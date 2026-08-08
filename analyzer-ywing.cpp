@@ -174,7 +174,12 @@ bool YWingTechnique::find_ywing(const Board &board, const Cell &pivot, FindingLi
     //
     // The elimination *set* does not depend on any of it: find() records every
     // Y-Wing and apply() acts on all of them, so sorting is free of behavioral
-    // cost while still changing printed output on 3 of the 34 corpus boards.
+    // cost while still changing printed output on a handful of corpus boards --
+    // delete the sort, rebuild, and diff full transcripts to see which. Stated
+    // without the arithmetic on purpose: the corpus grows with every technique
+    // that brings a fixture, so an "N of M" here expires on its own, which is how
+    // the previous wording came to cite a corpus two boards smaller than the one
+    // it was describing.
     // (Contrast XY-chain, where discovery order selects *which* chain is kept, so
     // the two are not the same case; see analyzer-xychain.cpp.)
     std::vector<const Cell *> ordered;
