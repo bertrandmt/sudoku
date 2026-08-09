@@ -1515,6 +1515,183 @@ void test_rebinding_ctor_carries_findings() {
           "the carried findings are byte-identical to the source's");
 }
 
+// --- Board's peer invariant ---
+//
+// These cases are about Board, not the Analyzer, and they live in this file
+// because the Makefile builds exactly one unit binary from exactly one source
+// (Makefile:80 hardcodes tests/unit/test_analyzer.cpp); a test_board.cpp would
+// need its own target. The file name undersells them, which is the price.
+//
+// They exist because the full-board filter_notes() sweep is gone (#8). That
+// sweep was idempotent repair: a peer violation from any cause was silently
+// fixed on the next analyze(). Nothing re-checks the invariant at runtime now --
+// deliberately, since a full peer check under assert would re-impose the cost
+// the sweep was removed to avoid, and asserts ship in this build. So the
+// property is pinned here instead, at the one function that maintains it.
+
+// Board's cached mNotesCount has no accessor. Its one public view is the
+// "Notes remaining:" line of operator<<, which is also the text the black-box
+// transcript suite compares, so read it back from there rather than adding a
+// test-only accessor or another friend. A solved board prints neither counter;
+// 0 is then the right answer, since its actual count is 0 too.
+size_t printed_notes_remaining(const Board &board) {
+    std::ostringstream oss;
+    oss << board;
+    const std::string s = oss.str();
+    const std::string label = "Notes remaining: ";
+    const auto p = s.find(label);
+    if (p == std::string::npos) return 0;
+    return static_cast<size_t>(std::stoul(s.substr(p + label.size())));
+}
+
+// The same quantity counted straight off the cells, so a drifting cache shows up
+// as a disagreement rather than being invisible.
+size_t actual_notes_remaining(const Board &board) {
+    size_t n = 0;
+    for (size_t r = 0; r < Board::height; ++r) {
+        for (size_t c = 0; c < Board::width; ++c) {
+            const Cell &cell = cell_at(board, r, c);
+            if (!cell.isNote()) continue;
+            for (Value v : value_range()) if (cell.check(v)) n++;
+        }
+    }
+    return n;
+}
+
+size_t actual_note_cells(const Board &board) {
+    size_t n = 0;
+    for (size_t r = 0; r < Board::height; ++r)
+        for (size_t c = 0; c < Board::width; ++c)
+            if (cell_at(board, r, c).isNote()) n++;
+    return n;
+}
+
+void test_set_value_clears_peer_notes() {
+    Board board = empty_board();
+
+    // (4,4) is the placed cell. Each probe shares exactly one unit with it, so a
+    // failure names the unit: (4,0) only row 4, (0,4) only column 4, (3,3) only
+    // the centre nonet. (0,0) shares none of the three.
+    check(has_candidate(board, 4, 0, kFive)
+       && has_candidate(board, 0, 4, kFive)
+       && has_candidate(board, 3, 3, kFive)
+       && has_candidate(board, 0, 0, kFive),
+          "peer invariant: all four probe cells hold 5 before the placement (else the checks below cannot fail)");
+
+    check(board.set_value_at(4, 4, kFive), "peer invariant: the placement reports success");
+
+    check(!has_candidate(board, 4, 0, kFive), "peer invariant: the row-only peer loses the placed value");
+    check(!has_candidate(board, 0, 4, kFive), "peer invariant: the column-only peer loses the placed value");
+    check(!has_candidate(board, 3, 3, kFive), "peer invariant: the nonet-only peer loses the placed value");
+    check(has_candidate(board, 0, 0, kFive),
+          "peer invariant: a cell sharing no unit with the placement keeps the value");
+
+    check(cell_at(board, 4, 4).isValue() && cell_at(board, 4, 4).value() == kFive,
+          "peer invariant: the placed cell holds the value");
+}
+
+void test_set_value_keeps_counts_consistent() {
+    Board board = empty_board();
+
+    check(printed_notes_remaining(board) == actual_notes_remaining(board),
+          "peer invariant: an empty board's cached note count matches its cells");
+    check(board.note_cells_count() == actual_note_cells(board),
+          "peer invariant: an empty board's cached note-cell count matches its cells");
+
+    // Placing (0,0) spends 9 candidates on the cell itself and one on each of its
+    // 20 distinct peers, so both counters move for two different reasons at once.
+    board.set_value_at(0, 0, kOne);
+    check(printed_notes_remaining(board) == actual_notes_remaining(board),
+          "peer invariant: the cached note count matches the cells after a placement clears peers");
+    check(board.note_cells_count() == actual_note_cells(board),
+          "peer invariant: the cached note-cell count matches the cells after a placement");
+
+    board.set_value_at(8, 8, kNine);
+    check(printed_notes_remaining(board) == actual_notes_remaining(board),
+          "peer invariant: the cached note count still matches after a second, disjoint placement");
+}
+
+void test_set_value_after_peer_cleared_a_candidate() {
+    Board board = empty_board();
+
+    // (0,1) shares row 0 with (0,0). Start it on {3,5} so the placement below
+    // strips 5 and leaves 3 -- the value it is itself about to be placed with.
+    // This is the shape naked/hidden singles produce: apply() places its whole
+    // bucket in one call, so an earlier placement now cleans peers before the
+    // later placements in the same batch happen.
+    set_candidates(board, 0, 1, {3, 5});
+    check(has_candidate(board, 0, 1, kFive) && has_candidate(board, 0, 1, kThree),
+          "batch placement: the second cell starts on {3,5}");
+
+    board.set_value_at(0, 0, kFive);
+    check(!has_candidate(board, 0, 1, kFive) && has_candidate(board, 0, 1, kThree),
+          "batch placement: the first placement strips 5 from the second cell and leaves 3");
+
+    check(board.set_value_at(0, 1, kThree), "batch placement: the second placement reports success");
+    check(cell_at(board, 0, 1).isValue() && cell_at(board, 0, 1).value() == kThree,
+          "batch placement: it lands the value its finding named");
+    check(printed_notes_remaining(board) == actual_notes_remaining(board),
+          "batch placement: the cached note count survives clear-then-place on one cell");
+}
+
+// Isolating the gate: set_value_at keys on isNote() alone and never asks whether
+// the value is still a candidate. That independence is what makes the batch case
+// above safe in general, rather than only when the stripped candidate happened
+// not to be the one being placed. Showing it needs a deliberately inconsistent
+// placement, which is why this is its own case and not folded into that one.
+void test_set_value_ignores_whether_the_value_is_still_a_candidate() {
+    Board board = empty_board();
+
+    board.set_value_at(0, 0, kFive);
+    check(!has_candidate(board, 0, 1, kFive), "isNote gate: the peer no longer holds 5");
+
+    check(board.set_value_at(0, 1, kFive),
+          "isNote gate: placing the just-stripped value still succeeds");
+    check(cell_at(board, 0, 1).isValue() && cell_at(board, 0, 1).value() == kFive,
+          "isNote gate: the cell holds the value it was given");
+}
+
+// The other half of #8: analyze() is a pure query. Board maintaining the peer
+// invariant is pinned above; this pins the claim that the analyzer no longer
+// mutates. Worth its own case because mBoard is still a Board &, so nothing in
+// the type system stops a mutation from reappearing there.
+//
+// What it catches and what it does not: any mutation analyze() actually
+// performs. NOT a faithfully reinstated filter_notes(), which would be a no-op
+// here -- that sweep only ever cleared candidates the invariant now prevents
+// from existing, and Board exposes no way to put one back, so no reachable
+// board can make it fire. Verified non-vacuous by mutation: a stray
+// clear_note_at() dropped into analyze() fails the grid check and the cached
+// note count, while leaving the note-cell count right -- clearing a candidate
+// does not change how many cells are notes.
+void test_analyze_does_not_mutate_the_board() {
+    Board board = empty_board();
+    // Placed values, so the board is not the all-notes grid every other case
+    // uses and a sweep would have something to look at, plus a naked single so
+    // the cascade runs a real search rather than finding nothing.
+    board.set_value_at(0, 0, kOne);
+    board.set_value_at(4, 4, kFive);
+    set_candidates(board, 8, 8, {7});
+
+    std::ostringstream before;
+    board.print_candidates(before);
+    const size_t before_cells = board.note_cells_count();
+    const size_t before_notes = printed_notes_remaining(board);
+
+    Analyzer analyzer(board);
+    analyzer.analyze();
+
+    std::ostringstream after;
+    board.print_candidates(after);
+
+    check(before.str() == after.str(),
+          "analyze() purity: the candidate grid is byte-identical after analyze()");
+    check(board.note_cells_count() == before_cells,
+          "analyze() purity: the note-cell count is unchanged");
+    check(printed_notes_remaining(board) == before_notes,
+          "analyze() purity: the cached note count is unchanged");
+}
+
 } // namespace
 
 int main() {
@@ -1556,6 +1733,11 @@ int main() {
     test_colorchain_rule2_contradiction();
     test_colorchain_benign_not_actionable();
     test_rebinding_ctor_carries_findings();
+    test_set_value_clears_peer_notes();
+    test_set_value_keeps_counts_consistent();
+    test_set_value_after_peer_cleared_a_candidate();
+    test_set_value_ignores_whether_the_value_is_still_a_candidate();
+    test_analyze_does_not_mutate_the_board();
 
     std::cout << "----------------------------------------\n";
     if (failures == 0) { std::cout << "unit: all checks passed\n"; return 0; }

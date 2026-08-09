@@ -6,6 +6,7 @@
 #include "column.h"
 #include "nonet.h"
 #include "cell.h"
+#include "verbose.h"
 
 #include <array>
 #include <cassert>
@@ -230,6 +231,19 @@ bool Board::set_value_at(size_t row, size_t col, const Value &value) {
     return set_value_at(Coord(row, col), value);
 }
 
+template<class Set>
+void Board::clear_peer_notes(const Coord &coord, const Value &value, const Set &set) {
+    for (auto const &other_cell : set) {
+        // One gate, not two: Cell::check is isNote() && ..., so this already
+        // skips value cells as well as note cells that no longer hold `value`.
+        if (!other_cell.check(value)) continue;
+
+        if (sVerbose) std::cout << "  [FNv] " << other_cell.coord() << " x" << value
+                  << " " << tag(set.kind()) << "(" << coord << ")" << std::endl;
+        clear_note_at(other_cell.coord(), value);
+    }
+}
+
 bool Board::set_value_at(const Coord &coord, const Value &value) {
     auto &cell = at(coord);
 
@@ -238,6 +252,14 @@ bool Board::set_value_at(const Coord &coord, const Value &value) {
     mNotesCount -= cell.notes().count();
     mNoteCellsCount--;
     cell.set(value);
+
+    // Restore the peer invariant this placement just broke: no note cell may
+    // hold a value placed in a cell it sees. Doing it here, at the one
+    // chokepoint every placement passes through, is what keeps the board
+    // self-consistent without the analyzer sweeping for it (see board.h).
+    clear_peer_notes(coord, value, nonet(coord));
+    clear_peer_notes(coord, value, column(coord));
+    clear_peer_notes(coord, value, row(coord));
 
     return true;
 }

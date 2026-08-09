@@ -42,12 +42,6 @@ public:
     friend struct AnalyzerTest;
 
 private:
-    //** Notes management
-    template<class Set>
-    void filter_notes(Cell &, const Set &);
-    void filter_notes();
-
-private:
     //** technique registry
     // The solving techniques, constructed once and shared by every Analyzer.
     // Function-local static (defined in analyzer.cpp): built on first use, and
