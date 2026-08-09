@@ -4,11 +4,6 @@
 #include "analyzer.h"
 #include "techniques.h"
 #include "board.h"
-#include "row.h"
-#include "column.h"
-#include "nonet.h"
-#include "cell.h"
-#include "verbose.h"
 
 #include <cassert>
 #include <iterator>
@@ -51,48 +46,10 @@ const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
     return reg;
 }
 
-template<class Set>
-void Analyzer::filter_notes(Cell &cell, const Set &set) {
-    // note cell; update its own notes from all the value cells in the same set
-    if (cell.isNote()) {
-        for (auto const &other_cell : set) {
-            // is the other cell a value note?
-            if (other_cell.isNote()) continue;
-            // yes, but is the value of other_cell already checked off cell's notes
-            if (!cell.check(other_cell.value())) continue;
-
-            if (sVerbose) std::cout << "  [FNn] " << cell.coord() << " x" << other_cell.value()
-                      << " " << tag(set.kind()) << "(" << other_cell.coord() << ")" << std::endl;
-            mBoard.clear_note_at(cell.coord(), other_cell.value());
-        }
-    }
-    // value cell; let's update notes in note cells in the same set
-    else {
-        assert(cell.isValue());
-        for (auto &other_cell : set) {
-            // is other_cell a note cell?
-            if (other_cell.isValue()) continue;
-            // yes, but is the value of cell already checked off other_cell's notes
-            if (!other_cell.check(cell.value())) continue;
-
-            if (sVerbose) std::cout << "  [FNv] " << other_cell.coord() << " x" << cell.value()
-                      << " " << tag(set.kind()) << "(" << cell.coord() << ")" << std::endl;
-            mBoard.clear_note_at(other_cell.coord(), cell.value());
-        }
-    }
-}
-
-void Analyzer::filter_notes() {
-    for (auto &cell: mBoard.cells()) {
-        filter_notes(cell, mBoard.nonet(cell));
-        filter_notes(cell, mBoard.column(cell));
-        filter_notes(cell, mBoard.row(cell));
-    }
-}
-
 void Analyzer::analyze() {
-    filter_notes();
-
+    // No note-filtering pass here: Board::set_value_at maintains the peer
+    // invariant at every placement, so this is a pure query over a board that
+    // already holds it (see #8).
     for (auto &b : mFindings) b.clear();
 
     // Walk the cascade in order, each technique finding into its own bucket, and

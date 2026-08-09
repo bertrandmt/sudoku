@@ -56,6 +56,17 @@ public:
 
     bool clear_note_at(const Coord &, const Value &);
     bool clear_note_at(size_t row, size_t col, const Value &);
+
+    // Place a value, and clear it from the notes of every cell that sees the
+    // placed one. That second half is this class's invariant rather than a
+    // solving step: a note cell holding a peer's placed value is a stale board,
+    // not a pending deduction. So no note cell holds one between calls, and
+    // analyze() can be a pure query (see #8).
+    //
+    // The invariant holds only while this stays the sole route to a value, so
+    // keep it that way: Cell::set(const Value &) has no other caller today, and
+    // a second one would have to maintain the invariant itself. That constraint
+    // is also why there is no non-const cells() accessor below.
     bool set_value_at(const Coord &, const Value &);
     bool set_value_at(size_t row, size_t col, const Value &);
 
@@ -67,8 +78,10 @@ public:
     const Column &column(const Coord &) const;
     const Nonet &nonet(const Coord &) const;
 
+    // Const only, deliberately. Every cell mutation goes through Board's own
+    // clear_note_at/set_value_at so the peer invariant documented above cannot
+    // be bypassed; a non-const overload here would reopen that.
     const std::vector<Cell> &cells() const { return mCells; }
-    std::vector<Cell> &cells() { return mCells; }
 
     const std::vector<Row> &rows() const { return mRows; }
     const std::vector<Column> &columns() const { return mColumns; }
@@ -105,6 +118,12 @@ private:
     const Cell &at(size_t row, size_t col) const;
     Cell &at(const Coord &coord) { return at(coord.row(), coord.column()); }
     const Cell &at(const Coord &coord) const { return at(coord.row(), coord.column()); }
+
+    // Clear `value` from the note cells of one unit containing `coord`, which is
+    // the placed cell. Called once per unit by set_value_at; a template because
+    // Row, Column and Nonet share no base, only the shape the loop needs.
+    template<class Set>
+    void clear_peer_notes(const Coord &coord, const Value &value, const Set &set);
 
     void rebuild_subsets();
 };
