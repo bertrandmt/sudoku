@@ -234,9 +234,8 @@ bool Board::set_value_at(size_t row, size_t col, const Value &value) {
 template<class Set>
 void Board::clear_peer_notes(const Coord &coord, const Value &value, const Set &set) {
     for (auto const &other_cell : set) {
-        // only note cells carry notes to clear
-        if (other_cell.isValue()) continue;
-        // and only those still holding this value have anything to lose
+        // One gate, not two: Cell::check is isNote() && ..., so this already
+        // skips value cells as well as note cells that no longer hold `value`.
         if (!other_cell.check(value)) continue;
 
         if (sVerbose) std::cout << "  [FNv] " << other_cell.coord() << " x" << value

@@ -392,7 +392,7 @@ echo "[6] Corpus: every puzzle logged in notes.txt solves correctly and soundly"
 # asserted here. What we *can* assert, independent of any annotation, is the
 # property that actually matters: any puzzle the solver finishes must finish at
 # a legal grid consistent with its clues, and must never drop a true candidate
-# on the way. That turns the ~25 real puzzles in notes.txt into full-solve and
+# on the way. That turns every real puzzle in notes.txt into full-solve and
 # per-step soundness fixtures for free, with no hand-written solution strings --
 # the solver's own final grid is validated structurally (a wrong placement would
 # make it fail grid_check) and only then reused as the soundness oracle, so the

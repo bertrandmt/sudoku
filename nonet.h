@@ -27,8 +27,10 @@ public:
     public:
         using difference_type = std::ptrdiff_t;
         using element_type = Cell;
-        using pointer = element_type *;
-        using reference = element_type&;
+        // Const on purpose: a unit hands out a read-only view of its cells, so
+        // Board's own mutators stay the only route to a change (see board.h).
+        using pointer = const element_type *;
+        using reference = const element_type&;
 
         Iterator()
             : mIndex(0, 0) { throw std::runtime_error("Not implemented"); }

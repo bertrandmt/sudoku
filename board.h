@@ -39,7 +39,6 @@ bool parse_rcv(const std::string &entry, size_t &row, size_t &col, Value &val);
 
 class Board {
 public:
-    friend class Analyzer;
     Board(const std::string &board_desc);
 private:
     void record_entries_form1(const std::string &);
@@ -66,7 +65,8 @@ public:
     // The invariant holds only while this stays the sole route to a value, so
     // keep it that way: Cell::set(const Value &) has no other caller today, and
     // a second one would have to maintain the invariant itself. That constraint
-    // is also why there is no non-const cells() accessor below.
+    // is why nothing below hands out a mutable cell -- neither cells() nor the
+    // unit iterators, which are const for this reason (see row.h).
     bool set_value_at(const Coord &, const Value &);
     bool set_value_at(size_t row, size_t col, const Value &);
 
@@ -78,9 +78,11 @@ public:
     const Column &column(const Coord &) const;
     const Nonet &nonet(const Coord &) const;
 
-    // Const only, deliberately. Every cell mutation goes through Board's own
-    // clear_note_at/set_value_at so the peer invariant documented above cannot
-    // be bypassed; a non-const overload here would reopen that.
+    // Const only, deliberately, and it is not the only door: Row, Column and
+    // Nonet each hold a Board & whose constness does not propagate, so their
+    // iterators would hand out a mutable Cell from a const Board if they were
+    // not themselves const. Both doors are shut, which is what makes the peer
+    // invariant above enforced rather than merely documented.
     const std::vector<Cell> &cells() const { return mCells; }
 
     const std::vector<Row> &rows() const { return mRows; }

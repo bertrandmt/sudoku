@@ -1519,8 +1519,8 @@ void test_rebinding_ctor_carries_findings() {
 //
 // These cases are about Board, not the Analyzer, and they live in this file
 // because the Makefile builds exactly one unit binary from exactly one source
-// (unit_bin/test_analyzer.cpp); a test_board.cpp would need its own target. The
-// file name undersells them, which is the price.
+// (Makefile:80 hardcodes tests/unit/test_analyzer.cpp); a test_board.cpp would
+// need its own target. The file name undersells them, which is the price.
 //
 // They exist because the full-board filter_notes() sweep is gone (#8). That
 // sweep was idempotent repair: a peer violation from any cause was silently
@@ -1651,6 +1651,47 @@ void test_set_value_ignores_whether_the_value_is_still_a_candidate() {
           "isNote gate: the cell holds the value it was given");
 }
 
+// The other half of #8: analyze() is a pure query. Board maintaining the peer
+// invariant is pinned above; this pins the claim that the analyzer no longer
+// mutates. Worth its own case because mBoard is still a Board &, so nothing in
+// the type system stops a mutation from reappearing there.
+//
+// What it catches and what it does not: any mutation analyze() actually
+// performs. NOT a faithfully reinstated filter_notes(), which would be a no-op
+// here -- that sweep only ever cleared candidates the invariant now prevents
+// from existing, and Board exposes no way to put one back, so no reachable
+// board can make it fire. Verified non-vacuous by mutation: a stray
+// clear_note_at() dropped into analyze() fails the grid check and the cached
+// note count, while leaving the note-cell count right -- clearing a candidate
+// does not change how many cells are notes.
+void test_analyze_does_not_mutate_the_board() {
+    Board board = empty_board();
+    // Placed values, so the board is not the all-notes grid every other case
+    // uses and a sweep would have something to look at, plus a naked single so
+    // the cascade runs a real search rather than finding nothing.
+    board.set_value_at(0, 0, kOne);
+    board.set_value_at(4, 4, kFive);
+    set_candidates(board, 8, 8, {7});
+
+    std::ostringstream before;
+    board.print_candidates(before);
+    const size_t before_cells = board.note_cells_count();
+    const size_t before_notes = printed_notes_remaining(board);
+
+    Analyzer analyzer(board);
+    analyzer.analyze();
+
+    std::ostringstream after;
+    board.print_candidates(after);
+
+    check(before.str() == after.str(),
+          "analyze() purity: the candidate grid is byte-identical after analyze()");
+    check(board.note_cells_count() == before_cells,
+          "analyze() purity: the note-cell count is unchanged");
+    check(printed_notes_remaining(board) == before_notes,
+          "analyze() purity: the cached note count is unchanged");
+}
+
 } // namespace
 
 int main() {
@@ -1696,6 +1737,7 @@ int main() {
     test_set_value_keeps_counts_consistent();
     test_set_value_after_peer_cleared_a_candidate();
     test_set_value_ignores_whether_the_value_is_still_a_candidate();
+    test_analyze_does_not_mutate_the_board();
 
     std::cout << "----------------------------------------\n";
     if (failures == 0) { std::cout << "unit: all checks passed\n"; return 0; }
