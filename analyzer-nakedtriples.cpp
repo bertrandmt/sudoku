@@ -15,15 +15,19 @@
 namespace {
 // File-local: NT's whitebox hook tests the predicate, not the finding, so nothing
 // outside this TU needs to name or downcast NakedTripleFinding. print() format:
-// "{coord1,coord2,coord3}#{value1,value2,value3}".
+// "{coord1,coord2,coord3}#{value1,value2,value3}[units]", where units is every unit
+// that holds all three cells ("[c]", or "[cn]" for a triple on a line that is also
+// in one nonet). That is a function of the cells alone, so it is the same whichever
+// unit find() reached the triple through, and it is the set apply() strikes in.
 struct NakedTripleFinding : Finding {
     std::array<Coord, 3> coords;
     std::array<Value, 3> values;
-    NakedTripleFinding(std::array<Coord, 3> c, std::array<Value, 3> v) : coords(c), values(v) { }
+    UnitSet units;
+    NakedTripleFinding(std::array<Coord, 3> c, std::array<Value, 3> v, UnitSet u) : coords(c), values(v), units(u) { }
     bool same(const NakedTripleFinding &o) const { return coords == o.coords && values == o.values; }
     void print(std::ostream &o) const override {
         o << "{" << coords[0] << "," << coords[1] << "," << coords[2] << "}#{"
-          << values[0] << "," << values[1] << "," << values[2] << "}";
+          << values[0] << "," << values[1] << "," << values[2] << "}" << units;
     }
 };
 
@@ -53,7 +57,7 @@ bool would_act(const Set &set, const Cell &c1, const Cell &c2, const Cell &c3, c
 // entry downcasts to NakedTripleFinding) catches the same triple reached again
 // through a second unit that holds all three cells.
 template<class Set>
-bool find_naked_triple(const Cell &cell, const Set &set, FindingList &out) {
+bool find_naked_triple(const Board &board, const Cell &cell, const Set &set, FindingList &out) {
     bool did_find = false;
 
     for (auto const &second : set) {
@@ -68,7 +72,8 @@ bool find_naked_triple(const Cell &cell, const Set &set, FindingList &out) {
 
             auto span = cell.notes().united(second.notes()).united(third.notes()).values();
             NakedTripleFinding nt({cell.coord(), second.coord(), third.coord()},
-                                  {span.at(0), span.at(1), span.at(2)});
+                                  {span.at(0), span.at(1), span.at(2)},
+                                  board.units_holding({cell.coord(), second.coord(), third.coord()}));
             bool already = false;
             for (auto const &f : out) {
                 if (bucket_cast<NakedTripleFinding>(*f).same(nt)) { already = true; break; }
@@ -157,9 +162,9 @@ bool NakedTripleTechnique::find(const Board &board, FindingList &out) const {
         // can this note cell start a triple?
         if (!triple_sized(cell)) continue;
 
-        did_find |= find_naked_triple(cell, board.row(cell), out);
-        did_find |= find_naked_triple(cell, board.column(cell), out);
-        did_find |= find_naked_triple(cell, board.nonet(cell), out);
+        did_find |= find_naked_triple(board, cell, board.row(cell), out);
+        did_find |= find_naked_triple(board, cell, board.column(cell), out);
+        did_find |= find_naked_triple(board, cell, board.nonet(cell), out);
     }
 
     return did_find;

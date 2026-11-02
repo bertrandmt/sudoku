@@ -317,6 +317,22 @@ std::optional<Unit> Board::see_each_other(const Coord &coord1, const Coord &coor
     return std::nullopt;
 }
 
+UnitSet Board::units_holding(std::initializer_list<Coord> coords) const {
+    assert(coords.size() > 0);
+    UnitSet units;
+    const Coord &first = *coords.begin();
+    bool in_row = true, in_column = true, in_nonet = true;
+    for (auto const &coord : coords) {
+        in_row    = in_row    && row(first)    == row(coord);
+        in_column = in_column && column(first) == column(coord);
+        in_nonet  = in_nonet  && nonet(first)  == nonet(coord);
+    }
+    if (in_row)    units.add(Unit::Row);
+    if (in_column) units.add(Unit::Column);
+    if (in_nonet)  units.add(Unit::Nonet);
+    return units;
+}
+
 std::optional<Unit> Board::any_see_each_other(const std::vector<Coord> &coords) const {
     for (size_t i = 0; i < coords.size(); ++i) {
         for (size_t j = i + 1; j < coords.size(); ++j) {

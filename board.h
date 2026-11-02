@@ -4,6 +4,9 @@
 
 #include "cell.h"
 
+#include <cassert>
+#include <initializer_list>
+#include <iostream>
 #include <vector>
 #include <unordered_set>
 #include <iterator>
@@ -28,6 +31,27 @@ constexpr std::string_view tag(Unit unit) {
     }
     return "?"; // unreachable; silences -Wreturn-type
 }
+
+// A set of units, kept in r, c, n order whatever order they were added in, so a
+// finding that holds in two units prints one way. Streams as its tags inside one
+// bracket, "[rn]" -- the notation Hidden Singles and the elimination lines use,
+// widened to a set. Never printed empty: a finding holds in at least one unit.
+class UnitSet {
+public:
+    void add(Unit unit) { mBits |= bit(unit); }
+    bool has(Unit unit) const { return (mBits & bit(unit)) != 0; }
+    bool empty() const { return mBits == 0; }
+
+    friend std::ostream &operator<<(std::ostream &o, const UnitSet &units) {
+        assert(!units.empty());
+        o << "[";
+        for (Unit u : {Unit::Row, Unit::Column, Unit::Nonet}) if (units.has(u)) o << tag(u);
+        return o << "]";
+    }
+private:
+    static unsigned bit(Unit unit) { return 1u << static_cast<unsigned>(unit); }
+    unsigned mBits = 0;
+};
 
 // Parse a 3-character "row,column,value" triple, each a digit 1-9, into
 // zero-based row/column indices and a Value. Returns false (leaving the
@@ -95,6 +119,11 @@ public:
     bool see_each_other(const Cell &c1, const Cell &c2) const {
         return see_each_other(c1.coord(), c2.coord()).has_value();
     }
+
+    // every unit that holds all of the passed coords: one for coords on a line,
+    // two for coords on a line that also share a nonet, none if they share no
+    // unit at all.
+    UnitSet units_holding(std::initializer_list<Coord>) const;
 
     // do any two of the passed coords see each other? returns the unit shared by
     // the first such pair found, or nullopt if none do.

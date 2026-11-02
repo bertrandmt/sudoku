@@ -543,11 +543,11 @@ prec_check "naked pair"        NP "$P_color" "[NP] [6, 4] x4 [r]
 [NP] [6, 6] x5 [r]"
 prec_check "locked candidates" LC "$P_adv" "[LC] [3, 5] x7 [c]
 [LC] [8, 5] x7 [c]"
-prec_check "hidden pair"       HP "$P_clm" "[HP] [4, 8] x3 {[4, 8],[5, 8]}#{2,5}
-[HP] [4, 8] x7 {[4, 8],[5, 8]}#{2,5}
-[HP] [5, 8] x3 {[4, 8],[5, 8]}#{2,5}
-[HP] [5, 8] x7 {[4, 8],[5, 8]}#{2,5}
-[HP] [5, 8] x9 {[4, 8],[5, 8]}#{2,5}"
+prec_check "hidden pair"       HP "$P_clm" "[HP] [4, 8] x3 {[4, 8],[5, 8]}#{2,5}[cn]
+[HP] [4, 8] x7 {[4, 8],[5, 8]}#{2,5}[cn]
+[HP] [5, 8] x3 {[4, 8],[5, 8]}#{2,5}[cn]
+[HP] [5, 8] x7 {[4, 8],[5, 8]}#{2,5}[cn]
+[HP] [5, 8] x9 {[4, 8],[5, 8]}#{2,5}[cn]"
 # Naked triples on P_nts: both patterns act in the one step. Column 3 holds
 # {5,8}, {5,6,8}, {5,6,8} in rows 2, 3 and 9 and column 7 holds {5,6,8} three
 # times in rows 6, 7 and 8; each strikes its span from the rest of the column.

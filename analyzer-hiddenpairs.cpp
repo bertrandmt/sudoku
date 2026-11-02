@@ -11,41 +11,48 @@
 #include <cassert>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace {
 // File-local: HP's whitebox hook tests the predicate, not the finding, so nothing
 // outside this TU needs to name or downcast HiddenPairFinding. print() format:
-// "{coord1,coord2}#{value1,value2}".
+// "{coord1,coord2}#{value1,value2}[units]", where units is every unit the pair is
+// hidden in, i.e. where no other cell carries either value. That is not the units
+// holding both cells: two cells on a line in one nonet can be hidden in the nonet
+// and not the line, or the reverse. apply() does not look at it, since it strips
+// the two cells whichever unit made the pair hidden.
 struct HiddenPairFinding : Finding {
     std::pair<Coord, Coord> coords;
     std::pair<Value, Value> values;
-    HiddenPairFinding(std::pair<Coord, Coord> c, std::pair<Value, Value> v) : coords(c), values(v) { }
+    UnitSet units;
+    HiddenPairFinding(std::pair<Coord, Coord> c, std::pair<Value, Value> v, Unit u) : coords(c), values(v) { units.add(u); }
     bool same(const HiddenPairFinding &o) const { return coords == o.coords && values == o.values; }
     void print(std::ostream &o) const override {
-        o << "{" << coords.first << "," << coords.second << "}#{" << values.first << "," << values.second << "}";
+        o << "{" << coords.first << "," << coords.second << "}#{" << values.first << "," << values.second << "}" << units;
     }
 };
 
-// Find a hidden pair for (cell, v1, v2) within `set`, if any, appending it to
-// `out`. Dedup is a scan of `out` -- this technique's own bucket, so every entry
-// downcasts to HiddenPairFinding.
+// Find the hidden pair for (cell, v1, v2) within `set`, if any, and merge it into
+// `found`. `found` holds what the caller has gathered for this one (cell, v1, v2)
+// across its units, so a pair hidden in two units is one finding that names both,
+// and the caller records it only once all three units have been through.
 template<class Set>
-bool find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set, FindingList &out) {
+bool find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set,
+                      std::vector<HiddenPairFinding> &found) {
     for (auto const &other_cell : set) {
         // is this candidate hidden pair good?
         if (!HiddenPairTechnique::test_hidden_pair(cell, other_cell, v1, v2, set)) continue;
 
-        // yes! but is it already recorded?
-        HiddenPairFinding hp({cell.coord(), other_cell.coord()}, {v1, v2});
+        // yes! but have we met it through another unit already?
+        HiddenPairFinding hp({cell.coord(), other_cell.coord()}, {v1, v2}, set.kind());
         bool already = false;
-        for (auto const &f : out) {
-            if (bucket_cast<HiddenPairFinding>(*f).same(hp)) { already = true; break; }
+        for (auto &f : found) {
+            if (f.same(hp)) { f.units.add(set.kind()); already = true; break; }
         }
         if (already) continue;
 
-        // no! let's record it
-        if (sVerbose) { std::cout << "  [fHP] "; hp.print(std::cout); std::cout << std::endl; }
-        out.push_back(std::make_shared<HiddenPairFinding>(hp));
+        // no! let's keep it
+        found.push_back(hp);
         return true;
     }
 
@@ -142,9 +149,19 @@ bool HiddenPairTechnique::find(const Board &board, FindingList &out) const {
                 assert(*pv2 != *pv1);
 
                 // let's see if we can find a hidden pair in the three cell sets
-                did_find |= find_hidden_pair(cell, *pv1, *pv2, board.row(cell), out);
-                did_find |= find_hidden_pair(cell, *pv1, *pv2, board.column(cell), out);
-                did_find |= find_hidden_pair(cell, *pv1, *pv2, board.nonet(cell), out);
+                std::vector<HiddenPairFinding> found;
+                find_hidden_pair(cell, *pv1, *pv2, board.row(cell), found);
+                find_hidden_pair(cell, *pv1, *pv2, board.column(cell), found);
+                find_hidden_pair(cell, *pv1, *pv2, board.nonet(cell), found);
+
+                // A pair is reached from its first cell only (the predicate wants c1
+                // before c2) and `found` is per (cell, v1, v2), so nothing here can
+                // already be in `out`: no dedup scan, just record.
+                for (auto const &hp : found) {
+                    if (sVerbose) { std::cout << "  [fHP] "; hp.print(std::cout); std::cout << std::endl; }
+                    out.push_back(std::make_shared<HiddenPairFinding>(hp));
+                    did_find = true;
+                }
             }
         }
     }

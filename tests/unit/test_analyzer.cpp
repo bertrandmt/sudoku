@@ -604,6 +604,48 @@ void test_naked_pair_accept_and_reject() {
           "rejected: a real pair with nothing to act on (would_act gate)");
 }
 
+// A naked pair's finding names every unit that holds both cells, and that is a
+// function of the cells alone: the same pair on a board where only one of those
+// units has anything to strike prints the same units. (0,0) and (0,1) share a row
+// and a nonet; (0,0) and (3,0) share only a column.
+void test_naked_pair_names_its_units() {
+    std::cout << "[naked pair] the finding line names every unit holding the pair\n";
+
+    auto rendered = [](Board &board) {
+        NakedPairTechnique np;
+        FindingList found;
+        if (!np.find(board, found) || found.size() != 1) return std::string("<no single finding>");
+        std::ostringstream os;
+        found.front()->print(os);
+        return os.str();
+    };
+
+    Board both = empty_board();
+    set_candidates(both, 0, 0, {3, 5});
+    set_candidates(both, 0, 1, {3, 5});
+    std::string got = rendered(both);
+    check(got == "{[1, 1],[1, 2]}#{3,5}[rn]", "a pair on a row inside one nonet: row and nonet, got " + got);
+
+    Board col = empty_board();
+    set_candidates(col, 0, 0, {3, 5});
+    set_candidates(col, 3, 0, {3, 5});
+    got = rendered(col);
+    check(got == "{[1, 1],[4, 1]}#{3,5}[c]", "a pair on a column across two nonets: the column alone, got " + got);
+
+    // Only the nonet has a cell left to strike: 3 and 5 are confined to the pair
+    // and the nonet's other cells, so the row has nothing to act on. The line still
+    // names the row, because the pair is a naked pair there whether or not that
+    // row has anything left to strike.
+    Board nonet_only = empty_board();
+    set_candidates(nonet_only, 0, 0, {3, 5});
+    set_candidates(nonet_only, 0, 1, {3, 5});
+    std::vector<std::pair<size_t, size_t>> keep = { {0, 0}, {0, 1}, {1, 0}, {1, 1}, {1, 2}, {2, 0}, {2, 1}, {2, 2} };
+    confine_value(nonet_only, kThree, keep);
+    confine_value(nonet_only, kFive, keep);
+    got = rendered(nonet_only);
+    check(got == "{[1, 1],[1, 2]}#{3,5}[rn]", "a pair whose row has nothing to strike still names the row, got " + got);
+}
+
 // ===========================================================================
 // Naked Triple
 // ===========================================================================
@@ -712,7 +754,8 @@ void test_naked_triple_find_and_apply() {
     if (found.size() == 1) {
         std::ostringstream os;
         found.front()->print(os);
-        check(os.str() == "{[1, 1],[1, 2],[1, 3]}#{1,2,3}", "find: records the cells and the span, got " + os.str());
+        check(os.str() == "{[1, 1],[1, 2],[1, 3]}#{1,2,3}[rn]",
+              "find: records the cells, the span and both units that hold them, got " + os.str());
     }
 
     check(nt.apply(board, found), "apply: acts on the triple");
@@ -732,10 +775,35 @@ void test_naked_triple_find_and_apply() {
     set_candidates(col, 6, 0, {4, 6});
     FindingList colfound;
     check(nt.find(col, colfound) && colfound.size() == 1, "find: a triple held by one column alone");
+    if (colfound.size() == 1) {
+        std::ostringstream os;
+        colfound.front()->print(os);
+        check(os.str() == "{[1, 1],[4, 1],[7, 1]}#{4,5,6}[c]", "find: names the one unit that holds it, got " + os.str());
+    }
     nt.apply(col, colfound);
     check(!has_candidate(col, 1, 0, kFive) && !has_candidate(col, 8, 0, kFour),
           "apply: the span is struck down the column");
     check(has_candidate(col, 0, 1, kFive), "apply: a cell beside the triple, in no shared unit, is untouched");
+
+    // The line names every unit that holds the triple, not only the one that has
+    // something left to strike. The span is confined to the triple and the nonet's
+    // cells off the row, so the row has nothing to act on and the nonet does.
+    Board nonet_only = empty_board();
+    set_candidates(nonet_only, 0, 0, {1, 2});
+    set_candidates(nonet_only, 0, 1, {2, 3});
+    set_candidates(nonet_only, 0, 2, {1, 3});
+    std::vector<std::pair<size_t, size_t>> keep = { {0, 0}, {0, 1}, {0, 2}, {1, 0}, {1, 1}, {1, 2}, {2, 0}, {2, 1}, {2, 2} };
+    confine_value(nonet_only, kOne, keep);
+    confine_value(nonet_only, kTwo, keep);
+    confine_value(nonet_only, kThree, keep);
+    FindingList nonet_found;
+    check(nt.find(nonet_only, nonet_found) && nonet_found.size() == 1, "find: a triple only its nonet can act on");
+    if (nonet_found.size() == 1) {
+        std::ostringstream os;
+        nonet_found.front()->print(os);
+        check(os.str() == "{[1, 1],[1, 2],[1, 3]}#{1,2,3}[rn]",
+              "find: still names the row, which holds the triple but has nothing to strike, got " + os.str());
+    }
 }
 
 // ===========================================================================
@@ -813,6 +881,58 @@ void test_hidden_pair_accept_and_reject() {
 
     check(!HiddenPairTechnique::test_hidden_pair(cell_at(partial, 0, 0), cell_at(partial, 0, 1), kThree, kFive, partial.row(cell_at(partial, 0, 0))),
           "rejected: partner carries 3 but not 5");
+}
+
+// A hidden pair's finding names the units the pair is *hidden* in, which is not
+// the units holding both cells. (0,0) and (0,1) share a row and a nonet. Each case
+// leaves the pair hidden in one unit, both, or neither of the two, by choosing
+// where the values 3 and 5 survive outside the pair, and the line follows.
+void test_hidden_pair_names_where_it_is_hidden() {
+    std::cout << "[hidden pair] the finding line names the units the pair is hidden in\n";
+
+    // Rendered findings of one board, joined, so a board that yields anything
+    // other than the single pair under test fails the comparison.
+    auto rendered = [](const Board &board) {
+        HiddenPairTechnique hp;
+        FindingList found;
+        if (!hp.find(board, found)) return std::string("<none>");
+        std::ostringstream os;
+        for (auto const &f : found) { f->print(os); os << ";"; }
+        return os.str();
+    };
+    auto board_with = [](std::initializer_list<std::pair<size_t, size_t>> extra) {
+        Board board = empty_board();
+        set_candidates(board, 0, 0, {3, 5, 8});
+        set_candidates(board, 0, 1, {3, 5, 9});
+        std::vector<std::pair<size_t, size_t>> keep = { {0, 0}, {0, 1} };
+        keep.insert(keep.end(), extra.begin(), extra.end());
+        confine_value(board, kThree, keep);
+        confine_value(board, kFive, keep);
+        return board;
+    };
+
+    // Nothing else carries 3 or 5 anywhere: hidden in the row and in the nonet.
+    std::string got = rendered(board_with({}));
+    check(got == "{[1, 1],[1, 2]}#{3,5}[rn];", "hidden in both the row and the nonet, got " + got);
+
+    // A cell of the nonet, off the row, carries 3 and 5: the row is still clear of
+    // them, the nonet is not.
+    got = rendered(board_with({ {1, 2} }));
+    check(got == "{[1, 1],[1, 2]}#{3,5}[r];", "hidden in the row only, got " + got);
+
+    // A cell of the row, outside the nonet, carries 3 and 5: the nonet is still
+    // clear of them, the row is not.
+    got = rendered(board_with({ {0, 5} }));
+    check(got == "{[1, 1],[1, 2]}#{3,5}[n];", "hidden in the nonet only, got " + got);
+
+    // Two cells on a column, across two nonets, hidden in the column alone.
+    Board col = empty_board();
+    set_candidates(col, 0, 0, {3, 5, 8});
+    set_candidates(col, 3, 0, {3, 5, 9});
+    confine_value(col, kThree, { {0, 0}, {3, 0} });
+    confine_value(col, kFive,  { {0, 0}, {3, 0} });
+    got = rendered(col);
+    check(got == "{[1, 1],[4, 1]}#{3,5}[c];", "hidden in the column that holds it, got " + got);
 }
 
 // ===========================================================================
@@ -1850,9 +1970,11 @@ int main() {
     test_ywing_rejects_non_patterns();
     test_notes_set_ops();
     test_naked_pair_accept_and_reject();
+    test_naked_pair_names_its_units();
     test_naked_triple_accept_and_reject();
     test_naked_triple_find_and_apply();
     test_hidden_pair_accept_and_reject();
+    test_hidden_pair_names_where_it_is_hidden();
     test_xwing_row_based();
     test_xwing_column_based();
     test_xwing_no_elimination();

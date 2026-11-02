@@ -15,14 +15,18 @@
 namespace {
 // File-local: NP's whitebox hook tests the predicate, not the finding, so nothing
 // outside this TU needs to name or downcast NakedPairFinding. print() format:
-// "{coord1,coord2}#{value1,value2}".
+// "{coord1,coord2}#{value1,value2}[units]", where units is every unit that holds
+// both cells ("[c]", or "[cn]" for a pair on a line that is also in one nonet).
+// That is a function of the cells alone, so it is the same whichever unit find()
+// reached the pair through, and it is the set apply() strikes in.
 struct NakedPairFinding : Finding {
     std::pair<Coord, Coord> coords;
     std::pair<Value, Value> values;
-    NakedPairFinding(std::pair<Coord, Coord> c, std::pair<Value, Value> v) : coords(c), values(v) { }
+    UnitSet units;
+    NakedPairFinding(std::pair<Coord, Coord> c, std::pair<Value, Value> v, UnitSet u) : coords(c), values(v), units(u) { }
     bool same(const NakedPairFinding &o) const { return coords == o.coords && values == o.values; }
     void print(std::ostream &o) const override {
-        o << "{" << coords.first << "," << coords.second << "}#{" << values.first << "," << values.second << "}";
+        o << "{" << coords.first << "," << coords.second << "}#{" << values.first << "," << values.second << "}" << units;
     }
 };
 
@@ -50,7 +54,7 @@ bool would_act(const Set &set, const Cell &c1, const Cell &c2, const Value &v1, 
 // Analyzer::find_naked_pair; the member vector dedup is now a scan of `out`
 // (this technique's own bucket, so every entry downcasts to NakedPairFinding).
 template<class Set>
-bool find_naked_pair(const Cell &cell, const Set &set, FindingList &out) {
+bool find_naked_pair(const Board &board, const Cell &cell, const Set &set, FindingList &out) {
     // cell is fixed across the loop, so its candidate pair is too; enumerate once.
     auto cellv = cell.notes().values();
 
@@ -59,7 +63,8 @@ bool find_naked_pair(const Cell &cell, const Set &set, FindingList &out) {
         if (!NakedPairTechnique::test_naked_pair(cell, pair_cell, set)) continue;
 
         // yes! but is it already recorded?
-        NakedPairFinding np({cell.coord(), pair_cell.coord()}, {cellv.at(0), cellv.at(1)});
+        NakedPairFinding np({cell.coord(), pair_cell.coord()}, {cellv.at(0), cellv.at(1)},
+                            board.units_holding({cell.coord(), pair_cell.coord()}));
         bool already = false;
         for (auto const &f : out) {
             if (bucket_cast<NakedPairFinding>(*f).same(np)) { already = true; break; }
@@ -163,9 +168,9 @@ bool NakedPairTechnique::find(const Board &board, FindingList &out) const {
         if (cell.notes().count() != 2) continue;
 
         // yes! let's see if we can find it a pair?
-        did_find |= find_naked_pair(cell, board.row(cell), out);
-        did_find |= find_naked_pair(cell, board.column(cell), out);
-        did_find |= find_naked_pair(cell, board.nonet(cell), out);
+        did_find |= find_naked_pair(board, cell, board.row(cell), out);
+        did_find |= find_naked_pair(board, cell, board.column(cell), out);
+        did_find |= find_naked_pair(board, cell, board.nonet(cell), out);
     }
 
     return did_find;
