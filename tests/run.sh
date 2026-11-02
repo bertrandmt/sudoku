@@ -149,6 +149,41 @@ S_fx="95124638776438195228397514651769382462941873543852761937516249889273456114
 P_fs="...5.2...6......9....9.8....42..........9..1..81......1..6..9.5....3.7.8......2.1"
 S_fs="893542176625713894417968523942351687576894312381276459138627945254139768769485231"
 
+# A puzzle that the pre-Naked-Triples solver could NOT crack, and that a naked
+# triple alone cracks. Singles, a naked pair and locked candidates carry it six
+# steps, then every technique in the cascade goes dry with 44 cells left. One naked
+# triple on {2,5,6} -- R1C5 {2,5}, R3C5 {2,5,6}, R3C6 {2,5,6}, all in the top-middle
+# nonet -- strikes 2 from R1C4 and 6 from R2C4 and R2C6, and singles carry the rest
+# of the way. So this fixture is load-bearing rather than merely reachable: unregister
+# NakedTripleTechnique and tier [1] fails here with "did not reach SOLVED!". It was
+# found by driving solver-plus-technique to a fixpoint over generated puzzles, not by
+# looking for the pattern: the pattern is common, and what had to hold was that the
+# solver is stuck without it and finishes with it.
+# S_nt was computed by an independent brute-force solver, which also confirmed the
+# puzzle has exactly one completion.
+P_nt=".1...36..3.2.4..5..9....7..2...8...1...5.....4..39....5............1..47.7...8.12"
+S_nt="715823694362749158894156723257684931139572486486391275541237869628915347973468512"
+
+# The board from the fixture comment on issue #70, and a STALL-PINNING fixture, not
+# a load-bearing one: Naked Triples is necessary for the step it unlocks, but the
+# board does not solve. The pre-Naked-Triples solver stops with 53 cells left and
+# every technique in the cascade dry. Two naked triples, both on {5,6,8} (column 3
+# and column 7), then strike ten candidates, and that makes Finned X-Wing available
+# where it was dry before: it strikes 5 from [7, 1] and [8, 1]. After that the
+# solver is stuck again with 53 cells left. What this pins is that interaction, in
+# three checks: tier [3] requires NT and FX both to fire, tier [7] pins the triples'
+# exact eliminations, and tier [1] requires that the board still does NOT solve, so
+# a later technique that does finish it fails there and prompts reclassifying this
+# board as a full-solve fixture. Unregister NakedTripleTechnique and the tier [3]
+# and tier [7] checks fail; the board has not been screened for whether a naked
+# quad, or anything else, finishes it.
+#
+# S_nts was computed by an independent brute-force solver, which also confirmed the
+# puzzle has exactly one completion. It is the soundness oracle for tier [2], like
+# S_hard, since the solver never reaches it.
+P_nts=".3452....2...6....1...7.2..4...5.3...6..8..7...9.4...1..7.1...9....9...7...73214."
+S_nts="934528716278163495156479283481957362563281974729346851347815629812694537695732148"
+
 echo "[0] Fixture sanity: puzzles and solutions are well-formed before they gate the solver"
 # A typo in a fixture would make a *correct* solver look broken, or mask a real
 # bug behind a "wrong grid" that is actually the fixture's fault. So validate the
@@ -207,7 +242,7 @@ fixture_ok() { # $1 = name, $2 = puzzle, $3 = solution
     why="$(consistent "$2" "$3")";    if [ -n "$why" ]; then bad "$1: solution contradicts a puzzle clue" "$why"; return; fi
     ok "$1: puzzle and solution are well-formed and consistent"
 }
-for name in easy med clm adv sf fx fs; do
+for name in easy med clm adv sf fx fs nt; do
     pvar="P_$name"; svar="S_$name"
     fixture_ok "$name" "${!pvar}" "${!svar}"
 done
@@ -216,9 +251,11 @@ done
 # clues consistent) -- a typo here would silently weaken the tier [2] soundness
 # check that relies on it.
 fixture_ok "hard" "$P_hard" "$S_hard"
+# P_nts stalls too (see its comment), so it is validated the same way.
+fixture_ok "nts" "$P_nts" "$S_nts"
 
 echo "[1] Full-solve correctness"
-for name in easy med clm adv sf fx fs; do
+for name in easy med clm adv sf fx fs nt; do
     pvar="P_$name"; svar="S_$name"
     out="$(printf 'n.%s\nr\np\n' "${!pvar}" | run_solver 2>&1)"
     got="$(printf '%s' "$out" | extract_grids | tail -1)"
@@ -230,6 +267,13 @@ for name in easy med clm adv sf fx fs; do
         bad "$name: solved to the WRONG grid" "got: ${got:-<none>}"
     fi
 done
+# P_nts is the one fixture here that must NOT solve: it pins a stall (see its
+# comment), and a technique that finishes it should be noticed, not absorbed.
+if printf 'n.%s\nr\n' "$P_nts" | run_solver 2>&1 | grep -q 'SOLVED!'; then
+    bad "nts: the stall-pinning board now solves -- reclassify it as a full-solve fixture"
+else
+    ok "nts: still stalls, as the stall-pinning fixture requires"
+fi
 
 echo "[2] Soundness: no step ever places a wrong value or removes a true candidate"
 # The core correctness property: every cell must always still list its true
@@ -278,7 +322,7 @@ elim_check() { # $1 = name, $2 = puzzle, $3 = solution
     else                           ok  "$1: every candidate grid still lists the solution's digits"
     fi
 }
-for name in easy med clm adv sf fx fs; do
+for name in easy med clm adv sf fx fs nt; do
     pvar="P_$name"; svar="S_$name"
     elim_check "$name" "${!pvar}" "${!svar}"
 done
@@ -286,6 +330,9 @@ done
 # short of a full solution but every step it takes (the Swordfish step included)
 # must still be sound. Checked against the independently-computed S_hard.
 elim_check "hard" "$P_hard" "$S_hard"
+# Same for P_nts: it stalls, but the naked triple step and the finned X-Wing step
+# after it must each leave every solution digit in place.
+elim_check "nts" "$P_nts" "$S_nts"
 
 echo "[3] Per-technique: advanced analyzers actually apply eliminations"
 # Applied steps look like '[XW] [3, 8] x9 [r]' (tag, space, coordinate).
@@ -309,6 +356,11 @@ vout_fx="$(printf 'v\nn.%s\nr\n' "$P_fx" | run_solver 2>&1)"
 check_tech "$vout_fx" FX "Finned X-Wing"
 vout_fs="$(printf 'v\nn.%s\nr\n' "$P_fs" | run_solver 2>&1)"
 check_tech "$vout_fs" FS "Finned Swordfish"
+vout_nt="$(printf 'v\nn.%s\nr\n' "$P_nt" | run_solver 2>&1)"
+check_tech "$vout_nt" NT "Naked Triple (full-solve fixture)"
+vout_nts="$(printf 'v\nn.%s\nr\n' "$P_nts" | run_solver 2>&1)"
+check_tech "$vout_nts" NT "Naked Triple (stall-pinning fixture)"
+check_tech "$vout_nts" FX "Finned X-Wing (dry on this board until naked triples fire)"
 vout_adv="$(printf 'v\nn.%s\nr\n' "$P_adv" | run_solver 2>&1)"
 check_tech "$vout_adv" SC "Simple Coloring"
 check_tech "$vout_adv" YW "Y-Wing"
@@ -496,6 +548,20 @@ prec_check "hidden pair"       HP "$P_clm" "[HP] [4, 8] x3 {[4, 8],[5, 8]}#{2,5}
 [HP] [5, 8] x3 {[4, 8],[5, 8]}#{2,5}
 [HP] [5, 8] x7 {[4, 8],[5, 8]}#{2,5}
 [HP] [5, 8] x9 {[4, 8],[5, 8]}#{2,5}"
+# Naked triples on P_nts: both patterns act in the one step. Column 3 holds
+# {5,8}, {5,6,8}, {5,6,8} in rows 2, 3 and 9 and column 7 holds {5,6,8} three
+# times in rows 6, 7 and 8; each strikes its span from the rest of the column.
+# Checked against the candidate grid at the firing step.
+prec_check "naked triple"      NT "$P_nts" "[NT] [1, 7] x6 [c]
+[NT] [1, 7] x8 [c]
+[NT] [2, 7] x5 [c]
+[NT] [2, 7] x8 [c]
+[NT] [4, 3] x8 [c]
+[NT] [5, 3] x5 [c]
+[NT] [5, 7] x5 [c]
+[NT] [8, 3] x5 [c]
+[NT] [8, 3] x6 [c]
+[NT] [8, 3] x8 [c]"
 prec_check "x-wing"            XW "$P_clm" "[XW] [1, 4] x7 [c]
 [XW] [5, 4] x7 [c]
 [XW] [8, 4] x7 [c]
@@ -754,6 +820,7 @@ Y-Wing|## Y-Wing|1|$P_yw1
 Swordfish|## Swordfish|1|$P_sf
 Finned X-Wing|## Finned X-Wing|1|$P_fx
 Finned Swordfish|## Finned Swordfish|1|$P_fs
+Naked Triples|## Naked Triples|1|$P_nts
 XY-Chain|## XY-Chain|1|$P_xy2
 EOF
 

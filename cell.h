@@ -102,6 +102,14 @@ public:
     // shared_value, zero shared candidates is a legal answer, not an assert.
     bool intersects(const Notes &other) const { return (mNotes & other.mNotes) != 0; }
 
+    // The candidates held by either set. Naked triples ask whether three cells
+    // together span exactly three values, which is a question about the union.
+    Notes united(const Notes &other) const {
+        Notes both = *this;
+        both.mNotes |= other.mNotes;
+        return both;
+    }
+
     // The single candidate this set shares with other. Mirror of other_value on
     // the intersection: AND the masks, require exactly one bit, read its value.
     Value shared_value(const Notes &other) const {

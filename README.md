@@ -174,6 +174,7 @@ Notes remaining: 210
 [NP](0) {}
 [LC](0) {}
 [HP](0) {}
+[NT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
@@ -190,6 +191,7 @@ The implemented heuristics are:
 1. `naked-pairs`, denoted as `[NP]`,
 1. `locked-candidates`, denoted as `[LC]`,
 1. `hidden-pairs`, denoted as `[HP]`,
+1. `naked-triples`, denoted as `[NT]`,
 1. `x-wing`, denoted as `[XW]`,
 1. `simple-coloring`, denoted as `[SC]`,
 1. `y-wing`, denoted as `[YW]`,
@@ -247,6 +249,83 @@ For example:
 
 This indicates there are two hidden pairs at that point in the resolution of a particular board. The first hidden pair is cells at row 3, column 1 and row 9, column 1 (on the same column), for candidate values 4 and 6.
 
+## Naked Triples
+
+Naked triples are the next member of the naked family after the pairs: three note cells in the same set (row, column or nonet) whose candidates together span exactly three values. Those three values must fill those three cells, so they can be struck from every other cell of the set. Unlike a naked pair, the cells need not agree. Each holds two or three of the values, so `{5,8}`, `{5,6,8}` and `{5,6,8}` is a triple, and so is `{1,2}`, `{2,3}` and `{1,3}`. A triple with nothing to strike is not reported.
+
+The syntax is that of the hidden pair with a third coordinate and a third value. For example, on a board where every cheaper heuristic has gone dry:
+```
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |     |     ][     |     |*    ][     |*    |     ]
+[    *|  3  |  4  ][  5  |  2  |     ][    *|    *|    *]
+[* * *|     |     ][     |     |  * *][* * *|  * *|  *  ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][*   *|     |*   *][     |*    |    *]
+[  2  |  *  |  *  ][*    |  6  |*    ][* *  |  *  |* *  ]
+[     |* * *|  *  ][  * *|     |  * *][* * *|  * *|  *  ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][    *|     |    *][     |     |    *]
+[  1  |  *  |  * *][*    |  7  |*    ][  2  |  * *|* * *]
+[     |  * *|  *  ][  * *|     |  * *][     |  * *|  *  ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |* *  |* *  ][* *  |     |*    ][     |     |  *  ]
+[  4  |     |     ][    *|  5  |    *][  3  |    *|    *]
+[     |* *  |  *  ][    *|     |*   *][     |  * *|  *  ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|     |* * *][* * *|     |*   *][     |     |  *  ]
+[  *  |  6  |  *  ][     |  8  |     ][* *  |  7  |* *  ]
+[     |     |     ][    *|     |    *][    *|     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|  *  |     ][  * *|     |    *][     |     |     ]
+[  *  |  *  |  9  ][    *|  4  |    *][  * *|  * *|  1  ]
+[* *  |* *  |     ][     |     |*    ][  *  |  *  |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[    *|  *  |     ][     |     |     ][     |  * *|     ]
+[  * *|* *  |  7  ][*   *|  1  |* * *][  * *|     |  9  ]
+[  *  |  *  |     ][  *  |     |  *  ][  *  |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|* *  |* * *][     |     |     ][     |  * *|     ]
+[  * *|* *  |  * *][*   *|  9  |* * *][  * *|     |  7  ]
+[  *  |  *  |  *  ][  *  |     |  *  ][  *  |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][     |     |     ][     |     |     ]
+[  * *|  *  |  * *][  7  |  3  |  2  ][  1  |  4  |  * *]
+[  * *|  * *|  *  ][     |     |     ][     |     |  *  ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+Left to solve:   53
+Notes remaining: 189
+[NS](0) {}
+[HS](0) {}
+[NP](0) {}
+[LC](0) {}
+[HP](0) {}
+[NT](2) {{{[2, 3],[3, 3],[9, 3]}#{5,6,8}}, {{[6, 7],[7, 7],[8, 7]}#{5,6,8}}}
+[XW](0) {}
+[SC](0) {}
+[YW](0) {}
+[SF](0) {}
+[FX](0) {}
+[FS](0) {}
+[XY](0) {}
+```
+This indicates two naked triples, both on candidates 5, 6 and 8. The first is in cells at row 2, column 3 (candidates 5 and 8), row 3, column 3 (5, 6 and 8) and row 9, column 3 (5, 6 and 8), all in column 3. The second is in cells at row 6, column 7, row 7, column 7 and row 8, column 7, each holding 5, 6 and 8, all in column 7. The action taken is to strike 5, 6 and 8 from the other cells of the column: 8 from row 4, 5 from row 5 and 5, 6 and 8 from row 8 in column 3, and likewise in column 7.
+
+On execution, the solver acts on both triples in one step:
+```
+λ >
+Step #3:
+[NT] [4, 3] x8 [c]
+[NT] [5, 3] x5 [c]
+[NT] [8, 3] x5 [c]
+[NT] [8, 3] x6 [c]
+[NT] [8, 3] x8 [c]
+[NT] [1, 7] x6 [c]
+[NT] [1, 7] x8 [c]
+[NT] [2, 7] x5 [c]
+[NT] [2, 7] x8 [c]
+[NT] [5, 7] x5 [c]
+```
+
 ## X-Wing
 
 The Sudoku Wiki [explainer page](https://www.sudokuwiki.org/x_wing_strategy) on the X-Wing Strategy states: "When there are only two possible cells for a value in each of two different rows, and these candidates lie also in the same columns, then all other candidates for this value in the columns can be eliminated." The same is true when swapping rows and columns. There is an additional dimension when considering nonets instead of rows/columns, but that dimension does not usually fall under the X-Wing Strategy moniker.
@@ -297,6 +376,7 @@ Notes remaining: 178
 [NP](0) {}
 [LC](0) {}
 [HP](0) {}
+[NT](0) {}
 [XW](1) {{{[5, 5],[9, 8]}#2[^r]}}
 [SC](0) {}
 [YW](0) {}
@@ -379,6 +459,7 @@ Notes remaining: 49
 [NP](0) {}
 [LC](0) {}
 [HP](0) {}
+[NT](0) {}
 [XW](0) {}
 [SC](1) {{{[4, 8]🟩,[6, 5]🟩,[6, 7]🟥,[8, 7]🟩,[9, 8]🟥}#4}}
 [YW](0) {}
@@ -439,6 +520,7 @@ Notes remaining: 47
 [NP](0) {}
 [LC](0) {}
 [HP](0) {}
+[NT](0) {}
 [XW](0) {}
 [SC](1) {{{[4, 8]🟩,[6, 5]🟩,[6, 7]🟥,[8, 7]🟩,[9, 5]🟥,[9, 8]🟥}#5}}
 [YW](0) {}
@@ -509,6 +591,7 @@ Notes remaining: 73
 [NP](0) {}
 [LC](0) {}
 [HP](0) {}
+[NT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](2) {{[3, 3]Y{[1, 2],[3, 6]}#9}, {[3, 3]Y{[2, 2],[3, 8]}#9}}
@@ -579,6 +662,7 @@ Notes remaining: 95
 [NP](0) {}
 [LC](0) {}
 [HP](0) {}
+[NT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
@@ -652,6 +736,7 @@ Notes remaining: 86
 [NP](0) {}
 [LC](0) {}
 [HP](0) {}
+[NT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
@@ -722,6 +807,7 @@ Notes remaining: 227
 [NP](0) {}
 [LC](0) {}
 [HP](0) {}
+[NT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
@@ -794,6 +880,7 @@ Notes remaining: 139
 [NP](0) {}
 [LC](0) {}
 [HP](0) {}
+[NT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
@@ -814,7 +901,7 @@ Step #9:
 
 ## Order of analysis and resolution
 
-The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring, Swordfish, Finned X-Wing, Finned Swordfish and XY-Chain.
+The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs, Naked Triples and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring, Swordfish, Finned X-Wing, Finned Swordfish and XY-Chain.
 
 # Editing the table
 

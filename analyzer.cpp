@@ -22,7 +22,7 @@ const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
     // spelled out here once and checked against the built registry below, rather
     // than left implicit in the sequence of push_backs.
     [[maybe_unused]] static constexpr const char *kCascade[] = {
-        "NS", "HS", "NP", "LC", "HP", "XW", "SC", "YW", "SF", "FX", "FS", "XY",
+        "NS", "HS", "NP", "LC", "HP", "NT", "XW", "SC", "YW", "SF", "FX", "FS", "XY",
     };
     static const std::vector<std::unique_ptr<Technique>> reg = [] {
         std::vector<std::unique_ptr<Technique>> r;
@@ -31,6 +31,7 @@ const std::vector<std::unique_ptr<Technique>> &Analyzer::registry() {
         r.push_back(std::make_unique<NakedPairTechnique>());
         r.push_back(std::make_unique<LockedCandidatesTechnique>());
         r.push_back(std::make_unique<HiddenPairTechnique>());
+        r.push_back(std::make_unique<NakedTripleTechnique>());
         r.push_back(std::make_unique<XWingTechnique>());
         r.push_back(std::make_unique<ColorChainTechnique>());
         r.push_back(std::make_unique<YWingTechnique>());

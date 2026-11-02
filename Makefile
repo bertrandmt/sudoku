@@ -35,6 +35,7 @@ src = coord.cpp \
 	  analyzer-nakedsingles.cpp \
 	  analyzer-hiddensingles.cpp \
 	  analyzer-nakedpairs.cpp \
+	  analyzer-nakedtriples.cpp \
 	  analyzer-lockedcandidates.cpp \
 	  analyzer-hiddenpairs.cpp \
 	  analyzer-xwing.cpp \

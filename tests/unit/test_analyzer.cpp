@@ -24,6 +24,7 @@
 #include "analyzer.h"
 #include "analyzer-nakedpairs.h"
 #include "analyzer-hiddenpairs.h"
+#include "analyzer-nakedtriples.h"
 #include "analyzer-xwing.h"
 #include "analyzer-colorchain.h"
 #include "analyzer-ywing.h"
@@ -88,11 +89,11 @@ struct AnalyzerTest {
     // static and YWingFinding is declared in analyzer-ywing.h -- both without
     // friendship.
 
-    // --- the fish / naked pair / hidden pair ---
-    // No hooks: every one of them is a standalone Technique. Naked pair and
-    // hidden pair are given-tuple shaped, so their test_naked_pair /
-    // test_hidden_pair are public statics the whitebox cases call directly. The
-    // fish -- plain X-Wing and Swordfish, and their finned variants -- are all
+    // --- the fish / naked pair / naked triple / hidden pair ---
+    // No hooks: every one of them is a standalone Technique. Naked pair, naked
+    // triple and hidden pair are given-tuple shaped, so their test_naked_pair /
+    // test_naked_triple / test_hidden_pair are public statics the whitebox cases
+    // call directly. The fish -- plain X-Wing and Swordfish, and their finned variants -- are all
     // scan-fused (no test_ predicate -- see docs/test-predicate-idiom.md); the
     // cases drive each one's per-anchor entry (XWingTechnique::find_xwing,
     // SwordfishTechnique::find_swordfish,
@@ -528,7 +529,7 @@ void test_ywing_rejects_non_patterns() {
 // The bitmask set primitives the analyzers now lean on (#28). Tested directly,
 // not just through their call sites, so a regression names the primitive.
 void test_notes_set_ops() {
-    std::cout << "[notes] bitmask set operations: ==, intersects, shared_value\n";
+    std::cout << "[notes] bitmask set operations: ==, intersects, united, shared_value\n";
     Notes a; a.clear(); a.set(kThree, true); a.set(kFive, true);   // {3,5}
     Notes b; b.clear(); b.set(kFive, true);  b.set(kThree, true);  // {3,5}, set reversed
     Notes c; c.clear(); c.set(kThree, true); c.set(kSix, true);    // {3,6}, overlaps a on 3
@@ -542,6 +543,14 @@ void test_notes_set_ops() {
     check(a.intersects(c), "intersects: {3,5} and {3,6} share one (3)");
     check(a.intersects(b), "intersects: {3,5} and {3,5} share two (3 and 5)");
     check(!a.intersects(d), "disjoint: {3,5} and {1,2} share nothing");
+
+    // united: the candidates held by either, without disturbing either operand.
+    Notes u = a.united(c);                                         // {3,5,6}
+    check(u.count() == 3 && u.check(kThree) && u.check(kFive) && u.check(kSix),
+          "united: {3,5} and {3,6} hold {3,5,6}");
+    check(a.count() == 2 && !a.check(kSix), "united: leaves its receiver unchanged");
+    check(a.united(b) == a, "united: {3,5} with itself is {3,5}");
+    check(a.united(d).count() == 4, "united: disjoint {3,5} and {1,2} hold four");
 
     // shared_value: the single common candidate.
     check(a.shared_value(c) == kThree, "shared_value: {3,5} and {3,6} share 3");
@@ -593,6 +602,139 @@ void test_naked_pair_accept_and_reject() {
 
     check(!NakedPairTechnique::test_naked_pair(cell_at(inert, 0, 0), cell_at(inert, 0, 1), inert.row(cell_at(inert, 0, 0))),
           "rejected: a real pair with nothing to act on (would_act gate)");
+}
+
+// ===========================================================================
+// Naked Triple
+// ===========================================================================
+
+// test_naked_triple is given-tuple shaped like test_naked_pair (see
+// docs/test-predicate-idiom.md) and a public static for the same reason. What a
+// pair cannot show is that the cells need not agree: a triple is any three cells
+// whose candidates *together* span three values. The cases below keep every other
+// cell of the row at all nine candidates, so a genuine triple is trivially
+// actionable and each reject case isolates the gate it names.
+void test_naked_triple_accept_and_reject() {
+    std::cout << "[naked triple] the span, size, order, membership and actionability gates\n";
+
+    auto judge = [](const Board &b, size_t r1, size_t c1, size_t r2, size_t c2, size_t r3, size_t c3) {
+        return NakedTripleTechnique::test_naked_triple(cell_at(b, r1, c1), cell_at(b, r2, c2), cell_at(b, r3, c3),
+                                                       b.row(cell_at(b, 0, 0)));
+    };
+
+    // --- span gate ---
+    // The cells disagree pairwise, so a check that demanded each cell hold all
+    // three values, or equal candidate sets as a pair does, would miss this.
+    Board spread = empty_board();
+    set_candidates(spread, 0, 0, {1, 2});
+    set_candidates(spread, 0, 1, {2, 3});
+    set_candidates(spread, 0, 2, {1, 3});
+    check(judge(spread, 0, 0, 0, 1, 0, 2), "accepted: {1,2}, {2,3}, {1,3} span exactly three values");
+
+    Board mixed = empty_board();
+    set_candidates(mixed, 0, 0, {1, 2, 3});
+    set_candidates(mixed, 0, 1, {1, 2, 3});
+    set_candidates(mixed, 0, 2, {2, 3});
+    check(judge(mixed, 0, 0, 0, 1, 0, 2), "accepted: {1,2,3}, {1,2,3}, {2,3} span exactly three values");
+
+    Board wide = empty_board();
+    set_candidates(wide, 0, 0, {1, 2});
+    set_candidates(wide, 0, 1, {2, 3});
+    set_candidates(wide, 0, 2, {3, 4});
+    check(!judge(wide, 0, 0, 0, 1, 0, 2), "rejected: {1,2}, {2,3}, {3,4} span four values");
+
+    // Three cells that share two values are a contradiction, not a triple: the
+    // span must be exactly three, and "at most three" would accept this.
+    Board narrow = empty_board();
+    set_candidates(narrow, 0, 0, {1, 2});
+    set_candidates(narrow, 0, 1, {1, 2});
+    set_candidates(narrow, 0, 2, {1, 2});
+    check(!judge(narrow, 0, 0, 0, 1, 0, 2), "rejected: {1,2}, {1,2}, {1,2} span only two values");
+
+    // --- size gate ---
+    // {1}, {1,2}, {2,3} also spans exactly {1,2,3}, so the span gate alone would
+    // let this through; a lone candidate is a naked single, not a triple member.
+    Board lone = empty_board();
+    set_candidates(lone, 0, 0, {1});
+    set_candidates(lone, 0, 1, {1, 2});
+    set_candidates(lone, 0, 2, {2, 3});
+    check(!judge(lone, 0, 0, 0, 1, 0, 2), "rejected: a single-candidate cell is a naked single, not a triple member");
+
+    // --- order and membership gates (reuse the accepting board) ---
+    check(!judge(spread, 0, 1, 0, 0, 0, 2), "rejected: cells passed out of order (second before first)");
+    check(!judge(spread, 0, 0, 0, 2, 0, 1), "rejected: cells passed out of order (third before second)");
+    check(!judge(spread, 0, 0, 0, 1, 0, 1), "rejected: the same cell passed twice");
+
+    Board stray = empty_board();
+    set_candidates(stray, 0, 0, {1, 2});
+    set_candidates(stray, 0, 1, {2, 3});
+    set_candidates(stray, 1, 0, {1, 3});   // the right candidates, but in row 1
+    check(!judge(stray, 0, 0, 0, 1, 1, 0), "rejected: the third cell is not in the set");
+
+    // --- actionability gate ---
+    // A real triple whose three values live nowhere else in the row has nothing to
+    // eliminate, so the predicate must decline.
+    Board inert = empty_board();
+    set_candidates(inert, 0, 0, {1, 2});
+    set_candidates(inert, 0, 1, {2, 3});
+    set_candidates(inert, 0, 2, {1, 3});
+    for (Value v : {kOne, kTwo, kThree}) confine_value(inert, v, { {0, 0}, {0, 1}, {0, 2} });
+    check(!judge(inert, 0, 0, 0, 1, 0, 2), "rejected: a real triple with nothing to act on (would_act gate)");
+
+    // Let the third value, and only it, live in one other cell: now there is
+    // exactly one candidate to eliminate, and it belongs to the last value.
+    Board last = empty_board();
+    set_candidates(last, 0, 0, {1, 2});
+    set_candidates(last, 0, 1, {2, 3});
+    set_candidates(last, 0, 2, {1, 3});
+    confine_value(last, kOne, { {0, 0}, {0, 1}, {0, 2} });
+    confine_value(last, kTwo, { {0, 0}, {0, 1}, {0, 2} });
+    confine_value(last, kThree, { {0, 0}, {0, 1}, {0, 2}, {0, 5} });
+    check(judge(last, 0, 0, 0, 1, 0, 2), "accepted: the only candidate to strip is the span's last value");
+}
+
+// find() records each triple once however many units hold it, and apply() strips
+// the span from every unit the triple shares. (0,0), (0,1), (0,2) sit in one row
+// and one nonet, so a find that dedups on the triple records one finding, and an
+// apply that acted on only the first unit would leave the nonet's cells alone.
+void test_naked_triple_find_and_apply() {
+    std::cout << "[naked triple] find dedups across units; apply strips every shared unit\n";
+
+    Board board = empty_board();
+    set_candidates(board, 0, 0, {1, 2});
+    set_candidates(board, 0, 1, {2, 3});
+    set_candidates(board, 0, 2, {1, 3});
+
+    NakedTripleTechnique nt;
+    FindingList found;
+    check(nt.find(board, found), "find: reports the triple");
+    check(found.size() == 1, "find: one finding for a triple that row and nonet both hold");
+    if (found.size() == 1) {
+        std::ostringstream os;
+        found.front()->print(os);
+        check(os.str() == "{[1, 1],[1, 2],[1, 3]}#{1,2,3}", "find: records the cells and the span, got " + os.str());
+    }
+
+    check(nt.apply(board, found), "apply: acts on the triple");
+    check(found.empty(), "apply: consumes its findings");
+    check(!has_candidate(board, 0, 5, kTwo), "apply: the span is struck from another cell of the row");
+    check(!has_candidate(board, 1, 1, kThree), "apply: the span is struck from a cell only the nonet shares");
+    check(has_candidate(board, 0, 5, kFour), "apply: a value outside the span stays in the row");
+    check(has_candidate(board, 3, 0, kOne), "apply: a cell in no shared unit is untouched");
+    check(has_candidate(board, 0, 0, kOne) && has_candidate(board, 0, 1, kThree),
+          "apply: the triple's own cells keep their candidates");
+
+    // A triple held only by a column: the nonet and row do not hold all three.
+    Board col = empty_board();
+    set_candidates(col, 0, 0, {4, 5});
+    set_candidates(col, 3, 0, {5, 6});
+    set_candidates(col, 6, 0, {4, 6});
+    FindingList colfound;
+    check(nt.find(col, colfound) && colfound.size() == 1, "find: a triple held by one column alone");
+    nt.apply(col, colfound);
+    check(!has_candidate(col, 1, 0, kFive) && !has_candidate(col, 8, 0, kFour),
+          "apply: the span is struck down the column");
+    check(has_candidate(col, 0, 1, kFive), "apply: a cell beside the triple, in no shared unit, is untouched");
 }
 
 // ===========================================================================
@@ -1500,8 +1642,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 12, "twelve registry buckets (NS, HS, NP, LC, HP, XW, SC, YW, SF, FX, FS, XY)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/XW/SC/YW/SF/FX/FS/XY short-circuited)");
+    check(AnalyzerTest::findings_bucket_count(a) == 13, "thirteen registry buckets (NS, HS, NP, LC, HP, NT, XW, SC, YW, SF, FX, FS, XY)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/NT/XW/SC/YW/SF/FX/FS/XY short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.
@@ -1707,6 +1849,8 @@ int main() {
     test_ywing_rejects_non_patterns();
     test_notes_set_ops();
     test_naked_pair_accept_and_reject();
+    test_naked_triple_accept_and_reject();
+    test_naked_triple_find_and_apply();
     test_hidden_pair_accept_and_reject();
     test_xwing_row_based();
     test_xwing_column_based();
