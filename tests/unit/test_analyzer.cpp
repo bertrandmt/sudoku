@@ -93,10 +93,10 @@ struct AnalyzerTest {
     // No hooks: every one of them is a standalone Technique. Naked pair, naked
     // triple and hidden pair are given-tuple shaped, so their test_naked_pair /
     // test_naked_triple / test_hidden_pair are public statics the whitebox cases
-    // call directly. The fish -- plain X-Wing and Swordfish, and their finned variants -- are all
-    // scan-fused (no test_ predicate -- see docs/test-predicate-idiom.md); the
-    // cases drive each one's per-anchor entry (XWingTechnique::find_xwing,
-    // SwordfishTechnique::find_swordfish,
+    // call directly. The fish -- plain X-Wing and Swordfish, and their finned
+    // variants -- are all scan-fused (no test_ predicate -- see
+    // docs/test-predicate-idiom.md); the cases drive each one's per-anchor entry
+    // (XWingTechnique::find_xwing, SwordfishTechnique::find_swordfish,
     // FinnedXWingTechnique::find_finned_xwing,
     // FinnedSwordfishTechnique::find_finned_swordfish) on crafted boards and
     // inspect the recorded finding, which each fish declares in its own header
@@ -721,7 +721,8 @@ void test_naked_triple_find_and_apply() {
     check(!has_candidate(board, 1, 1, kThree), "apply: the span is struck from a cell only the nonet shares");
     check(has_candidate(board, 0, 5, kFour), "apply: a value outside the span stays in the row");
     check(has_candidate(board, 3, 0, kOne), "apply: a cell in no shared unit is untouched");
-    check(has_candidate(board, 0, 0, kOne) && has_candidate(board, 0, 1, kThree),
+    check(has_candidate(board, 0, 0, kOne) && has_candidate(board, 0, 1, kThree)
+          && has_candidate(board, 0, 2, kOne),
           "apply: the triple's own cells keep their candidates");
 
     // A triple held only by a column: the nonet and row do not hold all three.
