@@ -25,7 +25,7 @@ Mapping every technique in the cascade:
 
 | Class | Pattern identity | Techniques | `test_`? |
 |-------|------------------|------------|----------|
-| **Given-tuple** | a small fixed-arity tuple the `find_` loop enumerates | naked single (1 cell), hidden single (cell+value), naked pair (2 cells), **hidden pair (2 cells + 2 values)**, Y-Wing (3 cells) | yes — natural |
+| **Given-tuple** | a small fixed-arity tuple the `find_` loop enumerates | naked single (1 cell), hidden single (cell+value), naked pair (2 cells), **hidden pair (2 cells + 2 values)**, naked triple (3 cells), Y-Wing (3 cells) | yes — natural |
 | **Materialized-object** | a standalone object built by an independent discovery step | simple coloring (`ColorChain`), XY-chain (chain vector) | yes — natural |
 | **Scan-fused** | membership emerges only from the validating scan; no tuple, no separable object | locked candidates, and all four fish: X-Wing, Swordfish, finned X-Wing, finned Swordfish | no — inline |
 
@@ -73,7 +73,7 @@ call `find_`, inspect the recorded pattern).
 
 ## Current state vs. the rule
 
-The partition the rule predicts is seven with `test_` (five given-tuple + two
+The partition the rule predicts is eight with `test_` (six given-tuple + two
 materialized-object) and the rest inline: every scan-fused technique, which is
 locked candidates plus all four fish. The codebase matches. The totals are spelled
 out once, here, rather than restated per class — a bare count repeated in several
@@ -89,6 +89,20 @@ places is exactly what went stale when the cascade last grew:
   member of `HiddenPairTechnique` and drop the friend hook; the whitebox suite
   calls `HiddenPairTechnique::test_hidden_pair` directly, backed by an explicit
   `Row` instantiation (see "A note on templates" below).
+
+- **Naked triple is given-tuple shaped, and takes the naked pair's seam.** Unlike
+  naked pair and hidden pair, which were ported onto the registry, it was added after
+  it, so it has no friend-hook history: `NakedTripleTechnique::test_naked_triple`
+  was a public `static` with an explicit `Row` instantiation from its first line.
+  Its identity is `(c1, c2, c3)` in ascending coord order, and the predicate judges
+  each tuple the `find_` loop hands it: same unit, two or three candidates per cell,
+  a union of exactly three values, and something left to strike. `NakedTripleFinding`
+  stays file-local, because the whitebox cases judge the predicate and drive `find`
+  and `apply` through the `Technique` interface, and never read a finding's fields.
+  The union question goes through `Notes::united`, per the rule that candidate-set
+  questions live on the bitmask. The one thing a pair's cases do not prepare for:
+  the three cells need not agree, so the accept cases use `{1,2}`, `{2,3}`, `{1,3}`
+  and not three equal sets.
 
 - **X-Wing correctly has no `test_`.** It is scan-fused; PR #24 removed the dead
   predicate and kept `find_xwing` inline, tested through `find_` like its fish
