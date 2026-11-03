@@ -25,6 +25,7 @@
 #include "analyzer-nakedpairs.h"
 #include "analyzer-hiddenpairs.h"
 #include "analyzer-nakedtriples.h"
+#include "analyzer-hiddentriples.h"
 #include "analyzer-xwing.h"
 #include "analyzer-colorchain.h"
 #include "analyzer-ywing.h"
@@ -89,12 +90,12 @@ struct AnalyzerTest {
     // static and YWingFinding is declared in analyzer-ywing.h -- both without
     // friendship.
 
-    // --- the fish / naked pair / naked triple / hidden pair ---
+    // --- the fish / naked pair / naked triple / hidden pair / hidden triple ---
     // No hooks: every one of them is a standalone Technique. Naked pair, naked
-    // triple and hidden pair are given-tuple shaped, so their test_naked_pair /
-    // test_naked_triple / test_hidden_pair are public statics the whitebox cases
-    // call directly. The fish -- plain X-Wing and Swordfish, and their finned
-    // variants -- are all scan-fused (no test_ predicate -- see
+    // triple, hidden pair and hidden triple are given-tuple shaped, so their
+    // test_naked_pair / test_naked_triple / test_hidden_pair / test_hidden_triple
+    // are public statics the whitebox cases call directly. The fish -- plain
+    // X-Wing and Swordfish, and their finned variants -- are all scan-fused (no test_ predicate -- see
     // docs/test-predicate-idiom.md); the cases drive each one's per-anchor entry
     // (XWingTechnique::find_xwing, SwordfishTechnique::find_swordfish,
     // FinnedXWingTechnique::find_finned_xwing,
@@ -529,7 +530,7 @@ void test_ywing_rejects_non_patterns() {
 // The bitmask set primitives the analyzers now lean on (#28). Tested directly,
 // not just through their call sites, so a regression names the primitive.
 void test_notes_set_ops() {
-    std::cout << "[notes] bitmask set operations: ==, intersects, united, shared_value\n";
+    std::cout << "[notes] bitmask set operations: ==, intersects, united, subset_of, shared_value\n";
     Notes a; a.clear(); a.set(kThree, true); a.set(kFive, true);   // {3,5}
     Notes b; b.clear(); b.set(kFive, true);  b.set(kThree, true);  // {3,5}, set reversed
     Notes c; c.clear(); c.set(kThree, true); c.set(kSix, true);    // {3,6}, overlaps a on 3
@@ -551,6 +552,16 @@ void test_notes_set_ops() {
     check(a.count() == 2 && !a.check(kSix), "united: leaves its receiver unchanged");
     check(a.united(b) == a, "united: {3,5} with itself is {3,5}");
     check(a.united(d).count() == 4, "united: disjoint {3,5} and {1,2} hold four");
+
+    // subset_of: every candidate of the receiver is in the argument. Not symmetric,
+    // and a set is a subset of itself and of a superset.
+    check(a.subset_of(b) && b.subset_of(a), "subset_of: {3,5} is a subset of itself");
+    check(a.subset_of(u), "subset_of: {3,5} is a subset of {3,5,6}");
+    check(!u.subset_of(a), "subset_of: {3,5,6} is not a subset of {3,5}");
+    check(!a.subset_of(c), "subset_of: {3,5} is not a subset of {3,6}, which overlaps it");
+    check(!a.subset_of(d), "subset_of: {3,5} is not a subset of the disjoint {1,2}");
+    Notes none; none.clear();
+    check(none.subset_of(a), "subset_of: the empty set is a subset of anything");
 
     // shared_value: the single common candidate.
     check(a.shared_value(c) == kThree, "shared_value: {3,5} and {3,6} share 3");
@@ -943,6 +954,177 @@ void test_hidden_pair_names_where_it_is_hidden() {
     confine_value(col, kFive,  { {0, 0}, {3, 0} });
     got = rendered(col);
     check(got == "{[1, 1],[4, 1]}#{3,5}[c];", "hidden in the column that holds it, got " + got);
+}
+
+// ===========================================================================
+// Hidden triple
+// ===========================================================================
+
+// test_hidden_triple is given-tuple shaped like test_hidden_pair (see
+// docs/test-predicate-idiom.md) and a public static for the same reason. What a
+// pair cannot show is that the cells need not agree: each value sits in two or
+// three of the three cells. Every case confines 1, 2 and 3 to the cells under test
+// and leaves those cells holding 4-9 as well, so a genuine triple is actionable and
+// each reject case isolates the gate it names.
+void test_hidden_triple_accept_and_reject() {
+    std::cout << "[hidden triple] the places, coverage, hidden, actionability, order and membership gates\n";
+
+    using Cells = std::vector<std::pair<size_t, size_t>>;
+    const Cells three = { {0, 0}, {0, 1}, {0, 2} };
+
+    auto judge = [](const Board &b, size_t c1, size_t c2, size_t c3, Value v1, Value v2, Value v3) {
+        return HiddenTripleTechnique::test_hidden_triple(cell_at(b, 0, c1), cell_at(b, 0, c2), cell_at(b, 0, c3),
+                                                         v1, v2, v3, b.row(cell_at(b, 0, 0)));
+    };
+    auto judge123 = [&](const Board &b) { return judge(b, 0, 1, 2, kOne, kTwo, kThree); };
+
+    // --- accepting boards ---
+    Board all = empty_board();
+    for (Value v : {kOne, kTwo, kThree}) confine_value(all, v, three);
+    check(judge123(all), "accepted: 1, 2 and 3 each in all three cells, which hold more to strip");
+
+    // The cells disagree pairwise: 1 in the first two, 2 in the last two, 3 in the
+    // outer two. A check that demanded every value in every cell would miss this.
+    Board spread = empty_board();
+    confine_value(spread, kOne,   { {0, 0}, {0, 1} });
+    confine_value(spread, kTwo,   { {0, 1}, {0, 2} });
+    confine_value(spread, kThree, { {0, 0}, {0, 2} });
+    check(judge123(spread), "accepted: each value in two of the three cells, covering all three");
+
+    // --- places gate ---
+    // 1 in a single cell is a hidden single. Every cell still carries one of the
+    // values and nothing else holds them, so only the two-places gate can reject.
+    Board lone = empty_board();
+    confine_value(lone, kOne,   { {0, 0} });
+    confine_value(lone, kTwo,   three);
+    confine_value(lone, kThree, three);
+    check(!judge123(lone), "rejected: 1 sits in one cell only, a hidden single and not a triple member");
+
+    // --- coverage gate ---
+    // 1, 2 and 3 each sit in two cells, but both are the first two: the third cell
+    // carries none of them. Places and hidden both hold, so only coverage rejects.
+    // The same board with each of the other two cells left out isolates their gates.
+    Board uncovered = empty_board();
+    for (Value v : {kOne, kTwo, kThree}) confine_value(uncovered, v, { {0, 0}, {0, 1} });
+    check(!judge123(uncovered), "rejected: the third cell carries none of the three values");
+    Board uncovered_first = empty_board();
+    for (Value v : {kOne, kTwo, kThree}) confine_value(uncovered_first, v, { {0, 1}, {0, 2} });
+    check(!judge123(uncovered_first), "rejected: the first cell carries none of the three values");
+    Board uncovered_second = empty_board();
+    for (Value v : {kOne, kTwo, kThree}) confine_value(uncovered_second, v, { {0, 0}, {0, 2} });
+    check(!judge123(uncovered_second), "rejected: the second cell carries none of the three values");
+
+    // --- hidden gate ---
+    Board stray = empty_board();
+    confine_value(stray, kOne,   three);
+    confine_value(stray, kTwo,   three);
+    confine_value(stray, kThree, { {0, 0}, {0, 1}, {0, 2}, {0, 5} });
+    check(!judge123(stray), "rejected: a fourth cell carries 3, so {1,2,3} is not hidden");
+
+    // --- actionability gate ---
+    // The three cells hold exactly {1,2,3} and nothing else: a naked triple, with
+    // nothing for a hidden triple to strip.
+    Board naked = empty_board();
+    for (Value v : {kOne, kTwo, kThree}) confine_value(naked, v, three);
+    for (size_t c = 0; c < 3; ++c) set_candidates(naked, 0, c, {1, 2, 3});
+    check(!judge123(naked), "rejected: the cells hold only {1,2,3}, a naked triple with nothing to strip");
+
+    // One extra candidate in one cell is enough to act on.
+    Board one_extra = empty_board();
+    for (Value v : {kOne, kTwo, kThree}) confine_value(one_extra, v, three);
+    set_candidates(one_extra, 0, 0, {1, 2, 3});
+    set_candidates(one_extra, 0, 1, {1, 2, 3});
+    set_candidates(one_extra, 0, 2, {1, 2, 3, 4});
+    check(judge123(one_extra), "accepted: one cell holding a fourth candidate is enough to strip");
+
+    // --- order and membership gates (reuse the accepting board) ---
+    check(!judge(all, 1, 0, 2, kOne, kTwo, kThree), "rejected: cells passed out of order (second before first)");
+    check(!judge(all, 0, 2, 1, kOne, kTwo, kThree), "rejected: cells passed out of order (third before second)");
+    check(!judge(all, 0, 1, 1, kOne, kTwo, kThree), "rejected: the same cell passed twice");
+    check(!judge(all, 0, 1, 2, kTwo, kOne, kThree), "rejected: values passed out of order (v2 < v1)");
+    check(!judge(all, 0, 1, 2, kOne, kThree, kTwo), "rejected: values passed out of order (v3 < v2)");
+    check(!judge(all, 0, 1, 2, kOne, kOne, kTwo), "rejected: the same value passed twice");
+
+    // The set is row 1 in both cases and the coords stay ascending, so the order
+    // gates cannot be what rejects. (A middle cell outside a row cannot be isolated:
+    // with its neighbours both in the row, row-major order puts it in the row too.)
+    auto judge_in_row1 = [](const Board &b, size_t r1, size_t c1, size_t r2, size_t c2, size_t r3, size_t c3) {
+        return HiddenTripleTechnique::test_hidden_triple(cell_at(b, r1, c1), cell_at(b, r2, c2), cell_at(b, r3, c3),
+                                                         kOne, kTwo, kThree, b.row(cell_at(b, 1, 0)));
+    };
+    Board first_out = empty_board();
+    for (Value v : {kOne, kTwo, kThree}) confine_value(first_out, v, { {0, 5}, {1, 0}, {1, 1} });
+    check(!judge_in_row1(first_out, 0, 5, 1, 0, 1, 1), "rejected: the first cell is not in the set");
+    Board third_out = empty_board();
+    for (Value v : {kOne, kTwo, kThree}) confine_value(third_out, v, { {1, 0}, {1, 1}, {2, 0} });
+    check(!judge_in_row1(third_out, 1, 0, 1, 1, 2, 0), "rejected: the third cell is not in the set");
+}
+
+// find() records each triple once however many units it is hidden in, and apply()
+// strips the three cells whichever unit made the triple hidden. (0,0), (0,1), (0,2)
+// sit in one row and one nonet; the line names the units in which test_hidden_triple
+// accepts the triple, which is not always the units holding all three cells.
+void test_hidden_triple_find_and_apply() {
+    std::cout << "[hidden triple] find dedups across units and names where it is hidden; apply strips the cells\n";
+
+    using Cells = std::vector<std::pair<size_t, size_t>>;
+
+    // Rendered findings of one board, joined, so a board that yields anything
+    // other than the single triple under test fails the comparison.
+    auto rendered = [](const Board &board) {
+        HiddenTripleTechnique ht;
+        FindingList found;
+        if (!ht.find(board, found)) return std::string("<none>");
+        std::ostringstream os;
+        for (auto const &f : found) { f->print(os); os << ";"; }
+        return os.str();
+    };
+    auto board_with = [](const Cells &extra) {
+        Board board = empty_board();
+        Cells keep = { {0, 0}, {0, 1}, {0, 2} };
+        keep.insert(keep.end(), extra.begin(), extra.end());
+        for (Value v : {kOne, kTwo, kThree}) confine_value(board, v, keep);
+        return board;
+    };
+
+    // Nothing else carries 1, 2 or 3 anywhere: hidden in the row and in the nonet,
+    // and found once, not once per unit.
+    std::string got = rendered(board_with({}));
+    check(got == "{[1, 1],[1, 2],[1, 3]}#{1,2,3}[rn];", "hidden in both the row and the nonet, once, got " + got);
+
+    // A cell of the nonet, off the row, carries all three: the row is still clear of
+    // them, the nonet is not.
+    got = rendered(board_with({ {1, 1} }));
+    check(got == "{[1, 1],[1, 2],[1, 3]}#{1,2,3}[r];", "hidden in the row only, got " + got);
+
+    // A cell of the row, outside the nonet, carries all three: the nonet is still
+    // clear of them, the row is not.
+    got = rendered(board_with({ {0, 5} }));
+    check(got == "{[1, 1],[1, 2],[1, 3]}#{1,2,3}[n];", "hidden in the nonet only, got " + got);
+
+    // Three cells on a column, across three nonets, hidden in the column alone.
+    Board col = empty_board();
+    for (Value v : {kOne, kTwo, kThree}) confine_value(col, v, { {0, 0}, {3, 0}, {6, 0} });
+    got = rendered(col);
+    check(got == "{[1, 1],[4, 1],[7, 1]}#{1,2,3}[c];", "hidden in the column that holds it, got " + got);
+
+    // apply: every candidate but the triple's own goes from each of its three cells,
+    // and nothing outside them is touched.
+    Board board = board_with({});
+    HiddenTripleTechnique ht;
+    FindingList found;
+    check(ht.find(board, found) && found.size() == 1, "find: reports the triple");
+    check(ht.apply(board, found), "apply: acts on the triple");
+    check(found.empty(), "apply: consumes its findings");
+    bool stripped = true, kept = true;
+    for (size_t c = 0; c < 3; ++c) {
+        for (int v = 4; v <= 9; ++v) if (has_candidate(board, 0, c, static_cast<Value>(v))) stripped = false;
+        for (int v = 1; v <= 3; ++v) if (!has_candidate(board, 0, c, static_cast<Value>(v))) kept = false;
+    }
+    check(stripped, "apply: 4 through 9 are struck from all three cells");
+    check(kept, "apply: the triple's own values stay in all three cells");
+    check(has_candidate(board, 0, 5, kFour) && has_candidate(board, 1, 1, kNine),
+          "apply: cells outside the triple keep their candidates");
 }
 
 // ===========================================================================
@@ -1773,8 +1955,8 @@ void test_rebinding_ctor_carries_findings() {
 
     Analyzer a(board);
     a.analyze();
-    check(AnalyzerTest::findings_bucket_count(a) == 13, "thirteen registry buckets (NS, HS, NP, LC, HP, NT, XW, SC, YW, SF, FX, FS, XY)");
-    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/NT/XW/SC/YW/SF/FX/FS/XY short-circuited)");
+    check(AnalyzerTest::findings_bucket_count(a) == 14, "fourteen registry buckets (NS, HS, NP, LC, HP, NT, HT, XW, SC, YW, SF, FX, FS, XY)");
+    check(AnalyzerTest::findings_total(a) == 1, "the naked single was recorded in a's bucket (HS/NP/LC/HP/NT/HT/XW/SC/YW/SF/FX/FS/XY short-circuited)");
 
     // Copy the candidate grid and rebind onto it -- this is the ONLY operation
     // under test. b.analyze() is deliberately never called.
@@ -1985,6 +2167,8 @@ int main() {
     test_naked_triple_find_and_apply();
     test_hidden_pair_accept_and_reject();
     test_hidden_pair_names_where_it_is_hidden();
+    test_hidden_triple_accept_and_reject();
+    test_hidden_triple_find_and_apply();
     test_xwing_row_based();
     test_xwing_column_based();
     test_xwing_no_elimination();

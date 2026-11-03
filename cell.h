@@ -110,6 +110,11 @@ public:
         return both;
     }
 
+    // Whether every candidate of this set is also in other. Hidden triples ask
+    // whether a cell holds anything beyond the triple's values, which is the
+    // negation of this.
+    bool subset_of(const Notes &other) const { return (mNotes & ~other.mNotes) == 0; }
+
     // The single candidate this set shares with other. Mirror of other_value on
     // the intersection: AND the masks, require exactly one bit, read its value.
     Value shared_value(const Notes &other) const {

@@ -25,7 +25,7 @@ Mapping every technique in the cascade:
 
 | Class | Pattern identity | Techniques | `test_`? |
 |-------|------------------|------------|----------|
-| **Given-tuple** | a small fixed-arity tuple the `find_` loop enumerates | naked single (1 cell), hidden single (cell+value), naked pair (2 cells), **hidden pair (2 cells + 2 values)**, naked triple (3 cells), Y-Wing (3 cells) | yes — natural |
+| **Given-tuple** | a small fixed-arity tuple the `find_` loop enumerates | naked single (1 cell), hidden single (cell+value), naked pair (2 cells), **hidden pair (2 cells + 2 values)**, naked triple (3 cells), **hidden triple (3 cells + 3 values)**, Y-Wing (3 cells) | yes — natural |
 | **Materialized-object** | a standalone object built by an independent discovery step | simple coloring (`ColorChain`), XY-chain (chain vector) | yes — natural |
 | **Scan-fused** | membership emerges only from the validating scan; no tuple, no separable object | locked candidates, and all four fish: X-Wing, Swordfish, finned X-Wing, finned Swordfish | no — inline |
 
@@ -73,7 +73,7 @@ call `find_`, inspect the recorded pattern).
 
 ## Current state vs. the rule
 
-The partition the rule predicts is eight with `test_` (six given-tuple + two
+The partition the rule predicts is nine with `test_` (seven given-tuple + two
 materialized-object) and the rest inline: every scan-fused technique, which is
 locked candidates plus all four fish. The codebase matches. The totals are spelled
 out once, here, rather than restated per class — a bare count repeated in several
@@ -103,6 +103,22 @@ places is exactly what went stale when the cascade last grew:
   questions live on the bitmask. The one thing a pair's cases do not prepare for:
   the three cells need not agree, so the accept cases use `{1,2}`, `{2,3}`, `{1,3}`
   and not three equal sets.
+
+- **Hidden triple is given-tuple shaped, and takes the hidden pair's seam.** Its
+  identity is `(c1, c2, c3, v1, v2, v3)`, cells and values each in ascending order,
+  and `HiddenTripleTechnique::test_hidden_triple` is a public `static` with an explicit
+  `Row` instantiation, as `test_hidden_pair` is. `HiddenTripleFinding` stays
+  file-local: the whitebox cases judge the predicate and drive `find` and `apply`
+  through the `Technique` interface, and never read a finding's fields. No seam was
+  promoted beyond the predicate. The predicate judges each tuple the `find_` loop
+  hands it: all three cells in the unit and notes, each value in at least two of the
+  three cells, each cell carrying at least one of the values, no other cell of the
+  unit carrying any of them, and a cell with something left to strip. The last
+  question goes through `Notes::subset_of`, per the rule that candidate-set
+  questions live on the bitmask. What a pair's cases do not prepare for: the cells
+  need not agree, so the accept cases include one where each value sits in only two
+  of the three cells, and the two-places and coverage gates each need a board that
+  only they can reject.
 
 - **X-Wing correctly has no `test_`.** It is scan-fused; PR #24 removed the dead
   predicate and kept `find_xwing` inline, tested through `find_` like its fish

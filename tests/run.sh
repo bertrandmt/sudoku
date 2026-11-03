@@ -149,40 +149,64 @@ S_fx="95124638776438195228397514651769382462941873543852761937516249889273456114
 P_fs="...5.2...6......9....9.8....42..........9..1..81......1..6..9.5....3.7.8......2.1"
 S_fs="893542176625713894417968523942351687576894312381276459138627945254139768769485231"
 
-# A puzzle that the pre-Naked-Triples solver could NOT crack, and that a naked
-# triple alone cracks. Singles, a naked pair and locked candidates carry it six
-# steps, then every technique in the cascade goes dry with 44 cells left. One naked
-# triple on {2,5,6} -- R1C5 {2,5}, R3C5 {2,5,6}, R3C6 {2,5,6}, all in the top-middle
-# nonet -- strikes 2 from R1C4 and 6 from R2C4 and R2C6, and singles carry the rest
-# of the way. So this fixture is load-bearing rather than merely reachable: unregister
-# NakedTripleTechnique and tier [1] fails here with "did not reach SOLVED!". It was
-# found by driving solver-plus-technique to a fixpoint over generated puzzles, not by
-# looking for the pattern: the pattern is common, and what had to hold was that the
-# solver is stuck without it and finishes with it.
+# A puzzle that the cascade cannot finish without Naked Triples, and that a naked
+# triple alone cracks. Singles and locked candidates carry it six steps, then every
+# technique ahead of Naked Triples goes dry with 47 cells left. One naked triple on
+# {3,8,9} in row 7 -- R7C5 {3,8,9}, R7C7 {3,8,9}, R7C9 {3,9} -- strikes eight
+# candidates from R7C1, R7C2, R7C3, R7C4 and R7C6, and singles carry the rest of the
+# way. With NakedTripleTechnique unregistered (Hidden Triples still in the cascade)
+# the solver runs three XY-Chain steps, which place nothing, and stalls with 47 cells
+# left, so tier [1] fails here with "did not reach SOLVED!". It was found by driving
+# solver-plus-technique to a fixpoint over generated puzzles, not by looking for the
+# pattern: the pattern is common, and what had to hold was that the solver is stuck
+# without it and finishes with it, WITH Hidden Triples present. An earlier board here
+# (found when Naked Triples was added) stopped being load-bearing once Hidden Triples
+# landed, because Hidden Triples does the same job on it; this one replaces it.
 # S_nt was computed by an independent brute-force solver, which also confirmed the
 # puzzle has exactly one completion.
-P_nt=".1...36..3.2.4..5..9....7..2...8...1...5.....4..39....5............1..47.7...8.12"
-S_nt="715823694362749158894156723257684931139572486486391275541237869628915347973468512"
+P_nt=".9..1...4..547..8...6....5....9264...32..8...8...5...........6.......712.1......5"
+S_nt="798615324125473689346892157571926438932148576864357291457281963689534712213769845"
 
-# The board from the fixture comment on issue #70, and a STALL-PINNING fixture, not
-# a load-bearing one: Naked Triples is necessary for the step it unlocks, but the
-# board does not solve. The pre-Naked-Triples solver stops with 53 cells left and
-# every technique in the cascade dry. Two naked triples, both on {5,6,8} (column 3
-# and column 7), then strike ten candidates, and that makes Finned X-Wing available
-# where it was dry before: it strikes 5 from [7, 1] and [8, 1]. After that the
-# solver is stuck again with 53 cells left. What this pins is that interaction, in
-# three checks: tier [3] requires NT and FX both to fire, tier [7] pins the triples'
-# exact eliminations, and tier [1] requires that the board still does NOT solve, so
-# a later technique that does finish it fails there and prompts reclassifying this
-# board as a full-solve fixture. Unregister NakedTripleTechnique and the tier [3]
-# and tier [7] checks fail; the board has not been screened for whether a naked
-# quad, or anything else, finishes it.
+# The board from the fixture comment on issue #70. It began as a STALL-PINNING
+# fixture, and Hidden Triples reclassified it, as its tier [1] check had said a later
+# technique would: it is now a full-solve fixture. The pre-Naked-Triples solver stops
+# with 53 cells left and every technique in the cascade dry. Two naked triples, both
+# on {5,6,8} (column 3 and column 7), then strike ten candidates, and that leaves a
+# hidden triple on {1,2,4} in the bottom-left nonet, which strikes five more; singles
+# and a locked-candidates and naked-pair step carry the rest of the way. Before Hidden
+# Triples the naked triples made Finned X-Wing available instead, and the solver
+# stalled again after it; that interaction is gone, because Hidden Triples sits ahead
+# of Finned X-Wing and finishes the board first. What it pins now: tier [7] pins the
+# naked triples' exact eliminations, and unregistering HiddenTripleTechnique fails
+# tier [1] here with "did not reach SOLVED!". It does not need Naked Triples to
+# solve: with that unregistered, a hidden triple strikes a different triple first and
+# finishes the board, so P_nt above is the board load-bearing for Naked Triples.
 #
 # S_nts was computed by an independent brute-force solver, which also confirmed the
-# puzzle has exactly one completion. It is the soundness oracle for tier [2], like
-# S_hard, since the solver never reaches it.
+# puzzle has exactly one completion.
 P_nts=".3452....2...6....1...7.2..4...5.3...6..8..7...9.4...1..7.1...9....9...7...73214."
 S_nts="934528716278163495156479283481957362563281974729346851347815629812694537695732148"
+
+# A puzzle that the pre-Hidden-Triples solver could NOT crack, and that a hidden
+# triple alone cracks. Singles, locked candidates and a hidden pair carry it seven
+# steps (37 cells left). Without Hidden Triples the cascade then runs Simple Coloring,
+# Finned X-Wing, Locked Candidates, Naked Pairs, XY-Chain, a hidden single and Naked
+# Pairs, and stalls with 36 cells left. One hidden triple on {2,6,9} in column 3 --
+# R1C3 {2,5,9}, R4C3 {2,5,6}, R7C3 {6,9}, and no other cell of the column carries 2,
+# 6 or 9 -- strikes 5 from R1C3 and R4C3 and finishes the board wherever it sits in
+# the cascade (it also solves with Hidden Triples last); in its slot it fires at
+# step 8, ahead of Simple Coloring. The three cells disagree: each value sits in only
+# two of them. So this fixture is load-bearing rather than merely reachable:
+# unregister HiddenTripleTechnique and tier [1] fails here with "did not reach
+# SOLVED!". It was found by driving solver-plus-technique to a fixpoint over generated
+# puzzles, not by looking for the pattern: the pattern is rare, and what had to hold
+# was that the solver is stuck without it and finishes with it. It is the one with a
+# single firing, the fewest steps and the fewest givens of the 106 such puzzles in
+# 59323 generated.
+# S_ht was computed by an independent brute-force solver, which also confirmed the
+# puzzle has exactly one completion.
+P_ht=".1...4.6....2..8...6..7..........41..93.1.5..14..62.8.......14....79....8.......9"
+S_ht="319584762457236891268179354682957413793418526145362987976823145524791638831645279"
 
 echo "[0] Fixture sanity: puzzles and solutions are well-formed before they gate the solver"
 # A typo in a fixture would make a *correct* solver look broken, or mask a real
@@ -242,7 +266,7 @@ fixture_ok() { # $1 = name, $2 = puzzle, $3 = solution
     why="$(consistent "$2" "$3")";    if [ -n "$why" ]; then bad "$1: solution contradicts a puzzle clue" "$why"; return; fi
     ok "$1: puzzle and solution are well-formed and consistent"
 }
-for name in easy med clm adv sf fx fs nt; do
+for name in easy med clm adv sf fx fs nt nts ht; do
     pvar="P_$name"; svar="S_$name"
     fixture_ok "$name" "${!pvar}" "${!svar}"
 done
@@ -251,11 +275,9 @@ done
 # clues consistent) -- a typo here would silently weaken the tier [2] soundness
 # check that relies on it.
 fixture_ok "hard" "$P_hard" "$S_hard"
-# P_nts stalls too (see its comment), so it is validated the same way.
-fixture_ok "nts" "$P_nts" "$S_nts"
 
 echo "[1] Full-solve correctness"
-for name in easy med clm adv sf fx fs nt; do
+for name in easy med clm adv sf fx fs nt nts ht; do
     pvar="P_$name"; svar="S_$name"
     out="$(printf 'n.%s\nr\np\n' "${!pvar}" | run_solver 2>&1)"
     got="$(printf '%s' "$out" | extract_grids | tail -1)"
@@ -267,13 +289,6 @@ for name in easy med clm adv sf fx fs nt; do
         bad "$name: solved to the WRONG grid" "got: ${got:-<none>}"
     fi
 done
-# P_nts is the one fixture here that must NOT solve: it pins a stall (see its
-# comment), and a technique that finishes it should be noticed, not absorbed.
-if printf 'n.%s\nr\n' "$P_nts" | run_solver 2>&1 | grep -q 'SOLVED!'; then
-    bad "nts: the stall-pinning board now solves -- reclassify it as a full-solve fixture"
-else
-    ok "nts: still stalls, as the stall-pinning fixture requires"
-fi
 
 echo "[2] Soundness: no step ever places a wrong value or removes a true candidate"
 # The core correctness property: every cell must always still list its true
@@ -322,7 +337,7 @@ elim_check() { # $1 = name, $2 = puzzle, $3 = solution
     else                           ok  "$1: every candidate grid still lists the solution's digits"
     fi
 }
-for name in easy med clm adv sf fx fs nt; do
+for name in easy med clm adv sf fx fs nt nts ht; do
     pvar="P_$name"; svar="S_$name"
     elim_check "$name" "${!pvar}" "${!svar}"
 done
@@ -330,9 +345,6 @@ done
 # short of a full solution but every step it takes (the Swordfish step included)
 # must still be sound. Checked against the independently-computed S_hard.
 elim_check "hard" "$P_hard" "$S_hard"
-# Same for P_nts: it stalls, but the naked triple step and the finned X-Wing step
-# after it must each leave every solution digit in place.
-elim_check "nts" "$P_nts" "$S_nts"
 
 echo "[3] Per-technique: advanced analyzers actually apply eliminations"
 # Applied steps look like '[XW] [3, 8] x9 [r]' (tag, space, coordinate).
@@ -359,8 +371,10 @@ check_tech "$vout_fs" FS "Finned Swordfish"
 vout_nt="$(printf 'v\nn.%s\nr\n' "$P_nt" | run_solver 2>&1)"
 check_tech "$vout_nt" NT "Naked Triple (full-solve fixture)"
 vout_nts="$(printf 'v\nn.%s\nr\n' "$P_nts" | run_solver 2>&1)"
-check_tech "$vout_nts" NT "Naked Triple (stall-pinning fixture)"
-check_tech "$vout_nts" FX "Finned X-Wing (dry on this board until naked triples fire)"
+check_tech "$vout_nts" NT "Naked Triple (second full-solve fixture)"
+check_tech "$vout_nts" HT "Hidden Triple (the step that finishes it after the naked triples)"
+vout_ht="$(printf 'v\nn.%s\nr\n' "$P_ht" | run_solver 2>&1)"
+check_tech "$vout_ht" HT "Hidden Triple (full-solve fixture)"
 vout_adv="$(printf 'v\nn.%s\nr\n' "$P_adv" | run_solver 2>&1)"
 check_tech "$vout_adv" SC "Simple Coloring"
 check_tech "$vout_adv" YW "Y-Wing"
@@ -562,6 +576,13 @@ prec_check "naked triple"      NT "$P_nts" "[NT] [1, 7] x6 [c]
 [NT] [8, 3] x5 [c]
 [NT] [8, 3] x6 [c]
 [NT] [8, 3] x8 [c]"
+# Hidden triple on P_ht, the board it is load-bearing for: column 3 holds 2, 6 and 9
+# only in rows 1, 4 and 7 (R1C3 {2,5,9}, R4C3 {2,5,6}, R7C3 {6,9}), so the triple
+# strikes 5 from R1C3 and R4C3 and has nothing to strike in R7C3. Checked against the
+# candidate grid at the firing step. The lines carry the finding, so the bracket and
+# the cells are pinned here too.
+prec_check "hidden triple"     HT "$P_ht" "[HT] [1, 3] x5 {[1, 3],[4, 3],[7, 3]}#{2,6,9}[c]
+[HT] [4, 3] x5 {[1, 3],[4, 3],[7, 3]}#{2,6,9}[c]"
 prec_check "x-wing"            XW "$P_clm" "[XW] [1, 4] x7 [c]
 [XW] [5, 4] x7 [c]
 [XW] [8, 4] x7 [c]
@@ -611,6 +632,12 @@ prec_check "xy-chain"          XY "$P_xy2" "[XY] [5, 5] x2 ({[5, 8]:..:[6, 4]}#2
 # naked triple is accepted in a row and a nonet at once. No solution is stored,
 # since the check reads only that first finding line.
 P_nt2=".....5.24...1....53...68....3..96...72.3............6...3.....1.78.2..9.9..8..5.."
+# P_ht2 is the same kind of board for Hidden Triples: generated, one completion
+# confirmed by an independent brute-force solver, picked because its first hidden
+# triple is hidden in a row and a nonet at once. Its provenance is not recoverable
+# from the repo (a throwaway generator, not kept), so the check below pins what the
+# board does, not where it came from.
+P_ht2=".....5.1...63....8379.......4.........57.3..2...25.8....4.....5...86....8.....1.3"
 first_finding() { # $1 = tag, $2 = board -> the first "[f<tag>]" line, prefix stripped
     printf 'v\nn.%s\nr\n' "$2" | run_solver 2>&1 | grep -m1 "^  \\[f$1\\] " | sed 's/^  \[f..\] //'
 }
@@ -624,6 +651,7 @@ finding_check() { # $1 = name, $2 = tag, $3 = board, $4 = expected finding text
 }
 finding_check "naked pair"   NP "$P_xy2" "{[2, 7],[2, 9]}#{2,3}[rn]"
 finding_check "naked triple" NT "$P_nt2" "{[3, 7],[3, 8],[3, 9]}#{1,7,9}[rn]"
+finding_check "hidden triple" HT "$P_ht2" "{[8, 1],[8, 2],[8, 3]}#{1,3,5}[rn]"
 
 echo "[8] Editing and singles-only commands: =, x and s"
 # Tiers [1]-[7] never exercise the interactive editing commands ('=' set a
@@ -847,6 +875,7 @@ Swordfish|## Swordfish|1|$P_sf
 Finned X-Wing|## Finned X-Wing|1|$P_fx
 Finned Swordfish|## Finned Swordfish|1|$P_fs
 Naked Triples|## Naked Triples|1|$P_nts
+Hidden Triples|## Hidden Triples|1|$P_ht
 XY-Chain|## XY-Chain|1|$P_xy2
 EOF
 

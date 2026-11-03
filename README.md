@@ -175,6 +175,7 @@ Notes remaining: 210
 [LC](0) {}
 [HP](0) {}
 [NT](0) {}
+[HT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
@@ -192,6 +193,7 @@ The implemented heuristics are:
 1. `locked-candidates`, denoted as `[LC]`,
 1. `hidden-pairs`, denoted as `[HP]`,
 1. `naked-triples`, denoted as `[NT]`,
+1. `hidden-triples`, denoted as `[HT]`,
 1. `x-wing`, denoted as `[XW]`,
 1. `simple-coloring`, denoted as `[SC]`,
 1. `y-wing`, denoted as `[YW]`,
@@ -315,6 +317,7 @@ Notes remaining: 189
 [LC](0) {}
 [HP](0) {}
 [NT](2) {{{[2, 3],[3, 3],[9, 3]}#{5,6,8}[c]}, {{[6, 7],[7, 7],[8, 7]}#{5,6,8}[c]}}
+[HT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
@@ -339,6 +342,74 @@ Step #3:
 [NT] [2, 7] x5 [c]
 [NT] [2, 7] x8 [c]
 [NT] [5, 7] x5 [c]
+```
+
+## Hidden Triples
+
+Hidden triples are the hidden counterpart of naked triples, as hidden pairs are of naked pairs: three values that, within one set (row, column or nonet), can go only in the same three cells. Those three cells must hold those three values, so every other candidate is struck from them. As with the naked triple, the cells need not agree. Each value sits in two or three of the three cells and together they cover all three, so `{2,5,9}`, `{2,5,6}` and `{6,9}` hold a hidden triple on 2, 6 and 9 when no other cell of the set carries any of the three. A value confined to a single cell is a hidden single and is not counted. A triple with nothing to strike, one whose three cells already hold only its own values, is not reported.
+
+The syntax is that of the hidden pair with a third coordinate and a third value, and the bracket follows the same rule: it names the sets in which the triple is hidden, meaning no other cell of the set carries any of the three values. For example, on a board where every cheaper heuristic has gone dry:
+```
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[  * *|     |  *  ][    *|     |     ][  * *|     |  *  ]
+[  *  |  1  |  *  ][  *  |  8  |  4  ][     |  6  |  *  ]
+[    *|     |    *][     |     |     ][*    |     |*    ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|    *|     ][     |    *|     ][     |     |     ]
+[* *  |  *  |* *  ][  2  |  *  |  6  ][  8  |  9  |  1  ]
+[*    |*    |*    ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[  * *|     |     ][     |     |     ][  * *|  * *|     ]
+[  *  |  6  |  8  ][  1  |  7  |  9  ][     |  *  |  4  ]
+[     |     |     ][     |     |     ][     |     |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[  *  |     |  *  ][     |    *|     ][     |     |  * *]
+[  * *|  8  |  * *][  9  |  *  |  7  ][  4  |  1  |    *]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[  *  |     |     ][     |     |     ][     |  *  |  *  ]
+[    *|  9  |  3  ][  4  |  1  |  8  ][  5  |     |    *]
+[*    |     |     ][     |     |     ][     |*    |*    ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |     |     ][    *|     |     ][     |     |    *]
+[  1  |  4  |  *  ][  *  |  6  |  2  ][  9  |  8  |     ]
+[     |     |*    ][     |     |     ][     |     |*    ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+[     |    *|     ][     |     |    *][     |     |     ]
+[    *|  *  |    *][  8  |  2  |  *  ][  1  |  4  |  *  ]
+[    *|*    |    *][     |     |     ][     |     |*    ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[    *|  * *|*    ][     |     |*   *][     |  * *|     ]
+[* *  |  *  |* *  ][  7  |  9  |  *  ][  6  |  *  |  8  ]
+[     |     |     ][     |     |     ][     |     |     ]
++-----+-----+-----++-----+-----+-----++-----+-----+-----+
+[     |  * *|*    ][     |     |*   *][  * *|  * *|     ]
+[  8  |  *  |  *  ][  6  |  4  |  *  ][     |  *  |  9  ]
+[     |*    |*    ][     |     |     ][*    |*    |     ]
++=====+=====+=====++=====+=====+=====++=====+=====+=====+
+Left to solve:   37
+Notes remaining: 103
+[NS](0) {}
+[HS](0) {}
+[NP](0) {}
+[LC](0) {}
+[HP](0) {}
+[NT](0) {}
+[HT](1) {{{[1, 3],[4, 3],[7, 3]}#{2,6,9}[c]}}
+[XW](0) {}
+[SC](0) {}
+[YW](0) {}
+[SF](0) {}
+[FX](0) {}
+[FS](0) {}
+[XY](0) {}
+```
+This indicates one hidden triple, in the cells at row 1, column 3 (candidates 2, 5 and 9), row 4, column 3 (2, 5 and 6) and row 7, column 3 (6 and 9), all in column 3. Of the three values, 2 sits in the first two cells, 6 in the last two and 9 in the first and last, and no other cell of column 3 carries any of them, which the `[c]` says. The three cells are in three different nonets, so no nonet holds them all. The action taken is to strike everything but 2, 6 and 9 from the three cells, which here means 5 from row 1 and from row 4. The elimination lines repeat the entry after the cell and the candidate they strip, as the hidden pair's do:
+```
+λ >
+Step #8:
+[HT] [1, 3] x5 {[1, 3],[4, 3],[7, 3]}#{2,6,9}[c]
+[HT] [4, 3] x5 {[1, 3],[4, 3],[7, 3]}#{2,6,9}[c]
 ```
 
 ## X-Wing
@@ -392,6 +463,7 @@ Notes remaining: 178
 [LC](0) {}
 [HP](0) {}
 [NT](0) {}
+[HT](0) {}
 [XW](1) {{{[5, 5],[9, 8]}#2[^r]}}
 [SC](0) {}
 [YW](0) {}
@@ -475,6 +547,7 @@ Notes remaining: 49
 [LC](0) {}
 [HP](0) {}
 [NT](0) {}
+[HT](0) {}
 [XW](0) {}
 [SC](1) {{{[4, 8]🟩,[6, 5]🟩,[6, 7]🟥,[8, 7]🟩,[9, 8]🟥}#4}}
 [YW](0) {}
@@ -536,6 +609,7 @@ Notes remaining: 47
 [LC](0) {}
 [HP](0) {}
 [NT](0) {}
+[HT](0) {}
 [XW](0) {}
 [SC](1) {{{[4, 8]🟩,[6, 5]🟩,[6, 7]🟥,[8, 7]🟩,[9, 5]🟥,[9, 8]🟥}#5}}
 [YW](0) {}
@@ -607,6 +681,7 @@ Notes remaining: 73
 [LC](0) {}
 [HP](0) {}
 [NT](0) {}
+[HT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](2) {{[3, 3]Y{[1, 2],[3, 6]}#9}, {[3, 3]Y{[2, 2],[3, 8]}#9}}
@@ -678,6 +753,7 @@ Notes remaining: 95
 [LC](0) {}
 [HP](0) {}
 [NT](0) {}
+[HT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
@@ -752,6 +828,7 @@ Notes remaining: 86
 [LC](0) {}
 [HP](0) {}
 [NT](0) {}
+[HT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
@@ -823,6 +900,7 @@ Notes remaining: 227
 [LC](0) {}
 [HP](0) {}
 [NT](0) {}
+[HT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
@@ -896,6 +974,7 @@ Notes remaining: 139
 [LC](0) {}
 [HP](0) {}
 [NT](0) {}
+[HT](0) {}
 [XW](0) {}
 [SC](0) {}
 [YW](0) {}
@@ -916,7 +995,7 @@ Step #9:
 
 ## Order of analysis and resolution
 
-The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs, Naked Triples and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring, Swordfish, Finned X-Wing, Finned Swordfish and XY-Chain.
+The solver will stop analysis when a heuristic detects possible actions. The order of evaluation of heuristics is as in the ordered list above. When solving for a given heuristic, in a given step, the solver will execute on *all* possible actions for Naked Singles, Hidden Singles, Haked Pairs, Locked Candidates, Hidden Pairs, Naked Triples, Hidden Triples and Y-Wing, and on only the first possible action for X-Wing, Simple Coloring, Swordfish, Finned X-Wing, Finned Swordfish and XY-Chain.
 
 # Editing the table
 

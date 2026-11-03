@@ -38,6 +38,7 @@ src = coord.cpp \
 	  analyzer-nakedtriples.cpp \
 	  analyzer-lockedcandidates.cpp \
 	  analyzer-hiddenpairs.cpp \
+	  analyzer-hiddentriples.cpp \
 	  analyzer-xwing.cpp \
 	  analyzer-finnedxwing.cpp \
 	  analyzer-swordfish.cpp \
