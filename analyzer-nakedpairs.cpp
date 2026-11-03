@@ -11,19 +11,21 @@
 #include <cassert>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace {
 // File-local: NP's whitebox hook tests the predicate, not the finding, so nothing
 // outside this TU needs to name or downcast NakedPairFinding. print() format:
-// "{coord1,coord2}#{value1,value2}[units]", where units is every unit that holds
-// both cells ("[c]", or "[cn]" for a pair on a line that is also in one nonet).
-// That is a function of the cells alone, so it is the same whichever unit find()
-// reached the pair through, and it is the set apply() strikes in.
+// "{coord1,coord2}#{value1,value2}[units]", where units is every unit in which
+// test_naked_pair accepts the pair (see UnitSet in board.h for the one rule). That
+// is the units that hold both cells and have something to strike. apply() does not
+// look at it: it strikes in every unit holding both cells, and a unit the line
+// leaves out has nothing to strike.
 struct NakedPairFinding : Finding {
     std::pair<Coord, Coord> coords;
     std::pair<Value, Value> values;
     UnitSet units;
-    NakedPairFinding(std::pair<Coord, Coord> c, std::pair<Value, Value> v, UnitSet u) : coords(c), values(v), units(u) { }
+    NakedPairFinding(std::pair<Coord, Coord> c, std::pair<Value, Value> v, Unit u) : coords(c), values(v) { units.add(u); }
     bool same(const NakedPairFinding &o) const { return coords == o.coords && values == o.values; }
     void print(std::ostream &o) const override {
         o << "{" << coords.first << "," << coords.second << "}#{" << values.first << "," << values.second << "}" << units;
@@ -50,11 +52,12 @@ bool would_act(const Set &set, const Cell &c1, const Cell &c2, const Value &v1, 
     return would_act;
 }
 
-// Find a naked pair for `cell` within `set`, if any, appending it to `out`. Was
-// Analyzer::find_naked_pair; the member vector dedup is now a scan of `out`
-// (this technique's own bucket, so every entry downcasts to NakedPairFinding).
+// Find a naked pair for `cell` within `set`, if any, and merge it into `found`.
+// Was Analyzer::find_naked_pair. `found` holds what the caller has gathered for
+// this one `cell` across its units, so a pair accepted in two units is one finding
+// that names both, and the caller records it once all three units have been through.
 template<class Set>
-bool find_naked_pair(const Board &board, const Cell &cell, const Set &set, FindingList &out) {
+bool find_naked_pair(const Cell &cell, const Set &set, std::vector<NakedPairFinding> &found) {
     // cell is fixed across the loop, so its candidate pair is too; enumerate once.
     auto cellv = cell.notes().values();
 
@@ -62,18 +65,16 @@ bool find_naked_pair(const Board &board, const Cell &cell, const Set &set, Findi
         // is this candidate pair cell good?
         if (!NakedPairTechnique::test_naked_pair(cell, pair_cell, set)) continue;
 
-        // yes! but is it already recorded?
-        NakedPairFinding np({cell.coord(), pair_cell.coord()}, {cellv.at(0), cellv.at(1)},
-                            board.units_holding({cell.coord(), pair_cell.coord()}));
+        // yes! but have we met it through another unit already?
+        NakedPairFinding np({cell.coord(), pair_cell.coord()}, {cellv.at(0), cellv.at(1)}, set.kind());
         bool already = false;
-        for (auto const &f : out) {
-            if (bucket_cast<NakedPairFinding>(*f).same(np)) { already = true; break; }
+        for (auto &f : found) {
+            if (f.same(np)) { f.units.add(set.kind()); already = true; break; }
         }
         if (already) continue;
 
-        // no! let's record it
-        if (sVerbose) { std::cout << "  [fNP] "; np.print(std::cout); std::cout << std::endl; }
-        out.push_back(std::make_shared<NakedPairFinding>(np));
+        // no! let's keep it
+        found.push_back(np);
         return true;
     }
 
@@ -168,9 +169,19 @@ bool NakedPairTechnique::find(const Board &board, FindingList &out) const {
         if (cell.notes().count() != 2) continue;
 
         // yes! let's see if we can find it a pair?
-        did_find |= find_naked_pair(board, cell, board.row(cell), out);
-        did_find |= find_naked_pair(board, cell, board.column(cell), out);
-        did_find |= find_naked_pair(board, cell, board.nonet(cell), out);
+        std::vector<NakedPairFinding> found;
+        find_naked_pair(cell, board.row(cell), found);
+        find_naked_pair(cell, board.column(cell), found);
+        find_naked_pair(cell, board.nonet(cell), found);
+
+        // A pair is reached from its first cell only (the predicate wants c1 not
+        // after c2) and `found` is per cell, so nothing here can already be in
+        // `out`: no dedup scan, just record.
+        for (auto const &np : found) {
+            if (sVerbose) { std::cout << "  [fNP] "; np.print(std::cout); std::cout << std::endl; }
+            out.push_back(std::make_shared<NakedPairFinding>(np));
+            did_find = true;
+        }
     }
 
     return did_find;

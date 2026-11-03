@@ -220,18 +220,21 @@ This indicates there are two hidden singles in the board. The cell at row 2, col
 
 ## Naked Pairs
 
-Naked pairs are pairs of note cells with the same two (and only two) possible candidate values, in the same set (row, column or nonet). For example, after step 11 of the 1/26/25 puzzle in `notes.txt`:
+Naked pairs are pairs of note cells with the same two (and only two) possible candidate values, in the same set (row, column or nonet). For example, on the board of the XY-Chain example below, as loaded:
 ```
-[NP](1) {{{[5, 6],[6, 6]}#{5,9}[cn]}}
+[NP](1) {{{[2, 7],[2, 9]}#{2,3}[rn]}}
 ```
-This indicates there is one naked pair in the board, in cells at row 5, column 6 and row 6, column 6. Their common pair of possible values is 5 and 9. The bracket names every set that holds both cells, `r` for a row, `c` for a column and `n` for a nonet, in that order. These two cells share a column and a nonet, hence `[cn]`. The same entry is never printed once per set: a pair in two sets is one entry naming both.
+This indicates there is one naked pair in the board, in cells at row 2, column 7 and row 2, column 9. Their common pair of possible values is 2 and 3. The bracket names every set in which the pair has something to strike, `r` for a row, `c` for a column and `n` for a nonet, in that order. These two cells share a row and a nonet, and both have other cells holding 2 or 3, hence `[rn]`. A set that holds both cells but has nothing left to strike is left out, and a pair accepted in two sets is one entry naming both, not one entry per set.
 
-The action taken if acting on this entry is to remove 5 and 9 as candidates in the cells of every set the entry names. Here the column has no other cell holding 5 or 9, so only the nonet has anything to strike, and the elimination lines name the set they strike in:
+The action taken if acting on this entry is to remove 2 and 3 as candidates in the cells of those sets, and the elimination lines name the set they strike in:
 ```
-[NP] [5, 4] x5 [n]
-[NP] [6, 4] x5 [n]
+[NP] [2, 3] x2 [r]
+[NP] [2, 3] x3 [r]
+[NP] [2, 6] x3 [r]
+[NP] [1, 7] x2 [n]
+[NP] [1, 7] x3 [n]
+[NP] [3, 7] x3 [n]
 ```
-The bracket on the entry says where the pair lives, not where it struck, so it can name a set the elimination lines do not.
 
 ## Locked Candidates
 
@@ -256,7 +259,7 @@ For example:
 
 This indicates there are two hidden pairs at that point in the resolution of a particular board. The first hidden pair is cells at row 3, column 1 and row 9, column 1 (on the same column), for candidate values 4 and 6.
 
-Unlike a naked pair's, the bracket names the sets the pair is hidden in, meaning those where no other cell carries either value. That can be fewer than the sets holding both cells: two cells on a row and in one nonet can be hidden in the row and not in the nonet, which is printed `[r]`, or in both, printed `[rn]`. The elimination lines repeat the entry after the cell and the candidate they strip, so they carry the bracket too:
+The bracket follows the same rule as the naked pair's: it names the sets in which the pair is accepted, here the sets where it is hidden, meaning no other cell carries either value. That can be fewer than the sets holding both cells: two cells on a row and in one nonet can be hidden in the row and not in the nonet, which is printed `[r]`, or in both, printed `[rn]`. The elimination lines repeat the entry after the cell and the candidate they strip, so they carry the bracket too:
 ```
 [HP] [4, 8] x3 {[4, 8],[5, 8]}#{2,5}[cn]
 ```
@@ -265,7 +268,7 @@ Unlike a naked pair's, the bracket names the sets the pair is hidden in, meaning
 
 Naked triples are the next member of the naked family after the pairs: three note cells in the same set (row, column or nonet) whose candidates together span exactly three values. Those three values must fill those three cells, so they can be struck from every other cell of the set. Unlike a naked pair, the cells need not agree. Each holds two or three of the values, so `{5,8}`, `{5,6,8}` and `{5,6,8}` is a triple, and so is `{1,2}`, `{2,3}` and `{1,3}`. A triple with nothing to strike is not reported.
 
-The syntax is that of the naked pair with a third coordinate and a third value: the bracket names every set that holds all three cells. For example, on a board where every cheaper heuristic has gone dry:
+The syntax is that of the naked pair with a third coordinate and a third value: the bracket names every set in which the triple has something to strike. For example, on a board where every cheaper heuristic has gone dry:
 ```
 +=====+=====+=====++=====+=====+=====++=====+=====+=====+
 [     |     |     ][     |     |*    ][     |*    |     ]
@@ -320,7 +323,7 @@ Notes remaining: 189
 [FS](0) {}
 [XY](0) {}
 ```
-This indicates two naked triples, both on candidates 5, 6 and 8. The first is in cells at row 2, column 3 (candidates 5 and 8), row 3, column 3 (5, 6 and 8) and row 9, column 3 (5, 6 and 8), all in column 3. The second is in cells at row 6, column 7, row 7, column 7 and row 8, column 7, each holding 5, 6 and 8, all in column 7. Both are in a column only, which the `[c]` says: no nonet holds all three cells of either. A triple inside one nonet on a row or a column names both, as in `[rn]`. The action taken is to strike 5, 6 and 8 from the other cells of the column: 8 from row 4, 5 from row 5 and 5, 6 and 8 from row 8 in column 3, and likewise in column 7.
+This indicates two naked triples, both on candidates 5, 6 and 8. The first is in cells at row 2, column 3 (candidates 5 and 8), row 3, column 3 (5, 6 and 8) and row 9, column 3 (5, 6 and 8), all in column 3. The second is in cells at row 6, column 7, row 7, column 7 and row 8, column 7, each holding 5, 6 and 8, all in column 7. Both are in a column, which the `[c]` says; each spans two nonets, so no nonet holds all three cells. A triple inside one nonet on a row or a column can name both, as in `[rn]`. The action taken is to strike 5, 6 and 8 from the other cells of the column: 8 from row 4, 5 from row 5 and 5, 6 and 8 from row 8 in column 3, and likewise in column 7.
 
 On execution, the solver acts on both triples in one step:
 ```

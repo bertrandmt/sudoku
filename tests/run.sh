@@ -599,6 +599,28 @@ prec_check "y-wing"            YW "$P_yw1" "[YW] [1, 5] x9
 prec_check "xy-chain"          XY "$P_xy2" "[XY] [5, 5] x2 ({[5, 8]:..:[6, 4]}#2)
 [XY] [6, 7] x2 ({[5, 8]:..:[6, 4]}#2)"
 
+# Finding lines. The checks above read elimination lines, which name only the unit
+# they strike in, so none of them sees the bracket a finding line carries. These pin
+# the first "[fXX]" line a board prints, on boards where the pattern is accepted in
+# two units at once (a row and a nonet) and both units then strike. A bracket that
+# named only the unit find() reached the pattern through would print "[r]" here.
+# P_nt2 is a generated puzzle, not a hand-kept one: no solution is stored, only the
+# first naked triple the solver finds on it, so it checks nothing but that line.
+P_nt2=".....5.24...1....53...68....3..96...72.3............6...3.....1.78.2..9.9..8..5.."
+first_finding() { # $1 = tag, $2 = board -> the first "[f<tag>]" line, prefix stripped
+    printf 'v\nn.%s\nr\n' "$2" | run_solver 2>&1 | grep -m1 "^  \\[f$1\\] " | sed 's/^  \[f..\] //'
+}
+finding_check() { # $1 = name, $2 = tag, $3 = board, $4 = expected finding text
+    local got
+    got="$(first_finding "$2" "$3")"
+    if   [ -z "$got" ];     then bad "$1 ($2): no finding line printed"
+    elif [ "$got" = "$4" ]; then ok  "$1 ($2): the finding line names the units that accept it"
+    else bad "$1 ($2): finding line changed" "$(printf 'expected: %s\n--- got: %s' "$4" "$got")"
+    fi
+}
+finding_check "naked pair"   NP "$P_xy2" "{[2, 7],[2, 9]}#{2,3}[rn]"
+finding_check "naked triple" NT "$P_nt2" "{[3, 7],[3, 8],[3, 9]}#{1,7,9}[rn]"
+
 echo "[8] Editing and singles-only commands: =, x and s"
 # Tiers [1]-[7] never exercise the interactive editing commands ('=' set a
 # value, 'x' strike a candidate) or singles-only solving ('s'). Coverage showed

@@ -604,12 +604,11 @@ void test_naked_pair_accept_and_reject() {
           "rejected: a real pair with nothing to act on (would_act gate)");
 }
 
-// A naked pair's finding names every unit that holds both cells, and that is a
-// function of the cells alone: the same pair on a board where only one of those
-// units has anything to strike prints the same units. (0,0) and (0,1) share a row
-// and a nonet; (0,0) and (3,0) share only a column.
+// A naked pair's finding names the units in which test_naked_pair accepts it,
+// which is the units holding both cells that also have something to strike.
+// (0,0) and (0,1) share a row and a nonet; (0,0) and (3,0) share only a column.
 void test_naked_pair_names_its_units() {
-    std::cout << "[naked pair] the finding line names every unit holding the pair\n";
+    std::cout << "[naked pair] the finding line names the units that accept the pair\n";
 
     auto rendered = [](Board &board) {
         NakedPairTechnique np;
@@ -633,9 +632,8 @@ void test_naked_pair_names_its_units() {
     check(got == "{[1, 1],[4, 1]}#{3,5}[c]", "a pair on a column across two nonets: the column alone, got " + got);
 
     // Only the nonet has a cell left to strike: 3 and 5 are confined to the pair
-    // and the nonet's other cells, so the row has nothing to act on. The line still
-    // names the row, because the pair is a naked pair there whether or not that
-    // row has anything left to strike.
+    // and the nonet's other cells, so the row has nothing to act on. The predicate
+    // rejects the pair in the row (would_act), so the line names the nonet alone.
     Board nonet_only = empty_board();
     set_candidates(nonet_only, 0, 0, {3, 5});
     set_candidates(nonet_only, 0, 1, {3, 5});
@@ -643,7 +641,18 @@ void test_naked_pair_names_its_units() {
     confine_value(nonet_only, kThree, keep);
     confine_value(nonet_only, kFive, keep);
     got = rendered(nonet_only);
-    check(got == "{[1, 1],[1, 2]}#{3,5}[rn]", "a pair whose row has nothing to strike still names the row, got " + got);
+    check(got == "{[1, 1],[1, 2]}#{3,5}[n]", "a pair whose row has nothing to strike names the nonet alone, got " + got);
+
+    // The mirror: the values survive on the row outside the nonet only, so the
+    // nonet has nothing to strike and the line names the row alone.
+    Board row_only = empty_board();
+    set_candidates(row_only, 0, 0, {3, 5});
+    set_candidates(row_only, 0, 1, {3, 5});
+    std::vector<std::pair<size_t, size_t>> row_keep = { {0, 0}, {0, 1}, {0, 3}, {0, 4}, {0, 5}, {0, 6}, {0, 7}, {0, 8} };
+    confine_value(row_only, kThree, row_keep);
+    confine_value(row_only, kFive, row_keep);
+    got = rendered(row_only);
+    check(got == "{[1, 1],[1, 2]}#{3,5}[r]", "a pair whose nonet has nothing to strike names the row alone, got " + got);
 }
 
 // ===========================================================================
@@ -755,7 +764,7 @@ void test_naked_triple_find_and_apply() {
         std::ostringstream os;
         found.front()->print(os);
         check(os.str() == "{[1, 1],[1, 2],[1, 3]}#{1,2,3}[rn]",
-              "find: records the cells, the span and both units that hold them, got " + os.str());
+              "find: records the cells, the span and both units that accept it, got " + os.str());
     }
 
     check(nt.apply(board, found), "apply: acts on the triple");
@@ -785,9 +794,9 @@ void test_naked_triple_find_and_apply() {
           "apply: the span is struck down the column");
     check(has_candidate(col, 0, 1, kFive), "apply: a cell beside the triple, in no shared unit, is untouched");
 
-    // The line names every unit that holds the triple, not only the one that has
-    // something left to strike. The span is confined to the triple and the nonet's
-    // cells off the row, so the row has nothing to act on and the nonet does.
+    // The line names the units in which test_naked_triple accepts the triple. The
+    // span is confined to the triple and the nonet's cells off the row, so the row
+    // has nothing to act on (would_act) and the nonet alone is named.
     Board nonet_only = empty_board();
     set_candidates(nonet_only, 0, 0, {1, 2});
     set_candidates(nonet_only, 0, 1, {2, 3});
@@ -801,8 +810,8 @@ void test_naked_triple_find_and_apply() {
     if (nonet_found.size() == 1) {
         std::ostringstream os;
         nonet_found.front()->print(os);
-        check(os.str() == "{[1, 1],[1, 2],[1, 3]}#{1,2,3}[rn]",
-              "find: still names the row, which holds the triple but has nothing to strike, got " + os.str());
+        check(os.str() == "{[1, 1],[1, 2],[1, 3]}#{1,2,3}[n]",
+              "find: names the nonet alone, the row holds the triple but has nothing to strike, got " + os.str());
     }
 }
 
@@ -883,8 +892,8 @@ void test_hidden_pair_accept_and_reject() {
           "rejected: partner carries 3 but not 5");
 }
 
-// A hidden pair's finding names the units the pair is *hidden* in, which is not
-// the units holding both cells. (0,0) and (0,1) share a row and a nonet. Each case
+// A hidden pair's finding names the units the pair is *hidden* in (where
+// test_hidden_pair accepts it), which is not always the units holding both cells. (0,0) and (0,1) share a row and a nonet. Each case
 // leaves the pair hidden in one unit, both, or neither of the two, by choosing
 // where the values 3 and 5 survive outside the pair, and the line follows.
 void test_hidden_pair_names_where_it_is_hidden() {

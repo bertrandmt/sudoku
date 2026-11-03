@@ -5,7 +5,6 @@
 #include "cell.h"
 
 #include <cassert>
-#include <initializer_list>
 #include <iostream>
 #include <vector>
 #include <unordered_set>
@@ -36,6 +35,12 @@ constexpr std::string_view tag(Unit unit) {
 // finding that holds in two units prints one way. Streams as its tags inside one
 // bracket, "[rn]" -- the notation Hidden Singles and the elimination lines use,
 // widened to a set. Never printed empty: a finding holds in at least one unit.
+//
+// One rule for what a finding's set contains, shared by Naked Pairs, Hidden Pairs
+// and Naked Triples: the units in which the technique's own predicate accepts the
+// pattern (test_naked_pair, test_hidden_pair, test_naked_triple). Each find() runs
+// the predicate once per unit and merges the hits for one pattern into one finding,
+// so a unit appears only if the pattern is actionable there.
 class UnitSet {
 public:
     void add(Unit unit) { mBits |= bit(unit); }
@@ -119,11 +124,6 @@ public:
     bool see_each_other(const Cell &c1, const Cell &c2) const {
         return see_each_other(c1.coord(), c2.coord()).has_value();
     }
-
-    // every unit that holds all of the passed coords: one for coords on a line,
-    // two for coords on a line that also share a nonet, none if they share no
-    // unit at all.
-    UnitSet units_holding(std::initializer_list<Coord>) const;
 
     // do any two of the passed coords see each other? returns the unit shared by
     // the first such pair found, or nullopt if none do.

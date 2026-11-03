@@ -11,19 +11,21 @@
 #include <array>
 #include <cassert>
 #include <memory>
+#include <vector>
 
 namespace {
 // File-local: NT's whitebox hook tests the predicate, not the finding, so nothing
 // outside this TU needs to name or downcast NakedTripleFinding. print() format:
 // "{coord1,coord2,coord3}#{value1,value2,value3}[units]", where units is every unit
-// that holds all three cells ("[c]", or "[cn]" for a triple on a line that is also
-// in one nonet). That is a function of the cells alone, so it is the same whichever
-// unit find() reached the triple through, and it is the set apply() strikes in.
+// in which test_naked_triple accepts the triple (see UnitSet in board.h for the one
+// rule). That is the units that hold all three cells and have something to strike.
+// apply() does not look at it: it strikes in every unit holding all three cells,
+// and a unit the line leaves out has nothing to strike.
 struct NakedTripleFinding : Finding {
     std::array<Coord, 3> coords;
     std::array<Value, 3> values;
     UnitSet units;
-    NakedTripleFinding(std::array<Coord, 3> c, std::array<Value, 3> v, UnitSet u) : coords(c), values(v), units(u) { }
+    NakedTripleFinding(std::array<Coord, 3> c, std::array<Value, 3> v, Unit u) : coords(c), values(v) { units.add(u); }
     bool same(const NakedTripleFinding &o) const { return coords == o.coords && values == o.values; }
     void print(std::ostream &o) const override {
         o << "{" << coords[0] << "," << coords[1] << "," << coords[2] << "}#{"
@@ -51,13 +53,13 @@ bool would_act(const Set &set, const Cell &c1, const Cell &c2, const Cell &c3, c
     return false;
 }
 
-// Find every naked triple whose first cell is `cell` within `set`, appending each
-// to `out`. The predicate wants ascending coords, so a triple is reached from its
-// lowest cell only; the dedup scan of `out` (this technique's own bucket, so every
-// entry downcasts to NakedTripleFinding) catches the same triple reached again
-// through a second unit that holds all three cells.
+// Find every naked triple whose first cell is `cell` within `set`, merging each
+// into `found`. The predicate wants ascending coords, so a triple is reached from
+// its lowest cell only. `found` holds what the caller has gathered for this one
+// `cell` across its units, so a triple accepted in two units is one finding that
+// names both, and the caller records it once all three units have been through.
 template<class Set>
-bool find_naked_triple(const Board &board, const Cell &cell, const Set &set, FindingList &out) {
+bool find_naked_triple(const Cell &cell, const Set &set, std::vector<NakedTripleFinding> &found) {
     bool did_find = false;
 
     for (auto const &second : set) {
@@ -72,16 +74,14 @@ bool find_naked_triple(const Board &board, const Cell &cell, const Set &set, Fin
 
             auto span = cell.notes().united(second.notes()).united(third.notes()).values();
             NakedTripleFinding nt({cell.coord(), second.coord(), third.coord()},
-                                  {span.at(0), span.at(1), span.at(2)},
-                                  board.units_holding({cell.coord(), second.coord(), third.coord()}));
+                                  {span.at(0), span.at(1), span.at(2)}, set.kind());
             bool already = false;
-            for (auto const &f : out) {
-                if (bucket_cast<NakedTripleFinding>(*f).same(nt)) { already = true; break; }
+            for (auto &f : found) {
+                if (f.same(nt)) { f.units.add(set.kind()); already = true; break; }
             }
             if (already) continue;
 
-            if (sVerbose) { std::cout << "  [fNT] "; nt.print(std::cout); std::cout << std::endl; }
-            out.push_back(std::make_shared<NakedTripleFinding>(nt));
+            found.push_back(nt);
             did_find = true;
         }
     }
@@ -162,9 +162,18 @@ bool NakedTripleTechnique::find(const Board &board, FindingList &out) const {
         // can this note cell start a triple?
         if (!triple_sized(cell)) continue;
 
-        did_find |= find_naked_triple(board, cell, board.row(cell), out);
-        did_find |= find_naked_triple(board, cell, board.column(cell), out);
-        did_find |= find_naked_triple(board, cell, board.nonet(cell), out);
+        std::vector<NakedTripleFinding> found;
+        find_naked_triple(cell, board.row(cell), found);
+        find_naked_triple(cell, board.column(cell), found);
+        find_naked_triple(cell, board.nonet(cell), found);
+
+        // A triple is reached from its lowest cell only and `found` is per cell,
+        // so nothing here can already be in `out`: no dedup scan, just record.
+        for (auto const &nt : found) {
+            if (sVerbose) { std::cout << "  [fNT] "; nt.print(std::cout); std::cout << std::endl; }
+            out.push_back(std::make_shared<NakedTripleFinding>(nt));
+            did_find = true;
+        }
     }
 
     return did_find;
