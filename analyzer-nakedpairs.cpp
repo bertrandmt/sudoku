@@ -57,7 +57,7 @@ bool would_act(const Set &set, const Cell &c1, const Cell &c2, const Value &v1, 
 // this one `cell` across its units, so a pair accepted in two units is one finding
 // that names both, and the caller records it once all three units have been through.
 template<class Set>
-bool find_naked_pair(const Cell &cell, const Set &set, std::vector<NakedPairFinding> &found) {
+void find_naked_pair(const Cell &cell, const Set &set, std::vector<NakedPairFinding> &found) {
     // cell is fixed across the loop, so its candidate pair is too; enumerate once.
     auto cellv = cell.notes().values();
 
@@ -75,10 +75,8 @@ bool find_naked_pair(const Cell &cell, const Set &set, std::vector<NakedPairFind
 
         // no! let's keep it
         found.push_back(np);
-        return true;
+        return;
     }
-
-    return false;
 }
 
 // Apply one recorded pair to one `set`, eliminating its two values from the other

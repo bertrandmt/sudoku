@@ -893,9 +893,10 @@ void test_hidden_pair_accept_and_reject() {
 }
 
 // A hidden pair's finding names the units the pair is *hidden* in (where
-// test_hidden_pair accepts it), which is not always the units holding both cells. (0,0) and (0,1) share a row and a nonet. Each case
-// leaves the pair hidden in one unit, both, or neither of the two, by choosing
-// where the values 3 and 5 survive outside the pair, and the line follows.
+// test_hidden_pair accepts it), which is not always the units holding both
+// cells. (0,0) and (0,1) share a row and a nonet. Each case leaves the pair
+// hidden in one unit, both, or neither of the two, by choosing where the values
+// 3 and 5 survive outside the pair, and the line follows.
 void test_hidden_pair_names_where_it_is_hidden() {
     std::cout << "[hidden pair] the finding line names the units the pair is hidden in\n";
 

@@ -220,7 +220,7 @@ This indicates there are two hidden singles in the board. The cell at row 2, col
 
 ## Naked Pairs
 
-Naked pairs are pairs of note cells with the same two (and only two) possible candidate values, in the same set (row, column or nonet). For example, on the board of the XY-Chain example below, as loaded:
+Naked pairs are pairs of note cells with the same two (and only two) possible candidate values, in the same set (row, column or nonet). For example, on the board `n........94 76.91..5. .9...2.81 .7..5..1. ...7.9... .8..31.67 24.1...7. .1..9..45 9.....1..` (the XY-Chain example below uses it too), as loaded:
 ```
 [NP](1) {{{[2, 7],[2, 9]}#{2,3}[rn]}}
 ```

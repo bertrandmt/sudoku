@@ -37,7 +37,7 @@ struct HiddenPairFinding : Finding {
 // across its units, so a pair hidden in two units is one finding that names both,
 // and the caller records it only once all three units have been through.
 template<class Set>
-bool find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set,
+void find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const Set &set,
                       std::vector<HiddenPairFinding> &found) {
     for (auto const &other_cell : set) {
         // is this candidate hidden pair good?
@@ -53,10 +53,8 @@ bool find_hidden_pair(const Cell &cell, const Value &v1, const Value &v2, const 
 
         // no! let's keep it
         found.push_back(hp);
-        return true;
+        return;
     }
-
-    return false;
 }
 
 // Strip every candidate other than the hidden pair's two values from the cell at

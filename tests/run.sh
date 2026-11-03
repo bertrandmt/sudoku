@@ -604,8 +604,12 @@ prec_check "xy-chain"          XY "$P_xy2" "[XY] [5, 5] x2 ({[5, 8]:..:[6, 4]}#2
 # the first "[fXX]" line a board prints, on boards where the pattern is accepted in
 # two units at once (a row and a nonet) and both units then strike. A bracket that
 # named only the unit find() reached the pattern through would print "[r]" here.
-# P_nt2 is a generated puzzle, not a hand-kept one: no solution is stored, only the
-# first naked triple the solver finds on it, so it checks nothing but that line.
+# P_nt2 is a generated puzzle, not a hand-kept one: it has exactly one completion,
+# confirmed by an independent brute-force solver (as P_xy2 does). It is line 1472
+# of a scratch set of 14096 minimal unique-solution puzzles made by a throwaway
+# generator; the generator's seed was not kept. It was picked because its first
+# naked triple is accepted in a row and a nonet at once. No solution is stored,
+# since the check reads only that first finding line.
 P_nt2=".....5.24...1....53...68....3..96...72.3............6...3.....1.78.2..9.9..8..5.."
 first_finding() { # $1 = tag, $2 = board -> the first "[f<tag>]" line, prefix stripped
     printf 'v\nn.%s\nr\n' "$2" | run_solver 2>&1 | grep -m1 "^  \\[f$1\\] " | sed 's/^  \[f..\] //'

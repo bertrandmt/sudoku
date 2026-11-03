@@ -59,9 +59,7 @@ bool would_act(const Set &set, const Cell &c1, const Cell &c2, const Cell &c3, c
 // `cell` across its units, so a triple accepted in two units is one finding that
 // names both, and the caller records it once all three units have been through.
 template<class Set>
-bool find_naked_triple(const Cell &cell, const Set &set, std::vector<NakedTripleFinding> &found) {
-    bool did_find = false;
-
+void find_naked_triple(const Cell &cell, const Set &set, std::vector<NakedTripleFinding> &found) {
     for (auto const &second : set) {
         // prune: two cells already spanning more than three values cannot be part
         // of any triple, whatever the third cell is
@@ -82,11 +80,8 @@ bool find_naked_triple(const Cell &cell, const Set &set, std::vector<NakedTriple
             if (already) continue;
 
             found.push_back(nt);
-            did_find = true;
         }
     }
-
-    return did_find;
 }
 
 // Apply one recorded triple to one `set`, eliminating its three values from the
