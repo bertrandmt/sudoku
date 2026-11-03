@@ -149,20 +149,23 @@ S_fx="95124638776438195228397514651769382462941873543852761937516249889273456114
 P_fs="...5.2...6......9....9.8....42..........9..1..81......1..6..9.5....3.7.8......2.1"
 S_fs="893542176625713894417968523942351687576894312381276459138627945254139768769485231"
 
-# A puzzle that the pre-Naked-Triples solver could NOT crack, and that a naked
-# triple alone cracks. Singles, a naked pair and locked candidates carry it six
-# steps, then every technique in the cascade goes dry with 44 cells left. One naked
-# triple on {2,5,6} -- R1C5 {2,5}, R3C5 {2,5,6}, R3C6 {2,5,6}, all in the top-middle
-# nonet -- strikes 2 from R1C4 and 6 from R2C4 and R2C6, and singles carry the rest
-# of the way. So this fixture is load-bearing rather than merely reachable: unregister
-# NakedTripleTechnique and tier [1] fails here with "did not reach SOLVED!". It was
-# found by driving solver-plus-technique to a fixpoint over generated puzzles, not by
-# looking for the pattern: the pattern is common, and what had to hold was that the
-# solver is stuck without it and finishes with it.
+# A puzzle that the cascade cannot finish without Naked Triples, and that a naked
+# triple alone cracks. Singles and locked candidates carry it six steps, then every
+# technique ahead of Naked Triples goes dry with 47 cells left. One naked triple on
+# {3,8,9} in row 7 -- R7C5 {3,8,9}, R7C7 {3,8,9}, R7C9 {3,9} -- strikes eight
+# candidates from R7C1, R7C2, R7C3, R7C4 and R7C6, and singles carry the rest of the
+# way. With NakedTripleTechnique unregistered (Hidden Triples still in the cascade)
+# the solver runs three XY-Chain steps, which place nothing, and stalls with 47 cells
+# left, so tier [1] fails here with "did not reach SOLVED!". It was found by driving
+# solver-plus-technique to a fixpoint over generated puzzles, not by looking for the
+# pattern: the pattern is common, and what had to hold was that the solver is stuck
+# without it and finishes with it, WITH Hidden Triples present. An earlier board here
+# (found when Naked Triples was added) stopped being load-bearing once Hidden Triples
+# landed, because Hidden Triples does the same job on it; this one replaces it.
 # S_nt was computed by an independent brute-force solver, which also confirmed the
 # puzzle has exactly one completion.
-P_nt=".1...36..3.2.4..5..9....7..2...8...1...5.....4..39....5............1..47.7...8.12"
-S_nt="715823694362749158894156723257684931139572486486391275541237869628915347973468512"
+P_nt=".9..1...4..547..8...6....5....9264...32..8...8...5...........6.......712.1......5"
+S_nt="798615324125473689346892157571926438932148576864357291457281963689534712213769845"
 
 # The board from the fixture comment on issue #70. It began as a STALL-PINNING
 # fixture, and Hidden Triples reclassified it, as its tier [1] check had said a later
@@ -174,9 +177,10 @@ S_nt="71582369436274915889415672325768493113957248648639127554123786962891534797
 # Triples the naked triples made Finned X-Wing available instead, and the solver
 # stalled again after it; that interaction is gone, because Hidden Triples sits ahead
 # of Finned X-Wing and finishes the board first. What it pins now: tier [7] pins the
-# naked triples' exact eliminations, and the board needs both techniques, so
-# unregistering either NakedTripleTechnique or HiddenTripleTechnique fails tier [1]
-# here with "did not reach SOLVED!".
+# naked triples' exact eliminations, and unregistering HiddenTripleTechnique fails
+# tier [1] here with "did not reach SOLVED!". It does not need Naked Triples to
+# solve: with that unregistered, a hidden triple strikes a different triple first and
+# finishes the board, so P_nt above is the board load-bearing for Naked Triples.
 #
 # S_nts was computed by an independent brute-force solver, which also confirmed the
 # puzzle has exactly one completion.
@@ -185,17 +189,20 @@ S_nts="9345287162781634951564792834819573625632819747293468513478156298126945376
 
 # A puzzle that the pre-Hidden-Triples solver could NOT crack, and that a hidden
 # triple alone cracks. Singles, locked candidates and a hidden pair carry it seven
-# steps, then every technique in the cascade goes dry with 37 cells left. One hidden
-# triple on {2,6,9} in column 3 -- R1C3 {2,5,9}, R4C3 {2,5,6}, R7C3 {6,9}, and no other
-# cell of the column carries 2, 6 or 9 -- strikes 5 from R1C3 and R4C3, Simple Coloring
-# on 5 becomes available where it was dry, and the rest follows. The three cells
-# disagree: each value sits in only two of them. So this fixture is load-bearing
-# rather than merely reachable: unregister HiddenTripleTechnique and tier [1] fails
-# here with "did not reach SOLVED!". It was found by driving solver-plus-technique to
-# a fixpoint over generated puzzles, not by looking for the pattern: the pattern is
-# rare, and what had to hold was that the solver is stuck without it and finishes
-# with it. It is the one with a single firing, the fewest steps and the fewest givens
-# of the 106 such puzzles in 59323 generated.
+# steps (37 cells left). Without Hidden Triples the cascade then runs Simple Coloring,
+# Finned X-Wing, Locked Candidates, Naked Pairs, XY-Chain, a hidden single and Naked
+# Pairs, and stalls with 36 cells left. One hidden triple on {2,6,9} in column 3 --
+# R1C3 {2,5,9}, R4C3 {2,5,6}, R7C3 {6,9}, and no other cell of the column carries 2,
+# 6 or 9 -- strikes 5 from R1C3 and R4C3 and finishes the board wherever it sits in
+# the cascade (it also solves with Hidden Triples last); in its slot it fires at
+# step 8, ahead of Simple Coloring. The three cells disagree: each value sits in only
+# two of them. So this fixture is load-bearing rather than merely reachable:
+# unregister HiddenTripleTechnique and tier [1] fails here with "did not reach
+# SOLVED!". It was found by driving solver-plus-technique to a fixpoint over generated
+# puzzles, not by looking for the pattern: the pattern is rare, and what had to hold
+# was that the solver is stuck without it and finishes with it. It is the one with a
+# single firing, the fewest steps and the fewest givens of the 106 such puzzles in
+# 59323 generated.
 # S_ht was computed by an independent brute-force solver, which also confirmed the
 # puzzle has exactly one completion.
 P_ht=".1...4.6....2..8...6..7..........41..93.1.5..14..62.8.......14....79....8.......9"
@@ -627,9 +634,9 @@ prec_check "xy-chain"          XY "$P_xy2" "[XY] [5, 5] x2 ({[5, 8]:..:[6, 4]}#2
 P_nt2=".....5.24...1....53...68....3..96...72.3............6...3.....1.78.2..9.9..8..5.."
 # P_ht2 is the same kind of board for Hidden Triples: generated, one completion
 # confirmed by an independent brute-force solver, picked because its first hidden
-# triple is hidden in a row and a nonet at once. It is line 1363 of a scratch file of
-# minimal puzzles from a throwaway generator run with seed 7001; the generator is not
-# in the repo.
+# triple is hidden in a row and a nonet at once. Its provenance is not recoverable
+# from the repo (a throwaway generator, not kept), so the check below pins what the
+# board does, not where it came from.
 P_ht2=".....5.1...63....8379.......4.........57.3..2...25.8....4.....5...86....8.....1.3"
 first_finding() { # $1 = tag, $2 = board -> the first "[f<tag>]" line, prefix stripped
     printf 'v\nn.%s\nr\n' "$2" | run_solver 2>&1 | grep -m1 "^  \\[f$1\\] " | sed 's/^  \[f..\] //'

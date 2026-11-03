@@ -94,8 +94,8 @@ struct AnalyzerTest {
     // No hooks: every one of them is a standalone Technique. Naked pair, naked
     // triple, hidden pair and hidden triple are given-tuple shaped, so their
     // test_naked_pair / test_naked_triple / test_hidden_pair / test_hidden_triple
-    // are public statics the whitebox cases call directly. The fish -- plain X-Wing and Swordfish, and their finned
-    // variants -- are all scan-fused (no test_ predicate -- see
+    // are public statics the whitebox cases call directly. The fish -- plain
+    // X-Wing and Swordfish, and their finned variants -- are all scan-fused (no test_ predicate -- see
     // docs/test-predicate-idiom.md); the cases drive each one's per-anchor entry
     // (XWingTechnique::find_xwing, SwordfishTechnique::find_swordfish,
     // FinnedXWingTechnique::find_finned_xwing,
@@ -1003,9 +1003,16 @@ void test_hidden_triple_accept_and_reject() {
     // --- coverage gate ---
     // 1, 2 and 3 each sit in two cells, but both are the first two: the third cell
     // carries none of them. Places and hidden both hold, so only coverage rejects.
+    // The same board with each of the other two cells left out isolates their gates.
     Board uncovered = empty_board();
     for (Value v : {kOne, kTwo, kThree}) confine_value(uncovered, v, { {0, 0}, {0, 1} });
     check(!judge123(uncovered), "rejected: the third cell carries none of the three values");
+    Board uncovered_first = empty_board();
+    for (Value v : {kOne, kTwo, kThree}) confine_value(uncovered_first, v, { {0, 1}, {0, 2} });
+    check(!judge123(uncovered_first), "rejected: the first cell carries none of the three values");
+    Board uncovered_second = empty_board();
+    for (Value v : {kOne, kTwo, kThree}) confine_value(uncovered_second, v, { {0, 0}, {0, 2} });
+    check(!judge123(uncovered_second), "rejected: the second cell carries none of the three values");
 
     // --- hidden gate ---
     Board stray = empty_board();
