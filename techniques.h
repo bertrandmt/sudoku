@@ -92,6 +92,7 @@
 #include "analyzer-lockedcandidates.h"
 #include "analyzer-hiddenpairs.h"
 #include "analyzer-nakedtriples.h"
+#include "analyzer-hiddentriples.h"
 #include "analyzer-xwing.h"
 #include "analyzer-colorchain.h"
 #include "analyzer-ywing.h"
